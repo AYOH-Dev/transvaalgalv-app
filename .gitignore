@@ -1,0 +1,11 @@
+.env
+.env.local
+.DS_Store
+Thumbs.db
+
+backend/bin/
+backend/.cache/
+backend/coverage.out
+
+frontend/node_modules/
+frontend/dist/

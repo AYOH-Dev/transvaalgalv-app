@@ -1,0 +1,10 @@
+name: Transvaal Galv App
+slug: transvaalgalv-app
+package: transvaalgalv
+app_id: transvaalgalv-app
+route_prefix: /transvaal
+database: transvaalgalv_app_db
+public_host: transvaal.ayai.live
+visibility: public-authenticated
+uses_docuware: yes
+owns_frontend: no

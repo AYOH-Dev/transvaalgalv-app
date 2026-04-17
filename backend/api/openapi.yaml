@@ -1,0 +1,20 @@
+openapi: 3.1.0
+info:
+  title: Transvaal Galv App API
+  version: 0.1.0
+  description: Initial backend baseline for the Transvaal Galv App with receiving as phase 1.
+servers:
+  - url: https://transvaal.ayai.live
+paths:
+  /health:
+    get:
+      summary: Health check
+      responses:
+        '200':
+          description: Service is healthy.
+  /ready:
+    get:
+      summary: Readiness check
+      responses:
+        '200':
+          description: Service is ready at a baseline level.
