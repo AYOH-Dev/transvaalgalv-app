@@ -4,6 +4,7 @@ package: transvaalgalv
 app_id: transvaalgalv-app
 route_prefix: /transvaal
 database: transvaalgalv_app_db
+database_dev: transvaalgalv_app_db_dev
 public_host: transvaal.ayai.live
 visibility: public-authenticated
 uses_docuware: yes

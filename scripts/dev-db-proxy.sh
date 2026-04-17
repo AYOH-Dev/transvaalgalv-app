@@ -18,5 +18,9 @@ if [[ -n "$env_file" && -f "$env_file" ]]; then
 	set +a
 fi
 
+binary_path="$repo_root/backend/bin/devdbproxy"
+
 cd "$repo_root/backend"
-go run ./cmd/api
+go build -o "$binary_path" ./cmd/devdbproxy
+
+exec "$binary_path"

@@ -18,3 +18,38 @@ paths:
       responses:
         '200':
           description: Service is ready at a baseline level.
+  /auth/bootstrap-admin:
+    post:
+      summary: Bootstrap the first admin account
+      responses:
+        '201':
+          description: Admin account created.
+  /auth/login:
+    post:
+      summary: Authenticate a project user
+      responses:
+        '200':
+          description: Authentication succeeded.
+  /auth/me:
+    get:
+      summary: Return the authenticated user profile
+      responses:
+        '200':
+          description: Authenticated user profile.
+  /admin/users:
+    get:
+      summary: List project users
+      responses:
+        '200':
+          description: User list.
+    post:
+      summary: Create a project user
+      responses:
+        '201':
+          description: User created.
+  /admin/users/{id}:
+    patch:
+      summary: Update a project user
+      responses:
+        '200':
+          description: User updated.
