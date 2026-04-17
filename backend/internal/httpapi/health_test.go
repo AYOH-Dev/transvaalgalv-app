@@ -36,7 +36,7 @@ func TestHealthHandler(t *testing.T) {
 
 func TestServerSecurityHeaders(t *testing.T) {
 	cfg := config.Config{AppName: "transvaalgalv-app", Environment: "test", Port: "8080"}
-	server := NewServer(cfg, nil, nil)
+	server := NewServer(cfg, nil, nil, nil)
 	req := httptest.NewRequest(http.MethodGet, "/health", nil)
 	recorder := httptest.NewRecorder()
 

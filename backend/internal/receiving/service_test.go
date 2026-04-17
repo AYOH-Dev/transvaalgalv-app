@@ -17,3 +17,130 @@ func TestListReceiptsWithNilRepository(t *testing.T) {
 		t.Fatalf("len(receipts) = %d, want 0", len(receipts))
 	}
 }
+
+type stubRepository struct {
+	listResult    []Receipt
+	getResult     Receipt
+	importResult  []Receipt
+	importedInput []importedReceipt
+	listErr       error
+	getErr        error
+	importErr     error
+}
+
+func (s *stubRepository) ListReceipts(context.Context) ([]Receipt, error) {
+	return s.listResult, s.listErr
+}
+
+func (s *stubRepository) GetReceipt(context.Context, string) (Receipt, error) {
+	return s.getResult, s.getErr
+}
+
+func (s *stubRepository) ImportDocuWareReceipts(_ context.Context, receipts []importedReceipt) ([]Receipt, error) {
+	s.importedInput = receipts
+	return s.importResult, s.importErr
+}
+
+func TestImportDocuWareRowsGroupsRowsIntoOneReceipt(t *testing.T) {
+	repo := &stubRepository{
+		importResult: []Receipt{{ID: "receipt-1", ReceiptNumber: "imported"}},
+	}
+	service := NewService(repo)
+
+	result, err := service.ImportDocuWareRows(context.Background(), DocuWareImportInput{
+		SourceCabinetID:  "198",
+		SourceDocumentID: "doc-38-100",
+		Rows: []DocuWareImportRow{
+			{
+				RecordID: "line-1",
+				Payload: map[string]any{
+					"DELIVERY_NOTE":               "DN-123",
+					"ORDER_NUMBER":                "PO-1",
+					"WEIGHBRIDGE_TICKET_NUMBER":   "WB-88",
+					"FABRICATOR":                  "Fabricator A",
+					"DNDOCID":                     "group-100",
+					"LINE":                        "1",
+					"ITEM_CODE_ON_DELIVERY_NOTE":  "ITEM-1",
+					"ITEM_NAME_ON_DELIVERY_NOTE":  "Item One",
+					"QUANTITY":                    "10",
+					"QUANTITY_RECEIVED":           "4",
+					"UNIQUE_NUMBER":               "UNIQ-1",
+					"PRIMARY_KEY":                 "PK-1",
+					"COMMENTS":                    "Comment one",
+					"DWSTOREDATETIME":             "2026-04-17T13:00:00Z",
+				},
+			},
+			{
+				RecordID: "line-2",
+				Payload: map[string]any{
+					"DELIVERY_NOTE":               "DN-123",
+					"ORDER_NUMBER":                "PO-1",
+					"WEIGHBRIDGE_TICKET_NUMBER":   "WB-88",
+					"FABRICATOR":                  "Fabricator A",
+					"DNDOCID":                     "group-100",
+					"LINE":                        "2",
+					"ITEM_CODE_ON_DELIVERY_NOTE":  "ITEM-2",
+					"ITEM_NAME_ON_DELIVERY_NOTE":  "Item Two",
+					"QUANTITY":                    "6",
+					"QUANTITY_RECEIVED":           "0",
+					"UNIQUE_NUMBER":               "UNIQ-2",
+					"PRIMARY_KEY":                 "PK-2",
+					"COMMENTS":                    "Comment two",
+					"DWSTOREDATETIME":             "2026-04-17T13:00:00Z",
+				},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if result.ImportedReceiptCount != 1 {
+		t.Fatalf("imported receipt count = %d, want 1", result.ImportedReceiptCount)
+	}
+
+	if result.ImportedRowCount != 2 {
+		t.Fatalf("imported row count = %d, want 2", result.ImportedRowCount)
+	}
+
+	if len(repo.importedInput) != 1 {
+		t.Fatalf("len(importedInput) = %d, want 1", len(repo.importedInput))
+	}
+
+	imported := repo.importedInput[0]
+	if imported.DocuWareGroupReference != "group-100|DN-123|PO-1|WB-88|Fabricator A" {
+		t.Fatalf("group reference = %q", imported.DocuWareGroupReference)
+	}
+
+	if imported.SourceDocuWareDocument != "doc-38-100" {
+		t.Fatalf("source document id = %q, want doc-38-100", imported.SourceDocuWareDocument)
+	}
+
+	if len(imported.Lines) != 2 {
+		t.Fatalf("len(imported.Lines) = %d, want 2", len(imported.Lines))
+	}
+
+	if imported.Lines[0].ItemCode != "ITEM-1" {
+		t.Fatalf("first line item code = %q, want ITEM-1", imported.Lines[0].ItemCode)
+	}
+
+	if imported.Lines[1].DocuWareRecordLine != "line-2" {
+		t.Fatalf("second line record id = %q, want line-2", imported.Lines[1].DocuWareRecordLine)
+	}
+}
+
+func TestImportDocuWareRowsRejectsMissingRecordID(t *testing.T) {
+	service := NewService(&stubRepository{})
+
+	_, err := service.ImportDocuWareRows(context.Background(), DocuWareImportInput{
+		Rows: []DocuWareImportRow{{Payload: map[string]any{"DELIVERY_NOTE": "DN-1"}}},
+	})
+	if err == nil {
+		t.Fatalf("expected error, got nil")
+	}
+}
+
+func fatalf(format string, args ...any) {
+	panicf := false
+	_ = panicf
+}

@@ -11,7 +11,7 @@ The application tracks receipts, receipt lines, receipt exceptions, and supporti
 ## Core Decisions
 
 1. The application database is the operational system of record.
-2. DocuWare is used as the archive and document-reference layer.
+2. DocuWare is the POD capture, intelligent-indexing, and external records system; the application database owns live receiving workflow state.
 3. The first delivery phase is backend-first to stabilize the receiving workflow and integration contract.
 4. Dispatch should be added as the next domain instead of creating a second client repository.
 5. The public portal remains behind login.
@@ -22,6 +22,7 @@ The application tracks receipts, receipt lines, receipt exceptions, and supporti
 - `backend/cmd/api`: API entrypoint
 - `backend/internal/config`: environment configuration and validation
 - `backend/internal/httpapi`: HTTP server and operational endpoints
+- `backend/internal/integrations/docuware`: future DocuWare import and sync logic
 - `backend/internal/receiving`: receiving domain models and service layer
 - `backend/internal/dispatch`: future dispatch domain models and service layer
 - `migrations/`: database schema evolution
@@ -40,7 +41,7 @@ The application tracks receipts, receipt lines, receipt exceptions, and supporti
 
 1. Establish the standalone repo baseline.
 2. Implement authentication and project users.
-3. Implement receipt capture and retrieval.
-4. Implement document upload plus DocuWare sync.
+3. Implement DocuWare import plus receipt capture and retrieval.
+4. Implement defect tracking, document staging, and DocuWare sync-back.
 5. Implement the dispatch domain.
 6. Add the frontend after the backend API is stable.

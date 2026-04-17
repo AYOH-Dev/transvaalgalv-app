@@ -4,7 +4,7 @@ Transvaal Galv App is the standalone operations application for Transvaal Galvan
 
 Phase 1 focuses on receiving. Later phases can extend the same application into dispatch and other operational workflows without creating a second client repo.
 
-This repository is the operational system of record for application workflows. DocuWare is treated as the document archive and reference layer, not the primary application datastore.
+This repository is the operational system of record for application workflows. DocuWare captures and indexes incoming PODs, while the application database stores live receiving state and synchronizes selected outcomes back to DocuWare.
 
 ## Current Scope
 
@@ -13,7 +13,9 @@ This repository is the operational system of record for application workflows. D
 - Public portal behind login
 - Project-specific users and roles
 - Receipt capture, line capture, document attachment, and exception handling
-- DocuWare archive integration through staged upload and retry
+- DocuWare import and sync integration around the receiving workflow
+
+See `docs/receiving-workflow.md` for the target receiving flow and system ownership model.
 
 ## Repository Rules
 

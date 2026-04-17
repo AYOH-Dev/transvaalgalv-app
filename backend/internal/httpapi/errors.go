@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/AYOH-Dev/transvaalgalv-app/backend/internal/receiving"
 	"github.com/AYOH-Dev/transvaalgalv-app/backend/internal/users"
 )
 
@@ -38,6 +39,26 @@ func mapUserError(w http.ResponseWriter, err error) {
 		return
 	default:
 		if errors.Is(err, users.ErrInvalidInput) {
+			writeError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+
+		writeError(w, http.StatusInternalServerError, "internal server error")
+	}
+}
+
+func mapReceivingError(w http.ResponseWriter, err error) {
+	switch err {
+	case receiving.ErrNotFound:
+		writeError(w, http.StatusNotFound, "receipt not found")
+	case receiving.ErrConflict:
+		writeError(w, http.StatusConflict, "receipt import conflict")
+	case receiving.ErrUnavailable:
+		writeError(w, http.StatusInternalServerError, "receiving service unavailable")
+	case nil:
+		return
+	default:
+		if errors.Is(err, receiving.ErrInvalidInput) {
 			writeError(w, http.StatusBadRequest, err.Error())
 			return
 		}

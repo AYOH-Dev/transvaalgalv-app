@@ -7,19 +7,22 @@ import (
 
 	"github.com/AYOH-Dev/transvaalgalv-app/backend/internal/auth"
 	"github.com/AYOH-Dev/transvaalgalv-app/backend/internal/config"
+	"github.com/AYOH-Dev/transvaalgalv-app/backend/internal/receiving"
 	"github.com/AYOH-Dev/transvaalgalv-app/backend/internal/users"
 )
 
 type App struct {
 	cfg          config.Config
 	users        *users.Service
+	receiving    *receiving.Service
 	tokenManager *auth.TokenManager
 }
 
-func NewServer(cfg config.Config, userService *users.Service, tokenManager *auth.TokenManager) *http.Server {
+func NewServer(cfg config.Config, userService *users.Service, receivingService *receiving.Service, tokenManager *auth.TokenManager) *http.Server {
 	app := &App{
 		cfg:          cfg,
 		users:        userService,
+		receiving:    receivingService,
 		tokenManager: tokenManager,
 	}
 
@@ -29,9 +32,12 @@ func NewServer(cfg config.Config, userService *users.Service, tokenManager *auth
 	mux.HandleFunc("POST /auth/bootstrap-admin", app.handleBootstrapAdmin)
 	mux.HandleFunc("POST /auth/login", app.handleLogin)
 	mux.Handle("GET /auth/me", app.requireAuth(http.HandlerFunc(app.handleCurrentUser)))
+	mux.Handle("GET /receipts", app.requireAuth(http.HandlerFunc(app.handleListReceipts)))
+	mux.Handle("GET /receipts/{id}", app.requireAuth(http.HandlerFunc(app.handleGetReceipt)))
 	mux.Handle("GET /admin/users", app.requireAdmin(http.HandlerFunc(app.handleListUsers)))
 	mux.Handle("POST /admin/users", app.requireAdmin(http.HandlerFunc(app.handleCreateUser)))
 	mux.Handle("PATCH /admin/users/{id}", app.requireAdmin(http.HandlerFunc(app.handleUpdateUser)))
+	mux.Handle("POST /integrations/docuware/imports", app.requireAdmin(http.HandlerFunc(app.handleImportDocuWareRows)))
 
 	return &http.Server{
 		Addr:         ":" + cfg.Port,

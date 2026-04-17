@@ -11,6 +11,7 @@ import (
 	"github.com/AYOH-Dev/transvaalgalv-app/backend/internal/config"
 	"github.com/AYOH-Dev/transvaalgalv-app/backend/internal/httpapi"
 	"github.com/AYOH-Dev/transvaalgalv-app/backend/internal/postgres"
+	"github.com/AYOH-Dev/transvaalgalv-app/backend/internal/receiving"
 	"github.com/AYOH-Dev/transvaalgalv-app/backend/internal/users"
 )
 
@@ -32,8 +33,10 @@ func main() {
 	tokenManager := auth.NewTokenManager(cfg.JWTSecret, cfg.AccessTokenTTL)
 	userRepository := users.NewRepository(dbPool)
 	userService := users.NewService(userRepository, tokenManager, cfg.BootstrapAdminToken)
+	receivingRepository := receiving.NewRepository(dbPool)
+	receivingService := receiving.NewService(receivingRepository)
 
-	server := httpapi.NewServer(cfg, userService, tokenManager)
+	server := httpapi.NewServer(cfg, userService, receivingService, tokenManager)
 	log.Printf("starting %s on :%s", cfg.AppName, cfg.Port)
 
 	if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
