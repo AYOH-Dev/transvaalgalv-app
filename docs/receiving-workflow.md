@@ -109,6 +109,8 @@ That operational state is cleaner and safer in the application database than in 
 - `GET /receipts`
 - `GET /receipts/{id}`
 
+`POST /integrations/docuware/imports` now requires dedicated DocuWare Basic auth via `DOCUWARE_PUSH_USERNAME` and `DOCUWARE_PUSH_PASSWORD`, which fits DocuWare web service connections better than interactive user login.
+
 ### Endpoints To Add For The Receiving Flow
 
 - `POST /receipts`: create a manual receipt when no DocuWare import exists
@@ -149,3 +151,5 @@ DocuWare stays in the process. Planet Press is what becomes optional.
 The first implemented import path accepts already-materialized `Receiving Data` rows through `POST /integrations/docuware/imports` and normalizes them into application receipts and receipt lines.
 
 That keeps the existing DocuWare `Documents` to `Receiving Data` transformation untouched while giving the application a stable ingestion boundary.
+
+For DocuWare push configuration, the current route is Basic-auth only with a dedicated machine username and password.

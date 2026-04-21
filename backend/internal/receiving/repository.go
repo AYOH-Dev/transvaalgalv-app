@@ -159,13 +159,15 @@ func (r *PostgresRepository) ImportDocuWareReceipts(ctx context.Context, imports
 func (r *PostgresRepository) upsertImportedReceipt(ctx context.Context, tx pgx.Tx, imported importedReceipt) (string, error) {
 	var existingID string
 	var existingStatus string
-	err := tx.QueryRow(ctx, `
+	lookupErr := tx.QueryRow(ctx, `
 		SELECT id::text, status::text
 		FROM receipts
 		WHERE docuware_group_reference = $1
 	`, imported.DocuWareGroupReference).Scan(&existingID, &existingStatus)
-	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
-		return "", fmt.Errorf("lookup imported receipt: %w", err)
+
+	insertNew, err := resolveImportedReceiptLookup(lookupErr, existingStatus)
+	if err != nil {
+		return "", err
 	}
 
 	payloadJSON, err := json.Marshal(imported.SourcePayload)
@@ -173,7 +175,7 @@ func (r *PostgresRepository) upsertImportedReceipt(ctx context.Context, tx pgx.T
 		return "", fmt.Errorf("marshal receipt payload: %w", err)
 	}
 
-	if errors.Is(err, pgx.ErrNoRows) {
+	if insertNew {
 		row := tx.QueryRow(ctx, `
 			INSERT INTO receipts (
 				receipt_number,
@@ -260,6 +262,21 @@ func (r *PostgresRepository) upsertImportedReceipt(ctx context.Context, tx pgx.T
 	}
 
 	return id, nil
+}
+
+func resolveImportedReceiptLookup(lookupErr error, existingStatus string) (bool, error) {
+	if lookupErr == nil {
+		if existingStatus != string(ReceiptStatusDraft) {
+			return false, ErrConflict
+		}
+		return false, nil
+	}
+
+	if errors.Is(lookupErr, pgx.ErrNoRows) {
+		return true, nil
+	}
+
+	return false, fmt.Errorf("lookup imported receipt: %w", lookupErr)
 }
 
 func (r *PostgresRepository) upsertImportedReceiptLine(ctx context.Context, tx pgx.Tx, receiptID string, line importedReceiptLine) error {

@@ -37,7 +37,7 @@ func NewServer(cfg config.Config, userService *users.Service, receivingService *
 	mux.Handle("GET /admin/users", app.requireAdmin(http.HandlerFunc(app.handleListUsers)))
 	mux.Handle("POST /admin/users", app.requireAdmin(http.HandlerFunc(app.handleCreateUser)))
 	mux.Handle("PATCH /admin/users/{id}", app.requireAdmin(http.HandlerFunc(app.handleUpdateUser)))
-	mux.Handle("POST /integrations/docuware/imports", app.requireAdmin(http.HandlerFunc(app.handleImportDocuWareRows)))
+	mux.Handle("POST /integrations/docuware/imports", app.requireDocuWareImportAuth(http.HandlerFunc(app.handleImportDocuWareRows)))
 
 	return &http.Server{
 		Addr:         ":" + cfg.Port,

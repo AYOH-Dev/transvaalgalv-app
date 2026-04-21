@@ -143,6 +143,16 @@ func (s *Service) ImportDocuWareRows(ctx context.Context, input DocuWareImportIn
 }
 
 func buildImportedReceipt(input DocuWareImportInput, groupReference string, payload map[string]any) *importedReceipt {
+	sourceDocumentID := firstNonEmpty(
+		strings.TrimSpace(input.SourceDocumentID),
+		payloadString(payload, "DNDOCID"),
+		payloadString(payload, "DNDOCIDI"),
+		payloadString(payload, "DWDOCID"),
+	)
+	sourceCabinetID := firstNonEmpty(
+		strings.TrimSpace(input.SourceCabinetID),
+		payloadString(payload, "DWSYS_FC_GUID"),
+	)
 	groupRecordID := firstNonEmpty(payloadString(payload, "DNDOCID"), payloadString(payload, "DNDOCIDI"))
 	receivedAt := firstNonZeroTime(
 		payloadTime(payload, "DWSTOREDATETIME"),
@@ -157,8 +167,8 @@ func buildImportedReceipt(input DocuWareImportInput, groupReference string, payl
 		SupplierReference:      firstNonEmpty(payloadString(payload, "DNDOCID"), payloadString(payload, "DNDOCIDI"), payloadString(payload, "JOB_NUMBER")),
 		PurchaseOrderNumber:    firstNonEmpty(payloadString(payload, "ORDER_NUMBER"), payloadString(payload, "DOCUMENTNO")),
 		DeliveryNoteNumber:     firstNonEmpty(payloadString(payload, "DELIVERY_NOTE"), payloadString(payload, "DELIVERY_NOTE_NUMBER")),
-		SourceDocuWareDocument: strings.TrimSpace(input.SourceDocumentID),
-		SourceDocuWareCabinet:  strings.TrimSpace(input.SourceCabinetID),
+		SourceDocuWareDocument: sourceDocumentID,
+		SourceDocuWareCabinet:  sourceCabinetID,
 		DocuWareRecordID:       groupRecordID,
 		DocuWareGroupReference: groupReference,
 		ReceivedAt:             receivedAt,
@@ -166,8 +176,8 @@ func buildImportedReceipt(input DocuWareImportInput, groupReference string, payl
 		SyncStatus:             "imported",
 		Notes:                  "",
 		SourcePayload: map[string]any{
-			"source_cabinet_id":    strings.TrimSpace(input.SourceCabinetID),
-			"source_document_id":   strings.TrimSpace(input.SourceDocumentID),
+			"source_cabinet_id":    sourceCabinetID,
+			"source_document_id":   sourceDocumentID,
 			"docuware_group_ref":   groupReference,
 			"delivery_note_number": firstNonEmpty(payloadString(payload, "DELIVERY_NOTE"), payloadString(payload, "DELIVERY_NOTE_NUMBER")),
 			"order_number":         payloadString(payload, "ORDER_NUMBER"),

@@ -19,6 +19,8 @@ type Config struct {
 	BootstrapAdminToken   string
 	DocuWareBaseURL       string
 	DocuWareFileCabinetID string
+	DocuWarePushUsername  string
+	DocuWarePushPassword  string
 }
 
 func Load() (Config, error) {
@@ -38,6 +40,8 @@ func Load() (Config, error) {
 		BootstrapAdminToken:   os.Getenv("BOOTSTRAP_ADMIN_TOKEN"),
 		DocuWareBaseURL:       os.Getenv("DOCUWARE_BASE_URL"),
 		DocuWareFileCabinetID: os.Getenv("DOCUWARE_FILE_CABINET_ID"),
+		DocuWarePushUsername:  strings.TrimSpace(os.Getenv("DOCUWARE_PUSH_USERNAME")),
+		DocuWarePushPassword:  strings.TrimSpace(os.Getenv("DOCUWARE_PUSH_PASSWORD")),
 	}
 
 	if err := validateDatabaseURL(cfg.DatabaseURL); err != nil {
@@ -49,6 +53,10 @@ func Load() (Config, error) {
 	}
 
 	if err := validateSecret("BOOTSTRAP_ADMIN_TOKEN", cfg.BootstrapAdminToken, false); err != nil {
+		return Config{}, err
+	}
+
+	if err := validateCredentialPair("DOCUWARE_PUSH_USERNAME", cfg.DocuWarePushUsername, "DOCUWARE_PUSH_PASSWORD", cfg.DocuWarePushPassword); err != nil {
 		return Config{}, err
 	}
 
@@ -96,6 +104,25 @@ func validateSecret(name, secret string, required bool) error {
 
 	if len(secret) < 32 {
 		return fmt.Errorf("%s must be at least 32 characters", name)
+	}
+
+	return nil
+}
+
+func validateCredentialPair(usernameName, username, passwordName, password string) error {
+	username = strings.TrimSpace(username)
+	password = strings.TrimSpace(password)
+
+	if username == "" && password == "" {
+		return nil
+	}
+
+	if username == "" {
+		return fmt.Errorf("%s is required when %s is set", usernameName, passwordName)
+	}
+
+	if password == "" {
+		return fmt.Errorf("%s is required when %s is set", passwordName, usernameName)
 	}
 
 	return nil

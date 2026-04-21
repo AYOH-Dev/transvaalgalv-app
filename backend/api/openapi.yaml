@@ -5,6 +5,66 @@ info:
   description: Initial backend baseline for the Transvaal Galv App with receiving as phase 1.
 servers:
   - url: https://transvaal.ayai.live
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    docuwareBasicAuth:
+      type: http
+      scheme: basic
+  schemas:
+    DocuWareImportEnvelope:
+      type: object
+      required:
+        - rows
+      properties:
+        source_cabinet_id:
+          type: string
+          description: Optional override for the Receiving Data cabinet identifier.
+        source_document_id:
+          type: string
+          description: Optional override for the upstream DocuWare document identifier.
+        rows:
+          type: array
+          items:
+            $ref: '#/components/schemas/DocuWareImportRow'
+    DocuWareImportRow:
+      type: object
+      required:
+        - payload
+      properties:
+        record_id:
+          type: string
+          description: Optional explicit row identifier. If omitted the API uses payload.DWDOCID.
+        payload:
+          $ref: '#/components/schemas/DocuWareReceivingDataRow'
+    DocuWareReceivingDataRow:
+      type: object
+      description: Native single-row Receiving Data payload as emitted by DocuWare web service connections. The API infers record_id from DWDOCID, source_document_id from DNDOCID or DNDOCIDI, and source_cabinet_id from DWSYS_FC_GUID when the wrapped envelope is not used.
+      required:
+        - DWDOCID
+      additionalProperties: true
+      properties:
+        DWDOCID:
+          type: string
+        DNDOCID:
+          type: string
+        DNDOCIDI:
+          oneOf:
+            - type: string
+            - type: integer
+        DWSYS_FC_GUID:
+          type: string
+        DELIVERY_NOTE:
+          type: string
+        ORDER_NUMBER:
+          type: string
+        LINE:
+          oneOf:
+            - type: string
+            - type: integer
 paths:
   /health:
     get:
@@ -33,23 +93,93 @@ paths:
   /auth/me:
     get:
       summary: Return the authenticated user profile
+      security:
+        - bearerAuth: []
       responses:
         '200':
           description: Authenticated user profile.
   /admin/users:
     get:
       summary: List project users
+      security:
+        - bearerAuth: []
       responses:
         '200':
           description: User list.
     post:
       summary: Create a project user
+      security:
+        - bearerAuth: []
       responses:
         '201':
           description: User created.
   /admin/users/{id}:
     patch:
       summary: Update a project user
+      security:
+        - bearerAuth: []
       responses:
         '200':
           description: User updated.
+  /integrations/docuware/imports:
+    post:
+      summary: Import already-materialized Receiving Data rows from DocuWare
+      description: Accepts either the wrapped batch format used for testing and scripts, or the native flat single-row JSON payload that DocuWare web service connections emit from the Receiving Data cabinet.
+      security:
+        - docuwareBasicAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - $ref: '#/components/schemas/DocuWareImportEnvelope'
+                - $ref: '#/components/schemas/DocuWareReceivingDataRow'
+            examples:
+              nativeFlatPayload:
+                summary: Native DocuWare web service payload
+                value:
+                  DWDOCID: "49831"
+                  DNDOCID: "doc-38-100"
+                  DWSYS_FC_GUID: "51b2227c-4d38-4e2e-a583-f5a012b75496"
+                  DELIVERY_NOTE: "DN-123"
+                  ORDER_NUMBER: "PO-1"
+                  LINE: "1"
+                  ITEM_CODE_ON_DELIVERY_NOTE: "ITEM-1"
+                  ITEM_NAME_ON_DELIVERY_NOTE: "Item One"
+                  QUANTITY: "10"
+                  QUANTITY_RECEIVED: "4"
+              wrappedBatchPayload:
+                summary: Wrapped batch payload
+                value:
+                  source_cabinet_id: "198"
+                  source_document_id: "doc-38-100"
+                  rows:
+                    - record_id: "49831"
+                      payload:
+                        DELIVERY_NOTE: "DN-123"
+                        ORDER_NUMBER: "PO-1"
+                        DWDOCID: "49831"
+      responses:
+        '201':
+          description: Receipt rows imported.
+        '401':
+          description: Missing or invalid Basic auth credentials.
+  /receipts:
+    get:
+      summary: List imported receipts
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Receipt list.
+  /receipts/{id}:
+    get:
+      summary: Return a single imported receipt
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Receipt detail.
+        '404':
+          description: Receipt not found.

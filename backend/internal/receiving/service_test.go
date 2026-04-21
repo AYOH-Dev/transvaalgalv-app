@@ -54,39 +54,39 @@ func TestImportDocuWareRowsGroupsRowsIntoOneReceipt(t *testing.T) {
 			{
 				RecordID: "line-1",
 				Payload: map[string]any{
-					"DELIVERY_NOTE":               "DN-123",
-					"ORDER_NUMBER":                "PO-1",
-					"WEIGHBRIDGE_TICKET_NUMBER":   "WB-88",
-					"FABRICATOR":                  "Fabricator A",
-					"DNDOCID":                     "group-100",
-					"LINE":                        "1",
-					"ITEM_CODE_ON_DELIVERY_NOTE":  "ITEM-1",
-					"ITEM_NAME_ON_DELIVERY_NOTE":  "Item One",
-					"QUANTITY":                    "10",
-					"QUANTITY_RECEIVED":           "4",
-					"UNIQUE_NUMBER":               "UNIQ-1",
-					"PRIMARY_KEY":                 "PK-1",
-					"COMMENTS":                    "Comment one",
-					"DWSTOREDATETIME":             "2026-04-17T13:00:00Z",
+					"DELIVERY_NOTE":              "DN-123",
+					"ORDER_NUMBER":               "PO-1",
+					"WEIGHBRIDGE_TICKET_NUMBER":  "WB-88",
+					"FABRICATOR":                 "Fabricator A",
+					"DNDOCID":                    "group-100",
+					"LINE":                       "1",
+					"ITEM_CODE_ON_DELIVERY_NOTE": "ITEM-1",
+					"ITEM_NAME_ON_DELIVERY_NOTE": "Item One",
+					"QUANTITY":                   "10",
+					"QUANTITY_RECEIVED":          "4",
+					"UNIQUE_NUMBER":              "UNIQ-1",
+					"PRIMARY_KEY":                "PK-1",
+					"COMMENTS":                   "Comment one",
+					"DWSTOREDATETIME":            "2026-04-17T13:00:00Z",
 				},
 			},
 			{
 				RecordID: "line-2",
 				Payload: map[string]any{
-					"DELIVERY_NOTE":               "DN-123",
-					"ORDER_NUMBER":                "PO-1",
-					"WEIGHBRIDGE_TICKET_NUMBER":   "WB-88",
-					"FABRICATOR":                  "Fabricator A",
-					"DNDOCID":                     "group-100",
-					"LINE":                        "2",
-					"ITEM_CODE_ON_DELIVERY_NOTE":  "ITEM-2",
-					"ITEM_NAME_ON_DELIVERY_NOTE":  "Item Two",
-					"QUANTITY":                    "6",
-					"QUANTITY_RECEIVED":           "0",
-					"UNIQUE_NUMBER":               "UNIQ-2",
-					"PRIMARY_KEY":                 "PK-2",
-					"COMMENTS":                    "Comment two",
-					"DWSTOREDATETIME":             "2026-04-17T13:00:00Z",
+					"DELIVERY_NOTE":              "DN-123",
+					"ORDER_NUMBER":               "PO-1",
+					"WEIGHBRIDGE_TICKET_NUMBER":  "WB-88",
+					"FABRICATOR":                 "Fabricator A",
+					"DNDOCID":                    "group-100",
+					"LINE":                       "2",
+					"ITEM_CODE_ON_DELIVERY_NOTE": "ITEM-2",
+					"ITEM_NAME_ON_DELIVERY_NOTE": "Item Two",
+					"QUANTITY":                   "6",
+					"QUANTITY_RECEIVED":          "0",
+					"UNIQUE_NUMBER":              "UNIQ-2",
+					"PRIMARY_KEY":                "PK-2",
+					"COMMENTS":                   "Comment two",
+					"DWSTOREDATETIME":            "2026-04-17T13:00:00Z",
 				},
 			},
 		},
@@ -137,6 +137,44 @@ func TestImportDocuWareRowsRejectsMissingRecordID(t *testing.T) {
 	})
 	if err == nil {
 		t.Fatalf("expected error, got nil")
+	}
+}
+
+func TestImportDocuWareRowsDerivesSourceIdentifiersFromPayload(t *testing.T) {
+	repo := &stubRepository{
+		importResult: []Receipt{{ID: "receipt-1", ReceiptNumber: "imported"}},
+	}
+	service := NewService(repo)
+
+	_, err := service.ImportDocuWareRows(context.Background(), DocuWareImportInput{
+		Rows: []DocuWareImportRow{{
+			Payload: map[string]any{
+				"DWDOCID":       "line-1",
+				"DNDOCID":       "source-doc-100",
+				"DWSYS_FC_GUID": "cabinet-guid-198",
+				"DELIVERY_NOTE": "DN-123",
+			},
+		}},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(repo.importedInput) != 1 {
+		t.Fatalf("len(importedInput) = %d, want 1", len(repo.importedInput))
+	}
+
+	imported := repo.importedInput[0]
+	if imported.SourceDocuWareDocument != "source-doc-100" {
+		t.Fatalf("source document id = %q, want source-doc-100", imported.SourceDocuWareDocument)
+	}
+
+	if imported.SourceDocuWareCabinet != "cabinet-guid-198" {
+		t.Fatalf("source cabinet id = %q, want cabinet-guid-198", imported.SourceDocuWareCabinet)
+	}
+
+	if imported.Lines[0].DocuWareRecordLine != "line-1" {
+		t.Fatalf("line record id = %q, want line-1", imported.Lines[0].DocuWareRecordLine)
 	}
 }
 

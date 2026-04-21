@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"context"
+	"crypto/subtle"
 	"net/http"
 	"strings"
 
@@ -42,6 +43,39 @@ func (a *App) requireAdmin(next http.Handler) http.Handler {
 
 		next.ServeHTTP(w, r)
 	}))
+}
+
+func (a *App) requireDocuWareImportAuth(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !a.hasDocuWarePushBasicAuth() {
+			writeError(w, http.StatusServiceUnavailable, "docuware import basic auth is not configured")
+			return
+		}
+
+		username, password, ok := r.BasicAuth()
+		if !ok {
+			w.Header().Set("WWW-Authenticate", `Basic realm="docuware-import"`)
+			writeError(w, http.StatusUnauthorized, "missing basic auth credentials")
+			return
+		}
+
+		if !a.matchesDocuWarePushBasicAuth(username, password) {
+			w.Header().Set("WWW-Authenticate", `Basic realm="docuware-import"`)
+			writeError(w, http.StatusUnauthorized, "invalid basic auth credentials")
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
+}
+
+func (a *App) hasDocuWarePushBasicAuth() bool {
+	return strings.TrimSpace(a.cfg.DocuWarePushUsername) != "" && strings.TrimSpace(a.cfg.DocuWarePushPassword) != ""
+}
+
+func (a *App) matchesDocuWarePushBasicAuth(username, password string) bool {
+	return subtle.ConstantTimeCompare([]byte(strings.TrimSpace(username)), []byte(a.cfg.DocuWarePushUsername)) == 1 &&
+		subtle.ConstantTimeCompare([]byte(strings.TrimSpace(password)), []byte(a.cfg.DocuWarePushPassword)) == 1
 }
 
 func currentSubject(ctx context.Context) (auth.Subject, bool) {

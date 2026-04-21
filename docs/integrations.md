@@ -55,3 +55,9 @@ The initial environment variables for the archive layer are defined in `.env.exa
 - `DOCUWARE_FILE_CABINET_ID`
 - `DOCUWARE_USERNAME`
 - `DOCUWARE_PASSWORD`
+- `DOCUWARE_PUSH_USERNAME`
+- `DOCUWARE_PUSH_PASSWORD`
+
+The inbound push endpoint `POST /integrations/docuware/imports` requires dedicated Basic auth credentials from DocuWare using `DOCUWARE_PUSH_USERNAME` and `DOCUWARE_PUSH_PASSWORD`.
+
+See `docs/docuware-web-service-connection.md` for the actual DocuWare web service body shape, inferred field behavior, and a ready-to-use Receiving Data payload template.
