@@ -5,12 +5,11 @@ import Dashboard from './pages/Dashboard'
 import Admin from './pages/Admin'
 import Settings from './pages/Settings'
 import { getToken, clearToken } from './auth'
-
-type Page = 'dashboard' | 'receipts' | 'admin' | 'settings'
+import Layout from './components/Layout'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 
 export default function App() {
   const [token, setToken] = useState<string | null>(getToken())
-  const [page, setPage] = useState<Page>('dashboard')
 
   useEffect(() => {
     setToken(getToken())
@@ -26,24 +25,16 @@ export default function App() {
   }
 
   return (
-    <div>
-      <header className="topbar">
-        <nav>
-          <button onClick={() => setPage('dashboard')}>Dashboard</button>
-          <button onClick={() => setPage('receipts')}>Receipts</button>
-          <button onClick={() => setPage('admin')}>Admin</button>
-          <button onClick={() => setPage('settings')}>Settings</button>
-        </nav>
-        <div style={{ float: 'right' }}>
-          <button onClick={logout}>Logout</button>
-        </div>
-      </header>
-      <main>
-        {page === 'dashboard' && <Dashboard />}
-        {page === 'receipts' && <Receipts onLogout={() => setToken(null)} />}
-        {page === 'admin' && <Admin />}
-        {page === 'settings' && <Settings />}
-      </main>
-    </div>
+    <BrowserRouter>
+      <Layout onLogout={logout}>
+        <Routes>
+          <Route path="/" element={<Dashboard />} />
+          <Route path="/receipts" element={<Receipts onLogout={() => setToken(null)} />} />
+          <Route path="/admin" element={<Admin />} />
+          <Route path="/settings" element={<Settings />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </Layout>
+    </BrowserRouter>
   )
 }

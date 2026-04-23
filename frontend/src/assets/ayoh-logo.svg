@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- AYOH Group simple badge -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 28" role="img" aria-labelledby="ayohTitle">
+  <title id="ayohTitle">AYOH Group</title>
+  <rect width="120" height="28" rx="6" fill="none"/>
+  <g transform="translate(6,4)">
+    <circle cx="10" cy="10" r="8" fill="#0ea5a4"/>
+    <text x="10" y="14" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-weight="700" font-size="10" fill="#021124">A</text>
+    <text x="30" y="16" font-family="Inter, Arial, sans-serif" font-size="12" fill="#334155">AYOH Group</text>
+  </g>
+</svg>
