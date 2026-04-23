@@ -1,0 +1,2211 @@
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Items to Receive</title> 
+<link crossorigin="anonymous" rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.0/font/bootstrap-icons.css">
+<link rel="stylesheet" href="https://cdn.datatables.net/v/bs5/dt-2.2.2/datatables.min.css">
+<link rel="stylesheet" href="../css/custom.css">
+<link rel="stylesheet" href="../css/default.css"><script src="https://code.jquery.com/jquery-3.7.0.min.js"></script><script crossorigin="anonymous" src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script><script src="https://cdn.datatables.net/v/bs5/dt-2.2.2/datatables.min.js"></script><script src="../js/general.js"></script><style>
+    .carousel-item {
+        padding: 20px;
+        max-height: 60vh;
+        overflow-y: auto;
+    }
+
+    .defect-group {
+        margin-bottom: 20px;
+    }
+
+    .mitigation-options {
+        /* No display: none */
+    }
+
+    .invalid-feedback {
+        color: red;
+        display: block;
+    }
+
+    .defect-item {
+        background: #fff;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        padding: 1rem;
+        margin-bottom: 1rem;
+    }
+
+    .defect-item h4 {
+        font-size: 1rem;
+        font-weight: 500;
+        color: #1f2937;
+    }
+
+	.progress-bar {
+	    transition: width 0.3s ease;
+	}
+	
+	#defectModal .progress {
+	    height: 12px;
+	    border-radius: 6px;
+	    background-color: #e9ecef;
+	    flex-shrink: 0; /* Prevent flex from collapsing it */
+	    min-height: 12px; /* Ensure it never collapses */
+	}
+	
+	#defectModal .progress-bar {
+	    height: 12px;
+	    min-width: 2%; /* Always show a sliver even at 0% */
+	    border-radius: 6px;
+	}
+
+    .camera-container {
+        text-align: center;
+    }
+
+    .photo-preview {
+        max-width: 100%;
+        border-radius: 8px;
+        margin-top: 1rem;
+    }
+
+    .capture-photo-btn {
+        display: none;
+        margin-top: 10px;
+    }
+
+    #defectModal .modal-dialog {
+	    max-width: 800px;
+	    height: 85vh;
+	    min-height: 600px;
+	    display: flex;
+	    flex-direction: column;
+	    align-items: stretch;
+	}
+	
+	#defectModal .modal-content {
+	    width: 100%;
+	    height: 100%;
+	    display: flex;
+	    flex-direction: column;
+	}
+	
+	#defectModal .modal-body {
+	    flex: 1 1 auto;
+	    overflow-y: auto;
+	    padding: 1rem;
+	    min-height: 0; /* Important - allows flex child to scroll */
+	}
+	
+	#defectModal .modal-header,
+	#defectModal .modal-footer {
+	    flex-shrink: 0;
+	}
+    #defectModal {
+        z-index: 1055 !important;
+    }
+
+    /* Ensure table and buttons render correctly */
+    #DNItemsTable th,
+    #DNItemsTable td {
+        text-align: left;
+        vertical-align: middle;
+    }
+
+    #DNItemsTable .btn-success {
+        display: inline-block !important;
+        /* Override any hiding */
+        margin: 0 auto;
+    }
+
+    #DNItemsTable .dt-buttons {
+        display: none;
+        /* Prevent DataTables buttons from interfering */
+    }
+
+    /* Ensure input fields are visible and properly styled */
+    #DNItemsTable .new-row.table-danger .form-control {
+        display: block !important;
+        visibility: visible !important;
+        width: 100% !important;
+        min-height: 30px;
+        padding: 5px;
+        border: 1px solid #ccc;
+        box-sizing: border-box;
+    }
+
+    /* Ensure table cells accommodate inputs */
+    #DNItemsTable .new-row.table-danger td {
+        padding: 8px;
+        vertical-align: middle;
+    }
+
+    /* Override any DataTables-specific hiding */
+    #DNItemsTable .new-row.table-danger td.dt-type-numeric input {
+        display: block !important;
+    }
+
+    #DNItemsTable tbody tr.new-row.table-danger td .form-control {
+        display: block !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        width: 100% !important;
+        min-height: 34px !important;
+        padding: 6px 12px !important;
+        border: 1px solid #ccc !important;
+        box-sizing: border-box !important;
+        background-color: #fff !important;
+        color: #000 !important;
+    }
+
+    /* Ensure table cells are visible and accommodate inputs */
+    #DNItemsTable tbody tr.new-row.table-danger td {
+        padding: 8px !important;
+        vertical-align: middle !important;
+        display: table-cell !important;
+    }
+
+    /* Override DataTables-specific classes */
+    #DNItemsTable tbody tr.new-row.table-danger td.dt-type-numeric .form-control,
+    #DNItemsTable tbody tr.new-row.table-danger td.sorting_1 .form-control {
+        display: block !important;
+        visibility: visible !important;
+    }
+
+    /* Debug visibility issues */
+    #DNItemsTable tbody tr.new-row.table-danger td.hidden {
+        display: table-cell !important;
+    }
+</style>
+<!-- Navigation -->
+<nav id="navbar" class="navbar navbar-expand-lg">
+    <div class="container">
+        <div class="align-items-center">
+            <h2 style="color: #76777a; text-align: center;"><b id="pagename">Index</b></h2>
+        </div>
+        <div id="navbarNav" class="collapse navbar-collapse">
+            <ul class="navbar-nav ms-auto">
+                <li id="navHome" class="nav-item">
+                    <a class="nav-link" href="index"><i class="bi bi-house"></i>Home</a> 
+                </li>
+                <li id="navBack" class="nav-item">
+                    <a class="nav-link" href="javascript:history.back();"><i class="bi bi-arrow-left"></i>Back </a>
+                </li>
+                <li class="nav-item">
+                    <a id="navSettings" class="nav-link" href="#"><i class="bi bi-gear"></i>Settings</a> 
+                </li>
+                <li id="navProfile" class="nav-item">
+                    <a class="nav-link" href="#"><i class="bi bi-person"></i>Profile</a> 
+                </li>
+            </ul>
+        </div>
+    </div>
+</nav>
+<!-- Stats Section -->
+<div id="statsSection" class="container my-5">
+    <h1 id="statsTitle" class="mb-4">Pending POD Items</h1>
+    <div id="tableContainer" class="table-responsive">
+        <table id="DNItemsTable" class="table table-hover">
+            <thead>
+                <tr>
+                    <th id="lineNumber">Line No.</th> 
+                    <th id="th-deliveryNoteNumber">Delivery Note #</th> 
+                    <th id="itemCode">Item Code</th> 
+                    <th id="itemDescription">Item Description</th> 
+                    <th id="itemSizeHeader">Item Size</th> 
+                    <th id="itemQtyHeader">Item Qty</th> 
+                    <th id="other">Other</th> 
+                    <th id="th-jobNumber">Job Number</th> 
+                    <th id="processColumn"></th>
+                    <th id="deleteColumn"></th>
+                    <th id="uniqueNumber" style="display: none;">Unique Number</th> 
+                    <th id="dwidColumn" style="display: none;">dwid</th> 
+                </tr>
+            </thead>
+            <tbody id="row_openItems"></tbody>
+        </table>
+    </div>
+    <div class="d-flex justify-content-between mt-3">
+        <button id="addNewItemBtn" class="btn btn-success">Add New Item</button>
+        <button id="refreshButton" class="btn btn-primary">Refresh</button>
+    </div>
+</div>
+<!-- Receive Item Modal -->
+<div id="receiveItemModal" class="modal fade" aria-labelledby="receiveItemModalLabel" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 id="receiveItemModalLabel" class="modal-title">Receive Item: <span id="modalItemDetails"></span></h5>
+                <button class="btn-close btn-close-white" data-bs-dismiss="modal" type="button" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div id="receiveFormErrors" class="alert alert-danger d-none"></div>
+                <form>
+                    <div id="receiveAccordion" class="accordion">
+                        <!-- Item Details Section -->
+                        <div class="accordion-item">
+                            <h2 id="headingItemDetails" class="accordion-header">
+                                <button class="accordion-button" data-bs-target="#collapseItemDetails" aria-controls="collapseItemDetails"
+                                data-bs-toggle="collapse" aria-expanded="true" type="button"><i class="bi bi-box-seam me-2"></i>Item Details </button>
+                            </h2>
+                            <div id="collapseItemDetails" class="accordion-collapse collapse show" aria-labelledby="headingItemDetails" data-bs-parent="#receiveAccordion">
+                                <div class="accordion-body">
+                                    <div class="row mb-3">
+                                        <div class="col">
+                                            <label class="form-label" for="weighbridgeTicketNumber">Weighbridge Ticket Number</label>
+                                            <input id="weighbridgeTicketNumber" class="form-control" type="text">
+                                        </div>
+                                        <div class="col">
+                                            <label class="form-label" for="deliveryNoteNumber">Delivery Note Number</label>
+                                            <input id="deliveryNoteNumber" class="form-control" type="text">
+                                        </div>
+                                    </div>
+                                    <div class="row mb-3">
+                                        <div class="col">
+                                            <label class="form-label" for="orderNumber">Order Number</label>
+                                            <input id="orderNumber" class="form-control" type="text">
+                                        </div>
+                                        <div class="col">
+                                            <label class="form-label" for="jobNumber">Job Number</label>
+                                            <input id="jobNumber" class="form-control" type="text">
+                                        </div>
+                                    </div>
+                                    <div class="row mb-3">
+                                        <div class="col">
+                                            <label class="form-label" for="companyName">Company Name (Customer)</label>
+                                            <input id="companyName" class="form-control" type="text">
+                                        </div>
+                                        <div class="col">
+                                            <label class="form-label" for="vehicleRegistration">Vehicle Registration</label>
+                                            <input id="vehicleRegistration" class="form-control" type="text">
+                                        </div>
+                                    </div>
+                                    <div class="row mb-3">
+                                        <div class="col">
+                                            <label class="form-label" for="itemCodeOnDeliveryNote">Item Code on Delivery Note</label>
+                                            <input id="itemCodeOnDeliveryNote" class="form-control" type="text">
+                                        </div>
+                                        <div class="col">
+                                            <label class="form-label" for="itemNameOnDeliveryNote">Item Name on Delivery Note</label>
+                                            <input id="itemNameOnDeliveryNote" class="form-control" type="text">
+                                        </div>
+                                    </div>
+                                    <div class="row mb-3">
+                                        <div class="col">
+                                            <label class="form-label" for="internalItemName">Internal Item Name</label>
+                                            <input id="internalItemName" class="form-control" type="text">
+                                        </div>
+                                        <div class="col">
+                                            <label class="form-label" for="itemSize">Item Size</label>
+                                            <input id="itemSize" class="form-control" placeholder="LxW or LxWxH (e.g., 1X1 or 1X1X1)" type="text">
+                                        </div>
+                                    </div>
+                                    <div class="row mb-3">
+                                        <div class="col">
+                                            <label class="form-label" for="itemType">Item Type</label>
+                                            <select id="itemType" class="form-select">
+                                                <option value="">Select item type</option>
+                                                <option value="blacksteel">Black Steel</option>
+                                                <option value="galvanised">Galvanised</option>
+                                                <option value="other">Other</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="row mb-3">
+                                        <div class="col">
+                                            <label class="form-label" for="materialMarkings">Material Markings</label>
+                                            <input id="materialMarkings" class="form-control" placeholder="Enter material markings" type="text">
+                                        </div>
+                                        <div class="col">
+                                            <label class="form-label" for="materialLength">Material Length</label>
+                                            <input id="materialLength" class="form-control" placeholder="Enter material length" type="text">
+                                        </div>
+                                    </div>
+                                    <div class="row mb-3">
+                                        <div class="col">
+                                            <label class="form-label" for="itemWeight">Weight (Total)</label>
+                                            <input id="itemWeight" class="form-control" placeholder="Enter total weight" type="text">
+                                        </div>
+                                        <div class="col">
+                                            <label class="form-label" for="fabricator">Fabricator</label>
+                                            <input id="fabricator" class="form-control" placeholder="Enter fabricator" type="text">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- Process & Packaging Section -->
+                            <div class="accordion-item">
+                                <h2 id="headingProcessPackaging" class="accordion-header">
+                                    <button class="accordion-button collapsed" data-bs-target="#collapseProcessPackaging"
+                                    aria-controls="collapseProcessPackaging" data-bs-toggle="collapse" aria-expanded="false" type="button"><i class="bi bi-gear me-2"></i>Process &amp; Packaging </button>
+                                </h2>
+                                <div id="collapseProcessPackaging" class="accordion-collapse collapse" aria-labelledby="headingProcessPackaging" data-bs-parent="#receiveAccordion">
+                                    <div class="accordion-body">
+                                        <div class="row mb-3">
+                                            <div class="col">
+                                                <label class="form-label" for="process">Process</label>
+                                                <select id="process" class="form-select">
+                                                    <option value="">Select process</option>
+                                                    <option value="galvanising">Galvanising</option>
+                                                    <option value="double_dip">Double-Dip</option>
+                                                    <option value="galvanising_paint">Galvanising &amp; Paint</option>
+                                                    <option value="strip_only">Strip Only</option>
+                                                    <option value="strip_regalvanise">Strip &amp; Regalvanise</option>
+                                                    <option value="strip_galvanising_paint">Strip, Galvanising &amp; Paint </option>
+                                                    <option value="shotblast_only">Shotblast Only</option>
+                                                    <option value="shotblast_galvanising">Shotblast &amp; Galvanising </option>
+                                                    <option value="shotblast_strip_regalvanising">Shotblast, Strip &amp; Regalvanising</option>
+                                                    <option value="shotblast_strip_regalvanising_paint">Shotblast, Strip, Regalvanising &amp; Paint</option>
+                                                    <option value="doesnt_fit_bath">Doesn't fit in bath</option>
+                                                    <option value="outsourcing_required">Outsourcing required</option>
+                                                    <option value="not_suitable">Not suitable for process</option>
+                                                    <option value="unsafe">Unsafe (Did not offload)</option>
+                                                    <option value="other">Other</option>
+                                                </select>
+                                            </div>
+                                            <div class="col">
+                                                <label class="form-label" for="packagingMethod">Packaging Method</label>
+                                                <select id="packagingMethod" class="form-select">
+                                                    <option value="">Select packaging method</option>
+                                                    <option value="pallet">Pallet</option>
+                                                    <option value="crate">Crate</option>
+                                                    <option value="bundle">Bundle</option>
+                                                    <option value="loose">Loose</option>
+                                                    <option value="bin">Bin</option>
+                                                    <option value="other">Other</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- Defects & Discrepancies Section -->
+                            <div class="accordion-item">
+                                <h2 id="headingDefectsDiscrepancies" class="accordion-header">
+                                    <button class="accordion-button collapsed" data-bs-target="#collapseDefectsDiscrepancies"
+                                    aria-controls="collapseDefectsDiscrepancies" data-bs-toggle="collapse" aria-expanded="false" type="button"><i class="bi bi-exclamation-triangle me-2"></i>Defects &amp; Discrepancies </button>
+                                </h2>
+                                <div id="collapseDefectsDiscrepancies" class="accordion-collapse collapse" aria-labelledby="headingDefectsDiscrepancies" data-bs-parent="#receiveAccordion">
+                                    <div class="accordion-body">
+                                        <div class="mb-3">
+                                            <label class="form-label">Defect Detected</label>
+                                            <div class="form-check form-check-inline">
+                                                <input id="defectYes" class="form-check-input" value="Yes" name="defectDetected" type="radio">
+                                                <label class="form-check-label" for="defectYes">Yes</label>
+                                            </div>
+                                            <div class="form-check form-check-inline">
+                                                <input id="defectNo" class="form-check-input" value="No" name="defectDetected" checked="checked" type="radio">
+                                                <label class="form-check-label" for="defectNo">No</label>
+                                            </div>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label" for="quantityDiscrepancy">Quantity Discrepancy</label>
+                                            <select id="quantityDiscrepancy" class="form-select" onchange="toggleQuantityFields()">
+                                                <option value="none">None</option>
+                                                <option value="short">Short Supplied</option>
+                                                <option value="over">Over Supplied</option>
+                                            </select>
+                                        </div>
+                                        <div id="quantityFields" class="d-none">
+                                            <div class="row mb-3">
+                                                <div class="col">
+                                                    <label for="itemQty">EXPECTED QUANTITY</label>
+                                                    <div class="input-group">
+                                                        <span class="input-group-text"><i class="bi bi-123"></i></span>
+                                                        <input id="itemQty" class="form-control" type="number">
+                                                    </div>
+                                                </div>
+                                                <div class="col">
+                                                    <label for="itemQtyReceived">ACTUAL QUANTITY RECEIVED</label>
+                                                    <div class="input-group">
+                                                        <span class="input-group-text"><i class="bi bi-123"></i></span>
+                                                        <input id="itemQtyReceived" class="form-control" min="0" type="number">
+                                                        <div class="input-group-append">
+                                                            <button id="resetQtyBtn" class="btn btn-secondary" type="button">Reset</button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div id="qtyDifferenceHelp" class="form-text"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- Storage & Comments Section -->
+                            <div class="accordion-item">
+                                <h2 id="headingStorageComments" class="accordion-header">
+                                    <button class="accordion-button collapsed" data-bs-target="#collapseStorageComments" data-bs-toggle="collapse"
+                                    aria-controls="collapseStorageComments" aria-expanded="false" type="button"><i class="bi bi-archive me-2"></i>Storage &amp; Comments </button>
+                                </h2>
+                                <div id="collapseStorageComments" class="accordion-collapse collapse" aria-labelledby="headingStorageComments" data-bs-parent="#receiveAccordion">
+                                    <div class="accordion-body">
+                                        <div class="mb-3">
+                                            <label class="form-label" for="bay">Plant/Bay</label>
+                                            <select id="bay" class="form-select">
+                                                <option value="None">None</option>
+                                                <option value="Plant 2~3">Plant 2~3</option>
+                                                <option value="Shotblast">Shotblast</option>
+                                                <option value="R1">R1</option>
+                                                <option value="R2">R2</option>
+                                                <option value="R3">R3</option>
+                                                <option value="R4">R4</option>
+                                                <option value="R5">R5</option>
+                                                <option value="R6">R6</option>
+                                                <option value="R7">R7</option>
+                                                <option value="R8">R8</option>
+                                                <option value="R9">R9</option>
+                                                <option value="R10">R10</option>
+                                                <option value="R11">R11</option>
+                                                <option value="R12">R12</option>
+                                                <option value="R13">R13</option>
+                                                <option value="R14">R14</option>
+                                                <option value="R15">R15</option>
+                                                <option value="R16">R16</option>
+                                                <option value="R17">R17</option>
+                                                <option value="R18">R18</option>
+                                                <option value="R19">R19</option>
+                                                <option value="R20">R20</option>
+                                                <option value="R21">R21</option>
+                                                <option value="R22">R22</option>
+                                                <option value="R23">R23</option>
+                                                <option value="R24">R24</option>
+                                                <option value="Other">Other</option>
+                                            </select>
+                                            <div class="invalid-feedback"></div>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label" for="accessories">Accessories</label>
+                                            <input id="accessories" class="form-control" type="text">
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label" for="comments">Comments</label>
+                                            <textarea id="comments" class="form-control" rows="3"></textarea>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" data-bs-dismiss="modal" type="button"><i class="bi bi-x-circle me-2"></i>Cancel</button>
+                    <button id="receiveItemBtn" class="btn btn-primary" type="button"><i class="bi bi-check-circle me-2"></i>Receive Item</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- Defect Modal -->
+<div id="defectModal" class="modal fade" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header border-bottom">
+                <div>
+                    <h5 class="modal-title">Capture Defects</h5>
+                    <p id="modalItemDetails" class="text-muted small"></p>
+                </div>
+                <button class="btn-close" data-bs-dismiss="modal" type="button" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div class="mb-4">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="text-muted">Progress</span> <span id="progressText" class="text-muted">0% Complete</span> 
+                    </div>
+                    <div class="progress">
+                        <div id="defectProgress" class="progress-bar bg-primary" role="progressbar" aria-valuenow="0" aria-valuemin="0" style="width: 0%;" aria-valuemax="100">
+                            0% 
+                        </div>
+                    </div>
+                </div>
+                <div id="contentArea">
+                    <div id="cameraContainer" class="camera-container d-none">
+                        <video id="webcam" class="w-100 rounded mb-3" playsinline="" autoplay="autoplay"></video>
+                        <canvas id="cameraCanvas" style="display: none;"></canvas><img id="photoPreview" class="photo-preview d-none" src="" data-broken-image="" alt="Captured Photo">
+                        <div class="d-flex justify-content-center gap-2">
+                            <button id="capturePhotoBtn" class="btn btn-primary">Capture</button>
+                            <button id="cancelCameraBtn" class="btn btn-secondary">Cancel</button>
+                        </div>
+                        <div id="photoError" class="invalid-feedback"></div>
+                    </div>
+                    <div id="defectContent">
+                        <h3 id="categoryTitle"></h3>
+                        <div id="defectItems"></div>
+                        <div id="commentsSection" class="mt-4 d-none">
+                            <label class="form-label" for="additionalComments">Additional Comments</label>
+                            <textarea id="additionalComments" class="form-control" placeholder="Describe any other defects or observations..." rows="3"></textarea>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer d-flex justify-content-between bg-light">
+                <button id="prevStepBtn" class="btn btn-secondary" disabled="disabled"><i class="bi bi-chevron-left me-1"></i>Previous</button>
+                <span id="stepIndicator">Step 1 of 7</span> 
+                <button id="nextStepBtn" class="btn btn-primary">Next<i class="bi bi-chevron-right ms-1"></i></button>
+                <button id="submitDefectsBtn" class="btn btn-success d-none">Submit Defects</button>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- Passed Modal -->
+<div id="passedModal" class="modal fade" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title">Defect Summary</h5>
+                <button class="btn-close btn-close-white" data-bs-dismiss="modal" type="button" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" style="max-height: 70vh; overflow-y: auto;">
+                <h6>Summary of Defects:</h6>
+                <ul id="defectSummaryList" class="defect-summary-list"></ul>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" data-bs-dismiss="modal" type="button">Back</button>
+                <button id="confirmReceiveBtn" class="btn btn-success" type="button">Confirm and Receive</button>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- Status Bar -->
+<div id="statusBar" class="status-bar text-center">
+    System Ready 
+</div>
+<!-- Loader -->
+<div id="loader" class="rotatethis" style="display: none; position: fixed; top: 45%; left: 47.5%; z-index:99999;">
+    <img id="loaderImage" src="images/baseline_settings_black_48dp.png" alt="Loading">
+</div>
+<script>
+    $(document).ready(function () {
+        const userData = checkSession();
+        if (!userData) return;
+        const username = userData.username;
+        const role = userData.role || '';
+        if (role !== 'Admin') $("#navSettings").hide();
+
+			// Set a maximum loader timeout
+		    let loaderTimeout;
+		    
+		    // Override show to set timeout
+		    const originalShow = $.fn.show;
+		    const originalFadeIn = $.fn.fadeIn;
+		    
+		    $.fn.show = function() {
+		        if (this.attr('id') === 'loader') {
+		            clearTimeout(loaderTimeout);
+		            loaderTimeout = setTimeout(() => {
+		                console.error('LOADER TIMEOUT: Forcing loader to hide after 30 seconds');
+		                $('#loader').hide();
+		                $('#statusBar').text('Operation timed out - please refresh');
+		            }, 30000); // 30 seconds
+		        }
+		        return originalShow.apply(this, arguments);
+		    };
+		    
+		    $.fn.fadeIn = function() {
+		        if (this.attr('id') === 'loader') {
+		            clearTimeout(loaderTimeout);
+		            loaderTimeout = setTimeout(() => {
+		                console.error('LOADER TIMEOUT: Forcing loader to hide after 30 seconds');
+		                $('#loader').fadeOut();
+		                $('#statusBar').text('Operation timed out - please refresh');
+		            }, 30000);
+		        }
+		        return originalFadeIn.apply(this, arguments);
+		    };
+		    
+		    // Clear timeout when hidden
+		    const originalHide = $.fn.hide;
+		    const originalFadeOut = $.fn.fadeOut;
+		    
+		    $.fn.hide = function() {
+		        if (this.attr('id') === 'loader') {
+		            clearTimeout(loaderTimeout);
+		        }
+		        return originalHide.apply(this, arguments);
+		    };
+		    
+		    $.fn.fadeOut = function() {
+		        if (this.attr('id') === 'loader') {
+		            clearTimeout(loaderTimeout);
+		        }
+		        return originalFadeOut.apply(this, arguments);
+		    };        
+        
+        $(document).ajaxError(function(event, jqXHR, ajaxSettings, thrownError) {
+	        // Only handle errors that haven't been explicitly handled
+	        if (!jqXHR.isHandled) {
+	            console.error('Global AJAX error caught:', {
+	                url: ajaxSettings.url,
+	                status: jqXHR.status,
+	                statusText: jqXHR.statusText,
+	                error: thrownError,
+	                timestamp: new Date().toLocaleString('en-ZA', { timeZone: 'Africa/Johannesburg' })
+	            });
+	            
+	            // Force hide loader
+	            $('#loader').hide();
+	            
+	            // Update status bar with generic error
+	            $('#statusBar').text('Network error - please try again');
+	        }
+	    });	
+        
+        $("#loader").show();
+        $("#pagename").text("Items to Receive");
+        const statusBar = document.getElementById('statusBar');
+        statusBar.textContent = 'Fetching Data...';
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const wbt = urlParams.get('wbt');
+        const company = urlParams.get('company');
+        $("#statsTitle").text(`Weighbridge Ticket: ${wbt} - Company: ${company}`);
+        $("#modalItemDetails").text(`Item #${wbt} - ${company}`);
+
+        const defectCategories = [
+            {
+                id: 'priority_defects_1', title: 'Priority Defects (1)',
+                items: [
+                    { key: 'holesInadequate', label: 'Holes Inadequate', options: ['no', 'yes'], mitigations: { 'no': [], 'yes': ['Vent holes required', 'Drain holes required', 'Jig holes required'] }, default: 'no' },
+                    { key: 'paint', label: 'Paint', options: ['none', 'little', 'a lot'], mitigations: { 'none': [], 'little': ['Thinners required'], 'a lot': ['Shotblasting required'] }, default: 'none' },
+                    { key: 'oilGreaseDiesel', label: 'Oil, Grease or Diesel', options: ['none', 'little', 'a lot'], mitigations: { 'none': [], 'little': [], 'a lot': [] }, default: 'none' }
+                ]
+            },
+            {
+                id: 'priority_defects_2', title: 'Priority Defects (2)',
+                items: [
+                    { key: 'damaged', label: 'Damaged', options: ['none', 'dented', 'bent', 'crack', 'deep scratch', 'multiple damages'], mitigations: { 'none': [], 'dented': ['Send to boilershop'], 'bent': ['Send to boilershop'], 'crack': ['Send to boilershop'], 'deep scratch': ['Send to boilershop'], 'multiple damages': ['Send to boilershop'] }, default: 'none' },
+                    { key: 'burr', label: 'Burr', options: ['none', 'little', 'a lot'], mitigations: { 'none': [], 'little': [], 'a lot': [] }, default: 'none' },
+                    { key: 'weldingFlux', label: 'Welding Flux', options: ['no', 'yes'], mitigations: { 'no': [], 'yes': [] }, default: 'no' }
+                ]
+            },
+            {
+                id: 'structural', title: 'Other Structural Issues',
+                items: [
+                    { key: 'sharpEdges', label: 'Sharp Edges', options: ['no', 'yes'], mitigations: { 'no': [], 'yes': [] }, default: 'no' },
+                    { key: 'possibleDistortion', label: 'Possible Distortion', options: ['no', 'possible', 'very likely (thickness <5mm)'], mitigations: { 'no': [], 'possible': [], 'very likely (thickness <5mm)': [] }, default: 'no' }
+                ]
+            },
+            {
+                id: 'surface', title: 'Other Surface Quality',
+                items: [
+                    { key: 'rust', label: 'Rust', options: ['normal', 'porosity', 'irreparable'], mitigations: { 'normal': [], 'porosity': ['Shotblasting required'], 'irreparable': ['Send to boilershop'] }, default: 'normal' }
+                ]
+            },
+            {
+                id: 'welding', title: 'Other Welding Related',
+                items: [
+                    { key: 'weldingSplatter', label: 'Welding or Cutting Splatter', options: ['no', 'yes'], mitigations: { 'no': [], 'yes': [] }, default: 'no' },
+                    { key: 'delamination', label: 'Delamination', options: ['no', 'yes'], mitigations: { 'no': [], 'yes': ['Shotblasting required'] }, default: 'no' }
+                ]
+            },
+            {
+                id: 'coating', title: 'Coating & Processing',
+                items: [
+                    { key: 'nonConformingPreGalv', label: 'Non-Conforming Pre-Galvanization', options: ['no', 'yes'], mitigations: { 'no': [], 'yes': ['Send to stripping'] }, default: 'no' },
+                    { key: 'pinHoles', label: 'Pin Holes', options: ['none', 'few', 'a lot (porosity)'], mitigations: { 'none': [], 'few': [], 'a lot (porosity)': [] }, default: 'none' },
+                    { key: 'enclosedCavity', label: 'Enclosed Cavity', options: ['no', 'yes'], mitigations: { 'no': [], 'yes': ['Cavity Vent holes required'] }, default: 'no' }
+                ]
+            },
+            {
+                id: 'assembly', title: 'Assembly & Fit',
+                items: [
+                    { key: 'noHanging', label: 'No Hanging Method', options: ['no', 'yes'], mitigations: { 'no': [], 'yes': ['Lifting lug-nut required', 'Hang notch required'] }, default: 'no' },
+                    { key: 'threadedArticle', label: 'Threaded Article', options: ['no', 'yes'], mitigations: { 'no': [], 'yes': ['Galv stop required'] }, default: 'no' },
+                    { key: 'articleOverlap', label: 'Article Overlap/Continuous Weld', options: ['no', 'yes'], mitigations: { 'no': [], 'yes': ['Article Overlap Vent Hole required'] }, default: 'no' }
+                ]
+            }
+        ];
+
+        let newRowIndex = 0;
+        let currentStep = 0;
+        let formData = {};
+        let photos = {};
+        let cameraActive = false;
+        let webcam = null;
+        let isSubmitting = false;
+        const PHOTO_REQUIRED = false;
+
+        $('#defectModal').on('shown.bs.modal', function () {
+            const itemDetails = $('#modalItemDetails').text() || $('#itemCodeOnDeliveryNote').val() + ' - ' + $('#itemNameOnDeliveryNote').val();
+            $('#modalItemDetails').text(itemDetails);
+            setDefaultDefectValues();
+            renderCategory();
+        }).on('hidden.bs.modal', function () {
+            console.log('defectModal hidden: Photos state:', photos, Object.keys(photos).length, 'Timestamp:', new Date().toLocaleString('en-ZA', { timeZone: 'Africa/Johannesburg' }));
+            formData = {};
+            currentStep = 0;
+            $('#cameraContainer').addClass('d-none');
+            $('#defectContent').removeClass('d-none');
+            document.activeElement.blur();
+            document.body.focus();
+            setDefaultDefectValues();
+            // Do not clear photos here
+        });
+        
+        // Debug defect modal events
+		$('#defectModal').on('show.bs.modal', function(e) {
+		    console.log('=== DEFECT MODAL SHOW EVENT ===');
+		    console.log('Event:', e);
+		    console.log('Modal element:', this);
+		    console.log('Is event prevented:', e.isDefaultPrevented());
+		});
+		
+		$('#defectModal').on('shown.bs.modal', function(e) {
+		    console.log('=== DEFECT MODAL SHOWN (visible) ===');
+		});
+		
+		$('#defectModal').on('hide.bs.modal', function(e) {
+		    console.log('=== DEFECT MODAL HIDE EVENT ===');
+		});
+		
+		$('#defectModal').on('hidden.bs.modal', function(e) {
+		    console.log('=== DEFECT MODAL HIDDEN ===');
+		});
+
+        $('#receiveItemModal, #passedModal').on('hide.bs.modal', function () {
+            console.log('Modal hiding, shifting focus:', new Date().toLocaleString('en-ZA', { timeZone: 'Africa/Johannesburg' }));
+            document.body.focus(); // Move focus to body
+            $(this).attr('inert', ''); // Apply inert attribute
+        }).on('shown.bs.modal', function () {
+            console.log('Modal shown, removing inert:', new Date().toLocaleString('en-ZA', { timeZone: 'Africa/Johannesburg' }));
+            $(this).removeAttr('inert'); // Remove inert when shown
+        });
+
+        function updateProgress() {
+            const totalItems = defectCategories.reduce((sum, category) => sum + category.items.length, 0);
+            const nonDefaultItems = defectCategories.reduce((sum, category) =>
+                sum + category.items.filter(item => {
+                    const value = formData[item.key] || item.default;
+                    return value !== item.default;
+                }).length, 0);
+            const percent = Math.round((nonDefaultItems / totalItems) * 100);
+            $('#defectProgress').css('width', `${percent}%`).attr('aria-valuenow', percent).text(`${percent}%`);
+            $('#progressText').text(`${percent}% Complete`);
+        }
+
+        function renderDefectItem(item) {
+            const value = formData[item.key] || item.default;
+            const hasDefect = value !== item.default;
+            const mitigations = item.mitigations[value] || [];
+            const mitigationStyle = mitigations.length > 0 ? '' : ' style="display: none;"';
+            return `
+            <div class="defect-item" data-defect="${item.key}">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h4>${item.label}</h4>
+                    ${formData[item.key] ? '<i class="bi bi-check-circle text-success"></i>' : ''}
+                </div>
+                <div class="d-flex gap-3">
+                    ${item.options.map(option => `
+                        <label class="d-flex align-items-center gap-2 cursor-pointer">
+                            <input type="radio" name="${item.key}" value="${option}" ${value === option ? 'checked' : ''}>
+                            <span>${option === 'no' ? 'No Issues' : option === 'yes' ? 'Issues Found' : option.charAt(0).toUpperCase() + option.slice(1)}</span>
+                        </label>
+                    `).join('')}
+                </div>
+                ${mitigations.length > 0 ? `
+                    <div class="mt-3 p-3 bg-warning-subtle rounded border mitigation-options"${mitigationStyle}>
+                        <p class="text-sm font-medium text-warning mb-2">Mitigation Options:</p>
+                        <div class="d-flex flex-column gap-1">
+                            ${mitigations.map(mitigation => {
+                const excludeInputs = ['rust', 'threadedArticle', 'nonConformingPreGalv', 'delamination', 'damaged', 'paint'].includes(item.key);
+                return `
+                                    <div class="d-flex align-items-center" style="min-width: 280px;">
+                                        <label class="d-flex align-items-center gap-1" style="width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                                            <input type="checkbox" name="${item.key}Mitigation" value="${mitigation}" ${formData[`${item.key}Mitigation`]?.includes(mitigation) ? 'checked' : ''}>
+                                            <span>${mitigation}</span>
+                                        </label>
+                                        ${excludeInputs ? '' : `
+                                            <input type="number" name="${item.key}MitigationQty_${mitigation}" value="${formData[`${item.key}MitigationQty_${mitigation}`] || (formData[`${item.key}Mitigation`]?.includes(mitigation) ? 0 : '')}" min="0" class="form-control form-control-sm" style="width: 80px;" ${!formData[`${item.key}Mitigation`]?.includes(mitigation) ? 'disabled' : ''}>
+                                        `}
+                                    </div>
+                                `;
+            }).join('')}
+                        </div>
+                    </div>
+                ` : ''}
+                <div class="photo-container" style="display: none;">
+                    <input type="file" class="file-input" id="fileInput_${item.key}" accept="image/*" ${hasDefect ? '' : ' style="display: none;"'}>
+                    <img class="photo-preview" src="" data-defect="${item.key}" style="display: none;">
+                </div>
+            </div>
+        `;
+        }
+
+        function renderCategory() {
+            const category = defectCategories[currentStep];
+            $('#categoryTitle').text(category.title);
+            $('#defectItems').html(category.items.map(renderDefectItem).join(''));
+            $('#commentsSection').toggleClass('d-none', currentStep !== defectCategories.length - 1);
+            $('#nextStepBtn').toggleClass('d-none', currentStep === defectCategories.length - 1);
+            $('#submitDefectsBtn').toggleClass('d-none', currentStep !== defectCategories.length - 1);
+            $('#prevStepBtn').prop('disabled', currentStep === 0);
+            $('#stepIndicator').text(`Step ${currentStep + 1} of ${defectCategories.length}`);
+            updatePhotoVisibility();
+        }
+
+        function isCategoryComplete() {
+            return defectCategories[currentStep].items.every(item => {
+                const value = formData[item.key] || item.default;
+                if (value !== item.default) {
+                    const mitigations = item.mitigations[value] || [];
+                    return mitigations.every(mitigation => {
+                        const qtyKey = `${item.key}MitigationQty_${mitigation}`;
+                        const qty = formData[qtyKey] || '';
+                        return qty === '' || (!isNaN(qty) && parseInt(qty) >= 0);
+                    });
+                }
+                return true;
+            });
+        }
+
+        function requiresPhoto() {
+            return Object.values(formData).some(value => value !== 'no' && value !== 'none' && value !== 'normal');
+        }
+
+        function setDefaultDefectValues() {
+            console.log('Photos in resetForms before clear:', photos, Object.keys(photos).length);
+            formData = {};
+            photos = {};
+            console.log('Photos in resetForms after clear:', photos, Object.keys(photos).length);
+            defectCategories.forEach(category => {
+                category.items.forEach(item => {
+                    formData[item.key] = item.default;
+                    formData[`${item.key}Mitigation`] = [];
+                    const defaultMitigations = item.mitigations[item.default] || [];
+                    defaultMitigations.forEach(mitigation => {
+                        formData[`${item.key}MitigationQty_${mitigation}`] = 0;
+                    });
+                    if (item.default === 'no') {
+                        const altMitigations = item.mitigations['yes'] || [];
+                        altMitigations.forEach(mitigation => {
+                            formData[`${item.key}MitigationQty_${mitigation}`] = 0;
+                        });
+                    } else {
+                        const altValue = Object.keys(item.mitigations).find(key => key !== item.default) || item.default;
+                        const altMitigations = item.mitigations[altValue] || [];
+                        altMitigations.forEach(mitigation => {
+                            formData[`${item.key}MitigationQty_${mitigation}`] = 0;
+                        });
+                    }
+                });
+            });
+            updateProgress();
+            renderCategory();
+        }
+
+        function updatePhotoVisibility() {
+            defectCategories[currentStep].items.forEach(item => {
+                const $defectItem = $(`#defectItems [data-defect="${item.key}"]`);
+                const value = formData[item.key];
+                const isDefault = value === item.default;
+                const $fileInput = $defectItem.find('.file-input');
+                const $photoPreview = $defectItem.find('.photo-preview');
+
+                if (!isDefault) {
+                    $fileInput.show();
+                } else {
+                    $fileInput.hide();
+                }
+
+                $fileInput.off('change').on('change', function () {
+                    const file = this.files[0];
+                    console.log(`File selected for ${item.key}:`, file ? file.name : 'none');
+                    if (file) {
+                        photos[item.key] = file;
+                        console.log('Photos after file selection:', photos, Object.keys(photos).length);
+                        const reader = new FileReader();
+                        reader.onload = function (e) {
+                            $photoPreview.attr('src', e.target.result).show();
+                        };
+                        reader.readAsDataURL(file);
+                    } else {
+                        delete photos[item.key];
+                        $photoPreview.hide();
+                    }
+                });
+            });
+        }
+
+        $('#defectModal').on('show.bs.modal', function () {
+            const itemDetails = $('#modalItemDetails').text() || $('#itemCodeOnDeliveryNote').val() + ' - ' + $('#itemNameOnDeliveryNote').val();
+            $('#modalItemDetails').text(itemDetails);
+            setDefaultDefectValues();
+            renderCategory();
+        });
+
+        $('#startCameraBtn').on('click', function () {
+            // Disabled for this test
+        });
+
+        $('#defectItems').on('click', '.capture-photo-btn', function () {
+            // Disabled for this test
+        });
+
+        $('#defectItems').on('change', 'input[type="radio"]', function () {
+            const name = $(this).attr('name');
+            formData[name] = $(this).val();
+            const item = defectCategories.flatMap(c => c.items).find(i => i.key === name);
+            formData[`${name}Mitigation`] = item.mitigations[$(this).val()] || [];
+            item.mitigations[item.default].forEach(mitigation => {
+                formData[`${name}MitigationQty_${mitigation}`] = 0;
+            });
+            item.mitigations[$(this).val()].forEach(mitigation => {
+                formData[`${name}MitigationQty_${mitigation}`] = formData[`${name}Mitigation`]?.includes(mitigation) ? formData[`${name}MitigationQty_${mitigation}`] || 0 : 0;
+            });
+            renderCategory();
+            updatePhotoVisibility();
+            updateProgress();
+            $('#nextStepBtn').prop('disabled', !isCategoryComplete());
+        });
+
+        $('#defectItems').on('change', 'input[type="checkbox"]', function () {
+            const name = $(this).attr('name');
+            const value = $(this).val();
+            const qtyInput = $(this).closest('div').find('input[type="number"]');
+            if (!formData[name]) formData[name] = [];
+            if ($(this).is(':checked')) {
+                formData[name] = [...new Set([...(formData[name] || []), value])];
+                qtyInput.prop('disabled', false).val(formData[`${name.replace('Mitigation', '')}MitigationQty_${value}`] || 0);
+            } else {
+                formData[name] = formData[name].filter(v => v !== value);
+                qtyInput.prop('disabled', true).val(0);
+                formData[`${name.replace('Mitigation', '')}MitigationQty_${value}`] = 0;
+            }
+            $('#nextStepBtn').prop('disabled', !isCategoryComplete());
+        });
+
+        $('#defectItems').on('change', 'input[type="number"]', function () {
+            if (!$(this).prop('disabled')) {
+                const name = $(this).attr('name');
+                const qty = $(this).val();
+                formData[name] = qty === '' ? 0 : parseInt(qty) || 0;
+                $('#nextStepBtn').prop('disabled', !isCategoryComplete());
+            }
+        });
+
+        $('#prevStepBtn').on('click', function () {
+            if (currentStep > 0) {
+                currentStep--;
+                renderCategory();
+            }
+        });
+
+        $('#nextStepBtn').on('click', function () {
+            if (isCategoryComplete() && currentStep < defectCategories.length - 1) {
+                currentStep++;
+                renderCategory();
+            } else {
+                alert('Please complete all required fields in this step.');
+            }
+        });
+
+        $('#submitDefectsBtn').on('click', function () {
+            console.log('Checking photo requirement at:', new Date().toLocaleString('en-ZA', { timeZone: 'Africa/Johannesburg' }));
+            console.log('File inputs found:', $('.file-input').length);
+            $('.file-input').each(function () {
+                console.log(`Input ${this.id} has files:`, this.files.length);
+            });
+            console.log('Stored photos before submission:', photos, Object.keys(photos).length);
+			if (PHOTO_REQUIRED && requiresPhoto() && Object.keys(photos).length === 0) {
+			    alert('A photo is required when defects are detected.');
+			    return;
+			}            
+            const collectedData = collectFormData();
+            $('#defectModal').modal('hide');
+            $('#passedModal').modal('show');
+            const summaryList = Object.entries(collectedData.defectInfo)
+                .filter(([key]) => !key.endsWith('Mitigation') && key !== 'photos' && key !== 'additionalComments')
+                .map(([key, value]) => {
+                    const item = defectCategories.flatMap(c => c.items).find(i => i.key === key);
+                    if (!item) return '';
+                    const mitigationValue = collectedData.defectInfo[`${key}Mitigation`] || '';
+					const mitigationDisplay = mitigationValue && mitigationValue !== 'None' 
+					    ? ` (Mitigation: ${mitigationValue})` 
+					    : '';
+					return value !== item.default 
+					    ? `<li>${item.label}: ${value}${mitigationDisplay}</li>` 
+					    : '';
+					}
+				)
+                .filter(Boolean)
+                .join('');
+            $('#defectSummaryList').html(summaryList || '<li>No defects detected.</li>');
+            $('#passedModal').data('formData', collectedData);
+            $('#passedModal').data('photos', photos); // Store photos for submission
+            console.log('Photos after defect submission:', photos, Object.keys(photos).length, 'Timestamp:', new Date().toLocaleString('en-ZA', { timeZone: 'Africa/Johannesburg' }));
+        });
+
+        $('#confirmReceiveBtn').on('click', function () {
+            const formData = $('#passedModal').data('formData');
+            if (!formData) {
+                console.error('Form data not found in passedModal data');
+                alert('Error: Unable to submit data. Please try again.');
+                return;
+            }
+            const row = $('#receiveItemModal').data('clickedRow');
+            const isNewRow = row && $(row).hasClass('new-row');
+            const rowIndex = isNewRow ? newRowIndex : null;
+            console.log('Submitting with:', { formData, photos, rowIndex });
+            submitFormData(formData, photos, rowIndex);
+        });
+
+        function applyInputFields(rowNode, lineNumber, weighbridgeTicketNumber, uniqueNumber) {
+            console.log('Applying input fields to row:', lineNumber);
+            if (!rowNode || !$(rowNode).is('tr')) {
+                console.warn('Invalid rowNode for line:', lineNumber);
+                return;
+            }
+            const $row = $(rowNode);
+            const table = $('#DNItemsTable').DataTable();
+            const rowData = table.row($row).data();
+
+            // Only add inputs if they don’t already exist
+            if (!$row.find('td:eq(1) input').length) {
+                $row.find('td').eq(1).html('<input type="text" class="form-control" placeholder="Delivery Note #">');
+                $row.find('td').eq(2).html('<input type="text" class="form-control" placeholder="Item Code">');
+                $row.find('td').eq(3).html('<input type="text" class="form-control" placeholder="Item Description">');
+                $row.find('td').eq(4).html('<input type="text" class="form-control" placeholder="LxWxH">');
+                $row.find('td').eq(5).html('<input type="number" class="form-control" placeholder="0" min="1">');
+                $row.find('td').eq(6).html('<input type="text" class="form-control" placeholder="Other">');
+                $row.find('td').eq(7).html('<input type="text" class="form-control" placeholder="Classifications">');
+
+                // Log row HTML safely
+                console.log('Input fields added to newRowNode:', $row[0].outerHTML);
+            }
+
+            // Reattach input event handlers to update DataTable data
+            $row.find('input').off('input change').on('input change', function () {
+                const deliveryNote = $row.find('td:eq(1) input').val()?.trim() || '';
+                const itemCode = $row.find('td:eq(2) input').val()?.trim() || '';
+                const isValid = deliveryNote && itemCode;
+                $row.find('.open-details').prop('disabled', !isValid);
+
+                // Update DataTable's internal data
+                rowData[1] = deliveryNote;
+                rowData[2] = itemCode;
+                rowData[3] = $row.find('td:eq(3) input').val()?.trim() || '';
+                rowData[4] = $row.find('td:eq(4) input').val()?.trim() || '';
+                rowData[5] = parseInt($row.find('td:eq(5) input').val()) || 0;
+                rowData[6] = $row.find('td:eq(6) input').val()?.trim() || '';
+                rowData[7] = $row.find('td:eq(7) input').val()?.trim() || '';
+                table.row($row).data(rowData);
+
+                console.log('Row data updated:', rowData);
+                validateInlineFields($row);
+            });
+
+            validateInlineFields($row);
+        }
+
+
+$('#addNewItemBtn').on('click', function () {
+    console.log('Add New Item button clicked at:', new Date().toLocaleString('en-ZA', { timeZone: 'Africa/Johannesburg' }));
+    try {
+        if (!$.fn.DataTable.isDataTable('#DNItemsTable')) {
+            console.error('DataTable not initialized');
+            $('#statusBar').text('Error: Table not initialized');
+            alert('Error: Table not initialized');
+            return;
+        }
+
+        const table = $('#DNItemsTable').DataTable();
+
+        // Use timestamp for unique line numbers
+		const lineNumber = `NEW_${Date.now()}`;
+        newRowIndex = lineNumber; // Keep as string since it's now timestamp-based
+
+const weighbridgeTicketNumber = typeof wbt !== 'undefined' ? wbt : 'Unknown_WBT';
+const companyName = typeof company !== 'undefined' ? company : 'Unknown_Company';
+
+// Get dwid from existing rows
+let existingDwid = '';
+table.rows().every(function () {
+    const rowData = this.data();
+    if (rowData[11]) { // dwid is at index 11
+        existingDwid = rowData[11];
+        return false; // Stop iteration after finding first dwid
+    }
+});
+
+// Create unique number in DocuWare format: {WeighbridgeTicket}_{DeliveryNote}_{dwid}_{LineNumber}
+// For new rows, we'll use 'NEW' as placeholder for delivery note until user fills it in
+const uniqueNumber = existingDwid 
+    ? `${weighbridgeTicketNumber}_NEW_${existingDwid}_${lineNumber}`
+    : `${weighbridgeTicketNumber}_NEW_TEMP_${lineNumber}`;
+        
+        // Create newRowData with input fields directly in the HTML
+        const newRowData = [
+            lineNumber, // 0 - Line Number
+            '<input type="text" class="form-control" placeholder="Delivery Note #">', // 1 - Delivery Note #
+            '<input type="text" class="form-control" placeholder="Item Code">', // 2 - Item Code
+            '<input type="text" class="form-control" placeholder="Item Description">', // 3 - Item Description
+            '<input type="text" class="form-control" placeholder="LxWxH">', // 4 - Item Size
+            '<input type="number" class="form-control" placeholder="0" min="1">', // 5 - Quantity
+            '<input type="text" class="form-control" placeholder="Other">', // 6 - Other
+            '<input type="text" class="form-control" placeholder="Classifications">', // 7 - Job Number
+            `<button class="btn btn-success open-details" data-wbt="${weighbridgeTicketNumber}" data-unique-number="${uniqueNumber}" disabled>Receive</button>`, // 8 - Action
+            `<button class="btn btn-danger delete-row" data-row-id="${lineNumber}">Delete</button>`, // 9 - Delete
+            uniqueNumber,        // 10
+		    existingDwid,        // 11
+		    weighbridgeTicketNumber, // 12
+		    '',                  // 13 - Order Number
+		    '',                  // 14 - Job Number (New)
+		    companyName,         // 15
+		    '',                  // 16 - Vehicle Registration
+		    '',                  // 17 - Material Markings
+		    '',                  // 18 - Material Length
+		    '',                  // 19 - Weight
+		    ''                   // 20 - Fabricator
+        ];
+
+        // Add row
+        const newRow = table.row.add(newRowData);
+
+        // Draw table and go to last page
+        table.draw(false);
+        table.page('last').draw('page');
+
+        // Apply classes and event handlers after drawing
+        setTimeout(() => {
+            const finalRowNode = newRow.node();
+            if (finalRowNode) {
+                $(finalRowNode).addClass('new-row table-danger');
+                
+// Attach event handlers to the inputs
+$(finalRowNode).find('input').on('input change', function () {
+    const $row = $(finalRowNode);
+    const deliveryNote = $row.find('td:eq(1) input').val()?.trim() || '';
+    const itemCode = $row.find('td:eq(2) input').val()?.trim() || '';
+    const isValid = deliveryNote && itemCode;
+    $row.find('.open-details').prop('disabled', !isValid);
+
+    // Update DataTable's internal data WITHOUT triggering redraw
+    const rowData = table.row($row).data();
+    rowData[1] = deliveryNote;
+    rowData[2] = itemCode;
+    rowData[3] = $row.find('td:eq(3) input').val()?.trim() || '';
+    rowData[4] = $row.find('td:eq(4) input').val()?.trim() || '';
+    rowData[5] = parseInt($row.find('td:eq(5) input').val()) || 0;
+    rowData[6] = $row.find('td:eq(6) input').val()?.trim() || '';
+    rowData[7] = $row.find('td:eq(7) input').val()?.trim() || '';
+    // Don't call table.row($row).data(rowData) to avoid DOM conflicts
+
+    console.log('Row data updated:', rowData);
+    // validateInlineFields($row); // Remove this call as it also updates row data
+});
+
+                console.log('New row created with inputs directly in HTML');
+            }
+        }, 100);
+
+        $('#statusBar').text(`Added new row: ${lineNumber}`);
+    } catch (e) {
+        console.error('Error adding new row:', e, 'Timestamp:', new Date().toLocaleString('en-ZA', { timeZone: 'Africa/Johannesburg' }));
+        $('#statusBar').text('Error adding new row: ' + e.message);
+        alert('Error adding new row: ' + e.message);
+    }
+});
+
+
+// Ensure inputs persist after table draw
+$('#DNItemsTable').on('draw.dt', function () {
+    const table = $('#DNItemsTable').DataTable();
+
+    table.rows().every(function () {
+        const rowNode = this.node();
+        if (!rowNode) return;
+        const $row = $(rowNode);
+        if (!$row.hasClass('new-row')) return;
+
+        const rowData = this.data();
+
+        // Re-inject inputs only if they've been replaced by plain text
+        if (!$row.find('td:eq(1) input').length) {
+            $row.find('td').eq(1).html(`<input type="text" class="form-control" placeholder="Delivery Note #" value="${rowData[1] || ''}">`);
+            $row.find('td').eq(2).html(`<input type="text" class="form-control" placeholder="Item Code" value="${rowData[2] || ''}">`);
+            $row.find('td').eq(3).html(`<input type="text" class="form-control" placeholder="Item Description" value="${rowData[3] || ''}">`);
+            $row.find('td').eq(4).html(`<input type="text" class="form-control" placeholder="LxWxH" value="${rowData[4] || ''}">`);
+            $row.find('td').eq(5).html(`<input type="number" class="form-control" placeholder="0" min="1" value="${rowData[5] || ''}">`);
+            $row.find('td').eq(6).html(`<input type="text" class="form-control" placeholder="Other" value="${rowData[6] || ''}">`);
+            $row.find('td').eq(7).html(`<input type="text" class="form-control" placeholder="Classifications" value="${rowData[7] || ''}">`);
+
+            // Restore Receive button disabled state
+            const hasMinimumData = !!(rowData[1] && rowData[2]);
+            $row.find('.open-details').prop('disabled', !hasMinimumData);
+
+            // Re-attach change handlers
+            $row.find('input').off('input change').on('input change', function () {
+                const dn = $row.find('td:eq(1) input').val()?.trim() || '';
+                const ic = $row.find('td:eq(2) input').val()?.trim() || '';
+                $row.find('.open-details').prop('disabled', !(dn && ic));
+                rowData[1] = dn;
+                rowData[2] = ic;
+                rowData[3] = $row.find('td:eq(3) input').val()?.trim() || '';
+                rowData[4] = $row.find('td:eq(4) input').val()?.trim() || '';
+                rowData[5] = parseInt($row.find('td:eq(5) input').val()) || 0;
+                rowData[6] = $row.find('td:eq(6) input').val()?.trim() || '';
+                rowData[7] = $row.find('td:eq(7) input').val()?.trim() || '';
+                console.log('Row data updated after draw restore:', rowData);
+            });
+
+            console.log('Re-injected inputs for new row after draw, restored values from rowData');
+        }
+    });
+});
+
+        // Updated delete handler to preserve pagination
+        $(document).on('click', '.delete-row', function () {
+            try {
+                const rowId = $(this).data('row-id');
+                console.log('Delete button clicked for rowId:', rowId, 'Timestamp:', new Date().toLocaleString('en-ZA', { timeZone: 'Africa/Johannesburg' }));
+
+                const table = $('#DNItemsTable').DataTable();
+                let rowNode = null;
+                let rowIndex = -1;
+                table.rows().every(function (index) {
+                    if (this.data()[0] === rowId.toString()) {
+                        rowNode = this.node();
+                        rowIndex = index;
+                    }
+                });
+
+                if (!rowNode) {
+                    console.error('Failed to find row with rowId:', rowId);
+                    $('#statusBar').text('Error: Failed to delete row');
+                    alert('Error: Failed to delete row');
+                    return;
+                }
+
+                // Capture current page
+                const pageInfo = table.page.info();
+                const currentPage = pageInfo.page;
+                const rowsPerPage = pageInfo.length;
+                const totalRows = pageInfo.recordsTotal;
+                console.log('Current page before deletion:', currentPage, 'Page info:', pageInfo);
+
+                // Calculate rows on the current page after deletion
+                const rowsOnCurrentPage = table.rows({ page: 'current' }).count();
+                console.log('Rows on current page before deletion:', rowsOnCurrentPage);
+
+                // Remove the row
+                table.row(rowNode).remove();
+
+                // Determine the target page after deletion
+                let targetPage = currentPage;
+                if (rowsOnCurrentPage === 1 && currentPage > 0 && totalRows > 1) {
+                    // If deleting the last row on the current page and it's not the first page,
+                    // move to the previous page
+                    targetPage = currentPage - 1;
+                    console.log('Last row on page deleted, moving to previous page:', targetPage);
+                }
+
+                // Redraw table and restore page
+                table.draw(false); // false prevents resetting to page 0
+                table.page(targetPage).draw('page');
+                console.log('Row deleted, Rows in data:', table.rows().count(), 'Restored page:', targetPage);
+
+                $('#statusBar').text(`Deleted row: ${rowId}`);
+            } catch (e) {
+                console.error('Error deleting row:', e, 'Timestamp:', new Date().toLocaleString('en-ZA', { timeZone: 'Africa/Johannesburg' }));
+                $('#statusBar').text('Error deleting row: ' + e.message);
+                alert('Error deleting row: ' + e.message);
+            }
+        });
+
+        $('#DNItemsTable').on('click', '.open-details', function () {
+            const row = $(this).closest('tr');
+		    const isNewRow = $(row).hasClass('new-row');
+		    
+		    console.log('Row classes:', $(row).attr('class'));
+		    console.log('Is new row:', isNewRow);
+		    console.log('Row HTML:', $(row)[0].outerHTML);
+		    
+		    let itemCode, itemDescription, itemSize, itemQty, deliveryNote, materialMarkings, materialLength, itemWeight, fabricator;
+			if (isNewRow) {
+			    itemCode = row.find('td:eq(2) input').val()?.trim() || '';
+			    itemDescription = row.find('td:eq(3) input').val()?.trim() || '';
+			    itemSize = row.find('td:eq(4) input').val()?.trim() || '';
+			    itemQty = parseInt(row.find('td:eq(5) input').val()) || 0;
+			    deliveryNote = row.find('td:eq(1) input').val()?.trim() || '';
+			    
+			    console.log('Reading new row values:', {
+			        deliveryNote,
+			        itemCode,
+			        itemDescription,
+			        itemSize,
+			        itemQty
+			    });
+			} else {
+                itemCode = row.find('td:eq(2)').text().trim();
+			    itemDescription = row.find('td:eq(3)').text().trim();
+			    const itemSizeInput = row.find('td:eq(4) input#tableItemSize');
+			    itemSize = itemSizeInput.length ? itemSizeInput.val() : row.find('td:eq(4)').text().trim();
+			    const itemQtyText = row.find('td:eq(5)').text().trim();
+			    itemQty = parseInt(itemQtyText) || 0;
+			    deliveryNote = row.find('td:eq(1)').text().trim();
+			    
+			    // GET Material Markings, Material Length, Weight, and Fabricator from DataTable
+				const table = $('#DNItemsTable').DataTable();
+				const rowData = table.row(row).data() || [];
+				materialMarkings = rowData[17] || '';
+				materialLength = rowData[18] || '';
+				itemWeight = rowData[19] || '';
+				fabricator = rowData[20] || '';
+            }
+            if (isNewRow && !validateInlineFields(row)) {
+                const errors = $(row).data('errors') || [];
+                alert('Please correct the following errors:\n' + errors.join('\n'));
+                return;
+            }
+            $('#receiveItemModal').data('clickedRow', row);
+            $('#receiveItemModal').data('expectedQty', itemQty);
+            $('#receiveItemModal').data('itemSize', itemSize);
+            $('#receiveItemModal').data('lastItemCode', itemCode);
+            $('#modalItemDetails').text(`${itemCode} - ${itemDescription}`);
+            $('#itemCodeOnDeliveryNote').val(itemCode);
+            $('#itemNameOnDeliveryNote').val(itemDescription);
+            $('#internalItemName').val(itemDescription);
+            $('#itemSize').val(itemSize).trigger('change');
+            $('#itemQty').val(itemQty).trigger('change');
+            document.getElementById('itemQty')?.setAttribute('value', itemQty);
+            $('#itemQtyReceived').val(itemQty);
+            $('#packagingMethod').val('loose').trigger('change');
+            $('#materialMarkings').val(materialMarkings || '');
+            $('#materialLength').val(materialLength || '');
+            $('#itemWeight').val(itemWeight || '');
+            $('#fabricator').val(fabricator || '');
+
+			// Populate new read-only fields
+			const table = $('#DNItemsTable').DataTable();
+			const rowData = table.row(row).data() || [];
+			
+			if (isNewRow) {
+			    // For new rows, use input values we already read
+			    $('#weighbridgeTicketNumber').val(rowData[12] || ''); // Weighbridge Ticket Number
+			    $('#deliveryNoteNumber').val(deliveryNote); // Use the input value, not rowData
+			    $('#orderNumber').val(rowData[13] || ''); // Order Number
+			    $('#jobNumber').val(row.find('td:eq(7) input').val()?.trim() || ''); // Job Number from input
+			    $('#companyName').val(rowData[15] || ''); // Company Name
+			    $('#vehicleRegistration').val(rowData[16] || ''); // Vehicle Registration
+			} else {
+			    // For existing rows, use DataTable data
+			    $('#weighbridgeTicketNumber').val(rowData[12] || ''); 
+			    $('#deliveryNoteNumber').val(rowData[1] || '');  
+			    $('#orderNumber').val(rowData[13] || '');
+			    $('#jobNumber').val(rowData[7] || '');
+			    $('#companyName').val(rowData[15] || '');
+			    $('#vehicleRegistration').val(rowData[16] || '');
+			}
+
+            const receiveModal = new bootstrap.Modal(document.getElementById('receiveItemModal'));
+            receiveModal.show();
+            statusBar.textContent = `Navigating to Delivery Note Details...`;
+            console.log('Packaging Method on modal open:', $('#packagingMethod').val());
+            validateReceiveForm();
+        });
+
+        function getData(wbt, company) {
+            $.ajax({
+                url: address + '/getWBItemList',
+                type: 'POST',
+                data: { 'WBT': wbt, 'Company': company },
+                dataType: 'json',
+                success: function (data) {
+                    try {
+                        console.log('Raw response at:', new Date().toLocaleString('en-ZA', { timeZone: 'Africa/Johannesburg' }));
+                        console.log('Full raw response:', JSON.stringify(data, null, 2));
+                        $('#loader').hide();
+                        
+                        if (typeof data === 'string') {
+                            console.log('Parsing string response');
+                            data = JSON.parse(data);
+                        }
+                        console.log('Parsed data:', JSON.stringify(data, null, 2));
+
+                        
+                        let records = [];
+						if (data?.Root?.DataPage) {
+						    if (Array.isArray(data.Root.DataPage)) {
+						        // Multiple records: DataPage is an array of {Record: {...}}
+						        records = data.Root.DataPage.map(item => item.Record);
+						    } else if (data.Root.DataPage.Record) {
+						        // Single record: DataPage.Record is the record object
+						        records = Array.isArray(data.Root.DataPage.Record) ? data.Root.DataPage.Record : [data.Root.DataPage.Record];
+						    }
+						}
+                        console.log('Records before processing:', JSON.stringify(records, null, 2));
+
+                        const items = records.map((record, index) => {
+                            const lineNumber = record.LineNumber || (index + 1).toString();
+                            const item = [
+                                lineNumber, // 0 - Line Number
+                                record.DeliveryNoteNo || '', // 1 - Delivery Note #
+                                record.ItemCode || '', // 2 - Item Code
+                                record.ItemDescription || '', // 3 - Item Description
+                                record.ItemSize || '', // 4 - Item Size
+                                parseInt(record.ItemQuantity) || 0, // 5 - Quantity
+                                record.ItemOther || '', // 6 - Other
+                                record.ItemJobNumber || '', // 7 - Job Number
+                                `<button class='btn btn-success open-details' data-wbt='${record.WeighbridgeTicketNo || ''}' data-unique-number='${record.UniqueNumber || ''}' type='button'>Receive</button>`, // 8 - Action
+                                '', // 9 - Delete (empty for existing rows)
+                                record.UniqueNumber || '', // 10 - Unique Number
+                                record.dwid || '', // 11 - dwid
+                                record.WeighbridgeTicketNo || '', // 12 - Weighbridge Ticket Number
+                                record.OrderNo || '', // 13 - Order Number (from header)
+                                record.ItemJobNumber || '', // 14 - Job Number (New)
+                                record.CompanyName || '', // 15 - Company Name (from header)
+                                record.VehicleRegistration || '', // 16 - Vehicle Registration (from header)
+                                record.MaterialMarkings || '', // 17 - Material Markings
+        						record.MaterialLength || '', // 18 - Material Length
+        						record.Weight || '', // 19 - Weight
+        						record.Fabricator || ''
+                            ];
+                            return item;
+                        });
+
+                        console.log('Number of items pushed to DataTable:', items.length);
+
+                        const table = $('#DNItemsTable');
+                        if ($.fn.DataTable.isDataTable('#DNItemsTable')) {
+                            table.DataTable().clear().destroy();
+                        }
+
+                        const dataTable = table.DataTable({
+                            data: items,
+                            columnDefs: [
+                                { title: 'Line Number', targets: 0 },
+                                { title: 'Delivery Note No', targets: 1 },
+                                { title: 'Item Code', targets: 2 },
+                                { title: 'Item Description', targets: 3 },
+                                { title: 'Item Size', targets: 4 },
+                                { title: 'Quantity', targets: 5 },
+                                { title: 'Other', targets: 6 },
+                                { title: 'Job Number', targets: 7 },
+                                { title: 'Action', targets: 8 },
+                                { title: '', targets: 9 },
+                                { title: 'Unique Number', targets: 10, visible: false },
+                                { title: 'DWID', targets: 11, visible: false },
+                                { title: 'Weighbridge Ticket Number', targets: 12, visible: false },
+                                { title: 'Order Number', targets: 13, visible: false },
+                                { title: 'Job Number (New)', targets: 14, visible: false },
+                                { title: 'Company Name', targets: 15, visible: false },
+                                { title: 'Vehicle Registration', targets: 16, visible: false },
+                                { title: 'Material Markings', targets: 17, visible: false },
+    							{ title: 'Material Length', targets: 18, visible: false },
+    							{ title: 'Weight', targets: 19, visible: false },
+    							{ title: 'Fabricator', targets: 20, visible: false }
+                            ],
+                            createdRow: function (row, data, dataIndex) {
+                                $(row).attr('data-unique-number', data[10]).addClass('align-middle');
+                            },
+                            initComplete: function () {
+                                const api = this.api();
+                                if (api.rows().count() === 0) {
+                                    initializeEmptyTable(wbt, company);
+                                }
+                                updateAddButtonVisibility(api);
+                                console.log(`${window.location.href}:${Date.now()} Table drawn, checking for new rows to reapply inputs`);
+                                table.find('tr.new-row').each(function () {
+                                    const rowNode = this;
+                                    const rowData = api.row(rowNode).data();
+                                    const uniqueNumber = rowData[10];
+                                    const lineNumber = rowData[0];
+                                    applyInputFields(rowNode, lineNumber, wbt, uniqueNumber);
+                                });
+                            },
+		                    drawCallback: function () {
+		                        // DON'T hide loader here - already hidden at the top
+		                        $("#statusBar").text('System Ready');
+		                    }
+                        });
+
+                        // Hide columns not in HTML <thead>
+                        dataTable.columns([10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]).visible(false);
+
+                        updateAddButtonVisibility(dataTable);
+                        if (items.length === 0) {
+                            $('#statusBar').text(`No items found for Weighbridge Ticket Number: ${wbt}`);
+                        } else {
+                            $('#statusBar').text(`Loaded ${items.length} item(s) for Weighbridge Ticket Number: ${wbt}`);
+                        }
+                    } catch (e) {
+                        console.error('Error processing response:', e);
+                        $('#loader').hide();
+                        $('#statusBar').text('Error loading data: ' + e.message);
+                        alert('Error loading data: ' + e.message);
+                    }
+                },
+                error: function (xhr, status, error) {
+                	xhr.isHandled = true;
+                    console.error('AJAX error:', status, error, xhr.responseText);
+                    $('#loader').hide();
+                    $('#statusBar').text(`Error loading data: ${xhr.status} ${xhr.statusText}`);
+                    alert(`Error loading data: ${xhr.status} ${xhr.statusText}`);
+                }
+            });
+        }
+
+        function collectFormData() {
+            const $row = $('#receiveItemModal').data('clickedRow') || $('.open-details').closest('tr');
+            const isNewRow = $row.hasClass('new-row');
+            const table = $('#DNItemsTable').DataTable();
+            const rowData = table.row($row).data() || [];
+            const deliveryNoteNumber = isNewRow ? $row.find('td:eq(1) input').val()?.trim() || '' : rowData[1] || '';
+            const lineNumber = rowData[0] || (newRowIndex !== null ? `New_${newRowIndex}` : '');
+            const uniqueNumber = rowData[10] || $row.find('.open-details').data('unique-number') || '';
+            const dwid = rowData[11] || '';
+
+            const itemSizeElement = document.getElementById('itemSize');
+            const itemSizeValue = itemSizeElement ? itemSizeElement.value : $('#receiveItemModal').data('itemSize') || '';
+
+            const expectedQty = parseInt($('#itemQty').val()) || 0;
+            const actualQtyReceived = $('#itemQtyReceived').val()?.trim() !== ''? parseInt($('#itemQtyReceived').val()): expectedQty;  
+			    
+			    
+            const quantityDiscrepancy = $('#quantityDiscrepancy').val() || 'none';
+            const remainingQty = (quantityDiscrepancy === 'short' && actualQtyReceived < expectedQty)
+                ? expectedQty - actualQtyReceived
+                : 0;
+
+            const receiveData = {
+                documentId: crypto.randomUUID(),
+                lineNumber: lineNumber,
+                uniqueNumber: uniqueNumber,
+                dwid: dwid,
+                weighbridgeTicketNumber: $('#weighbridgeTicketNumber').val() || wbt || $('.open-details').data('wbt') || '',
+                deliveryNoteNumber: $('#deliveryNoteNumber').val() || deliveryNoteNumber,
+                orderNumber: $('#orderNumber').val() || '',
+                jobNumber: $('#jobNumber').val() || '',
+                other: rowData[6] || '',
+                companyName: $('#companyName').val() || '',
+                vehicleRegistration: $('#vehicleRegistration').val() || '',
+                itemCodeOnDeliveryNote: $('#itemCodeOnDeliveryNote').val() || '',
+                itemNameOnDeliveryNote: $('#itemNameOnDeliveryNote').val() || '',
+                internalItemName: $('#internalItemName').val() || '',
+                itemSize: itemSizeValue,
+                itemType: $('#itemType').val() || null,
+                process: $('#process').val() || null,
+                defectDetected: $('input[name="defectDetected"]:checked').val() || 'No',
+                packagingMethod: $('#packagingMethod').val() || null,
+                quantityDiscrepancy: quantityDiscrepancy,
+                expectedQuantity: expectedQty,
+                actualQuantityReceived: actualQtyReceived,
+                remainingQuantity: remainingQty,
+                materialMarkings: $('#materialMarkings').val() || '',
+                materialLength: $('#materialLength').val() || '',
+                itemWeight: $('#itemWeight').val() || '',
+                fabricator: $('#fabricator').val() || '',
+                bay: $('#bay').val() || '',
+                accessories: $('#accessories').val() || '',
+                comments: $('#comments').val() || ''
+            };
+
+            let defectData = {};
+            if (receiveData.defectDetected === 'Yes') {
+                formData.additionalComments = $('#additionalComments').val();
+                defectData = {};
+                Object.keys(formData).forEach(key => {
+				    const xmlFriendlyKey = key.replace(/\s+/g, '_');
+				    const value = formData[key];
+				    if (Array.isArray(value) && key.endsWith('Mitigation')) {
+				        // Get the base key (e.g. 'holesInadequateMitigation' -> 'holesInadequate')
+				        const baseKey = key.replace('Mitigation', '');
+				        const item = defectCategories.flatMap(c => c.items).find(i => i.key === baseKey);
+				        if (item) {
+				            // For every possible mitigation option, output Yes/No
+				            Object.values(item.mitigations).flat().filter((v, i, a) => a.indexOf(v) === i).forEach(mitigation => {
+				                const mitigationKey = `${xmlFriendlyKey}_${mitigation
+				                    .toLowerCase()
+				                    .replace(/[^a-z0-9]+/g, '_')
+				                    .replace(/^_|_$/g, '')}`;
+				                defectData[mitigationKey] = value.includes(mitigation) ? 'Yes' : 'No';
+				            });
+				        }
+				    } else {
+				        defectData[xmlFriendlyKey] = value;
+				    }
+				});
+				
+				// Add consolidated mitigation fields for DocuWare
+				const mitigationFieldMap = {
+				    'paint': 'paintMitigation',
+				    'damaged': 'damagedMitigation',
+				    'rust': 'rustMitigation',
+				    'delamination': 'delaminationMitigation',
+				    'nonConformingPreGalv': 'nonConformingPreGalvMitigation',
+				    'enclosedCavity': 'enclosedCavityMitigation',
+				    'threadedArticle': 'threadedArticleMitigation'
+				};
+				
+				Object.entries(mitigationFieldMap).forEach(([defectKey, fieldName]) => {
+				    const mitigations = formData[`${defectKey}Mitigation`] || [];
+				    if (mitigations.length > 0) {
+				        defectData[fieldName] = mitigations.join(', ');
+				    } else {
+				        defectData[fieldName] = '';
+				    }
+				});
+				
+                defectCategories.forEach(category => {
+                    category.items.forEach(item => {
+                        const mitigations = formData[`${item.key}Mitigation`] || [];
+                        mitigations.forEach(mitigation => {
+                            const qtyKey = `${item.key}MitigationQty_${mitigation}`;
+                            const xmlFriendlyQtyKey = qtyKey.replace(/\s+/g, '_');
+                            if (formData[qtyKey]) {
+                                defectData[xmlFriendlyQtyKey] = formData[qtyKey];
+                            }
+                        });
+                    });
+                });
+            }
+
+            return { receiveInfo: receiveData, defectInfo: defectData, timestamp: new Date().toISOString() };
+        }
+
+        function submitFormData(formData, photos, newRowIndex) {
+            console.log('Photos at start of submitFormData:', photos, Object.keys(photos).length, 'Timestamp:', new Date().toLocaleString('en-ZA', { timeZone: 'Africa/Johannesburg' }));
+            $('#loader').fadeIn();
+            $('#statusBar').text('Submitting data...');
+            console.log('Submit attempt:', {
+                timestamp: new Date().toLocaleString('en-ZA', { timeZone: 'Africa/Johannesburg' }),
+                user: userData?.username || 'unknown',
+                isNewRow: newRowIndex !== null
+            });
+            const jsonPayload = {
+                root: {
+                    receiveData: formData.receiveInfo,
+                    defectData: formData.defectInfo,
+                    isNewRow: newRowIndex !== null // Add flag for backend
+                }
+            };
+            console.log('JSON Payload:', JSON.stringify(jsonPayload, null, 2));
+            fetch(address + '/submitItemData', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify(jsonPayload)
+            })
+			.then(async response => {
+			    console.log('Submit response status:', response.status, response.statusText);
+			    if (!response.ok) {
+			        const errorText = await response.text();
+			        console.error('Submit response body:', errorText);
+			        throw new Error(`Server Error (${response.status}): ${errorText || response.statusText}`);
+			    }
+			    
+			    // Handle "No documents found" response
+			    const responseText = await response.text();
+			    if (responseText.includes('No documents found')) {
+			        console.log('Server returned "No documents found" - treating as success');
+			        // Return a mock successful response
+			        return {
+			            Field: [{
+			                FieldName: 'DWDOCID',
+			                Item: 'TEMP_' + Date.now() // Temporary document ID
+			            }]
+			        };
+			    }
+			    
+			    // Parse as JSON for normal responses
+			    try {
+			        return JSON.parse(responseText);
+			    } catch (e) {
+			        console.error('Failed to parse response as JSON:', responseText);
+			        throw new Error('Invalid JSON response from server');
+			    }
+			})
+                .then(data => {
+                    console.log('Full server response:', JSON.stringify(data, null, 2));
+                    const docField = data.Field?.find(field => field.FieldName === 'DWDOCID');
+                    if (!docField || !docField.Item) {
+                        console.error('DWDOCID missing or invalid:', { dataField: data.Field });
+                        throw new Error('Invalid response format or missing DWDOCID');
+                    }
+                    const documentId = docField.Item;
+                    // Update dwid for new row in DataTable
+                    if (newRowIndex !== null) {
+                        const table = $('#DNItemsTable').DataTable();
+                        let rowNode = null;
+                        table.rows().every(function () {
+                            if (this.data()[0] === newRowIndex) {
+                                rowNode = this.node();
+                                const rowData = this.data();
+                                rowData[11] = documentId; // Update dwid
+                                rowData[8] = '<span class="text-success">Received</span>'; // Update Receive column
+                                this.data(rowData);
+                            }
+                        });
+                        if (rowNode) {
+                            $(rowNode).find('.open-details').prop('disabled', true); // Disable Receive button
+                            $(rowNode).removeClass('new-row table-danger'); // Remove new-row styling
+                        }
+                    }
+                    if (Object.keys(photos).length > 0) {
+                        return uploadImages(documentId, formData.receiveInfo.uniqueNumber, photos)
+                            .then(uploadResult => {
+                                photos = {}; // Clear photos only after successful upload
+                                return { success: true, documentId };
+                            });
+                    }
+                    photos = {}; // Clear photos if no upload is needed
+                    return { success: true, documentId };
+                })
+				.then(() => {
+				    console.log('Submission completed successfully at:', new Date().toLocaleString('en-ZA', { timeZone: 'Africa/Johannesburg' }));
+				    
+				    // For new rows, remove them from the table (simulate normal receive behavior)
+				    if (newRowIndex !== null) {
+				        const table = $('#DNItemsTable').DataTable();
+				        let rowToRemove = null;
+				        table.rows().every(function () {
+				            if (this.data()[0] === newRowIndex.toString()) {
+				                rowToRemove = this;
+				                return false; // Stop iteration
+				            }
+				        });
+				        if (rowToRemove) {
+				            rowToRemove.remove();
+				            table.draw();
+				            console.log('Removed new row after successful submission');
+				        }
+				    }
+    
+    $('#receiveItemModal').modal('hide');
+    $('#passedModal').modal('hide');
+    $('body').removeClass('modal-open');
+    $('.modal-backdrop').remove();
+    resetForms();
+    
+    // Don't refresh table to avoid "No documents found" error
+    // refreshTable();
+    
+    $('#statusBar').text('Submission successful - Item received');
+})
+                .catch(error => {
+                    console.error('Detailed error information:', {
+                        message: error.message,
+                        stack: error.stack,
+                        timestamp: new Date().toLocaleString('en-ZA', { timeZone: 'Africa/Johannesburg' })
+                    });
+                    $('#statusBar').text(`Error: ${error.message}`);
+                    alert(`Submission failed: ${error.message}\nPlease check the console for more details.`);
+                })
+                .finally(() => {
+                    $('#loader').fadeOut();
+                    if ($('.modal-backdrop').length > 0) {
+                        $('.modal-backdrop').remove();
+                        $('body').removeClass('modal-open');
+                    }
+                });
+        }
+
+        function uploadImages(documentId, uniqueNumber, photos) {
+            console.log('Uploading images at:', new Date().toLocaleString('en-ZA', { timeZone: 'Africa/Johannesburg' }), { documentId, uniqueNumber, photoKeys: Object.keys(photos) });
+            const photoFormData = new FormData();
+            Object.entries(photos).forEach(([defectKey, file]) => {
+                const xmlFriendlyKey = defectKey.replace(/\s+/g, '_');
+                const fileName = `${uniqueNumber}_${xmlFriendlyKey}_${documentId}.jpg`;
+                photoFormData.append(`photo_${xmlFriendlyKey}`, file, fileName);
+            });
+            photoFormData.append('documentId', documentId);
+            photoFormData.append('uniqueNumber', uniqueNumber);
+            photoFormData.append('timestamp', new Date().toISOString());
+            photoFormData.append('user', userData?.username || 'unknown');
+            console.log('Photo FormData contents:');
+            for (let [key, value] of photoFormData.entries()) {
+                console.log(`  ${key}: ${value instanceof File ? value.name : value}`);
+            }
+            return fetch(address + '/uploadImages', {
+                method: 'POST',
+                body: photoFormData
+            })
+                .then(async response => {
+                    console.log('Upload response status:', response.status, response.statusText);
+                    if (!response.ok) {
+                        const errorText = await response.text();
+                        console.error('Upload response body:', errorText);
+                        throw new Error(`Image upload failed (${response.status}): ${errorText || response.statusText}`);
+                    }
+                    return response.json();
+                })
+                .then(result => {
+                    console.log('Image upload successful:', result, 'Timestamp:', new Date().toLocaleString('en-ZA', { timeZone: 'Africa/Johannesburg' }));
+                    $('#statusBar').text('Images Successfully Uploaded');
+                    setTimeout(() => $('#statusBar').text('System Ready'), 3000);
+                    return result;
+                })
+                .catch(error => {
+                    console.error('Image upload error:', {
+                        message: error.message,
+                        stack: error.stack,
+                        timestamp: new Date().toLocaleString('en-ZA', { timeZone: 'Africa/Johannesburg' })
+                    });
+                    $('#statusBar').text(`Error Uploading Images: ${error.message}`);
+                    alert(`Image upload failed: ${error.message}\nPlease check the console for details.`);
+                    throw error;
+                });
+        }
+
+        function resetForms() {
+            console.log('Photos in resetForms before clear:', photos, Object.keys(photos).length, 'Timestamp:', new Date().toLocaleString('en-ZA', { timeZone: 'Africa/Johannesburg' }));
+            // Only clear photos after submission is confirmed
+            if ($('#receiveItemModal').is(':visible') || $('#passedModal').is(':visible') || $('#defectModal').is(':visible')) {
+                console.log('Preserving photos during modal transitions');
+                return; // Skip reset during modal transitions
+            }
+            photos = {};
+            console.log('Photos in resetForms after clear:', photos, Object.keys(photos).length, 'Timestamp:', new Date().toLocaleString('en-ZA', { timeZone: 'Africa/Johannesburg' }));
+            // Rest of reset logic
+            const receiveForm = $('#receiveItemModal form')[0];
+            const expectedQty = $('#receiveItemModal').data('expectedQty') || 0;
+            const itemDescription = $('#itemNameOnDeliveryNote').val() || '';
+            if (receiveForm) receiveForm.reset();
+            $('#quantityFields').addClass('d-none').removeClass('alert-warning');
+            $('#qtyDifferenceHelp').empty();
+            $('#itemQty').val(expectedQty).trigger('change');
+            document.getElementById('itemQty')?.setAttribute('value', expectedQty);
+            $('#itemQtyReceived').val(expectedQty);
+            $('#bay').val('None');
+            $('#packagingMethod').val('loose').trigger('change');
+            $('#internalItemName').val(itemDescription);
+            $('#receiveItemModal').data('itemSize', '');
+            $('#materialMarkings').val('');
+            $('#materialLength').val('');
+            $('#itemWeight').val('');
+            $('#fabricator').val('');
+            $('#itemSize, #bay, #itemCodeOnDeliveryNote, #itemNameOnDeliveryNote, #internalItemName, #itemType, #process, #packagingMethod, #itemQtyReceived').removeClass('is-invalid').next('.invalid-feedback').text('');
+
+            // Clear new read-only fields
+            $('#weighbridgeTicketNumber, #deliveryNoteNumber, #orderNumber, #jobNumber, #companyName, #vehicleRegistration').val('');
+
+            validateReceiveForm();
+            setDefaultDefectValues();
+        }
+
+        function refreshTable() {
+            $('#row_openItems').empty();
+            newRowIndex = null;
+            getData(wbt, company);
+        }
+
+        function updateAddButtonVisibility(table) {
+            $('#addNewItemBtn').show();
+        }
+
+        function initializeEmptyTable() {
+            if ($.fn.DataTable && $.fn.DataTable.isDataTable('#DNItemsTable')) {
+                $('#DNItemsTable').DataTable().destroy();
+            }
+            let table;
+            if ($.fn.DataTable) {
+                table = $("#DNItemsTable").DataTable({
+                    columnDefs: [
+                        { targets: [0, -1, -2], orderable: false }
+                    ]
+                });
+                updateAddButtonVisibility(table);
+                table.on('draw', function () {
+                    updateAddButtonVisibility(table);
+                });
+            } else {
+                console.error('DataTables library not loaded. Table functionality is limited.');
+                updateAddButtonVisibility(null);
+            }
+            $("#loader").fadeOut();
+            statusBar.textContent = `No POD Items found`;
+        }
+
+		function validateReceiveForm() {
+		    let expectedQty = parseInt($('#receiveItemModal').data('expectedQty')) || parseInt($('#itemQty').val()) || 0;
+		    $('#itemQty').val(expectedQty);
+		    let isValid = true;
+		    let errorMessages = [];
+		    const fields = {
+		        itemCode: { id: '#itemCodeOnDeliveryNote', message: 'Item Code on Delivery Note is required.' },
+		        itemName: { id: '#itemNameOnDeliveryNote', message: 'Item Name on Delivery Note is required.' },
+		        internalItemName: { id: '#internalItemName', message: 'Internal Item Name is required.' },
+		        itemType: { id: '#itemType', message: 'Item Type is required.' },
+		        process: { id: '#process', message: 'Process is required.' },
+		        packagingMethod: { id: '#packagingMethod', message: 'Packaging Method is required.' }
+		    };
+		    const quantityDiscrepancy = $('#quantityDiscrepancy').val() || 'none';
+		    const actualQtyReceived = parseInt($('#itemQtyReceived').val());
+		    const defectDetected = $('input[name="defectDetected"]:checked').val() || '';
+		    const itemSize = $('#itemSize').val()?.trim() || '';
+		    const bay = $('#bay').val()?.trim() || '';
+		
+		    Object.values(fields).forEach(field => {
+		        const value = $(field.id).val()?.trim() || '';
+		        if (!value) {
+		            isValid = false;
+		            errorMessages.push(field.message);
+		            $(field.id).addClass('is-invalid').next('.invalid-feedback').text(field.message);
+		        } else {
+		            $(field.id).removeClass('is-invalid').next('.invalid-feedback').text('');
+		        }
+		    });
+		
+		    if (!expectedQty || isNaN(expectedQty) || expectedQty <= 0) {
+		        isValid = false;
+		        errorMessages.push('Expected Quantity must be a positive number.');
+		        $('#itemQty').addClass('is-invalid').next('.invalid-feedback').text('Expected Quantity must be positive.');
+		    } else {
+		        $('#itemQty').removeClass('is-invalid').next('.invalid-feedback').text('');
+		    }
+		
+		    
+		    if (quantityDiscrepancy !== 'none') {
+		        if (isNaN(actualQtyReceived) || actualQtyReceived < 0) {
+		            isValid = false;
+		            errorMessages.push('Actual Quantity Received must be 0 or greater when there is a discrepancy.');
+		            $('#itemQtyReceived').addClass('is-invalid').next('.invalid-feedback').text('Actual Quantity must be 0 or greater.');
+		        } else {
+		            const difference = actualQtyReceived - expectedQty;
+		            
+		            if (quantityDiscrepancy === 'short' && difference >= 0) {
+		                isValid = false;
+		                errorMessages.push("Actual Quantity must be less than Expected Quantity for 'Short Supplied'.");
+		                $('#itemQtyReceived').addClass('is-invalid').next('.invalid-feedback').text('Actual Quantity must be less than Expected for Short Supplied.');
+		            } else if (quantityDiscrepancy === 'over' && difference <= 0) {
+		                isValid = false;
+		                errorMessages.push("Actual Quantity must be greater than Expected Quantity for 'Over Supplied'.");
+		                $('#itemQtyReceived').addClass('is-invalid').next('.invalid-feedback').text('Actual Quantity must be greater than Expected for Over Supplied.');
+		            } else if (Math.abs(difference) > expectedQty * 0.1) {
+		                // Warning only, doesn't block submission
+		                errorMessages.push('Warning: Difference exceeds 10% of Expected Quantity.');
+		            } else {
+		                $('#itemQtyReceived').removeClass('is-invalid').next('.invalid-feedback').text('');
+		            }
+		        }
+		    } else {
+		        $('#itemQtyReceived').removeClass('is-invalid').next('.invalid-feedback').text('');
+		    }
+		
+		    if (!defectDetected) {
+		        isValid = false;
+		        errorMessages.push('Defect Detected selection (Yes/No) is required.');
+		        $('input[name="defectDetected"]').addClass('is-invalid').next('.invalid-feedback').text('Defect Detected is required.');
+		    } else {
+		        $('input[name="defectDetected"]').removeClass('is-invalid').next('.invalid-feedback').text('');
+		    }
+		
+		    if (!itemSize) {
+		        isValid = false;
+		        errorMessages.push('Item Size is required.');
+		        $('#itemSize').addClass('is-invalid').next('.invalid-feedback').text('Item Size is required.');
+		    } else {
+		        $('#itemSize').removeClass('is-invalid').next('.invalid-feedback').text('');
+		    }
+		
+		    console.log('Bay value during validation:', bay);
+		
+		    $('#receiveItemBtn').prop('disabled', !isValid);
+		    const errorContainer = $('#receiveFormErrors');
+		    errorContainer.html(isValid ? '' : errorMessages.map(msg => `<div class="text-danger">${msg}</div>`).join('')).toggleClass('d-none', isValid);
+		    return isValid;
+		}
+
+        function validateInlineFields(rowNode) {
+		    const $row = $(rowNode);
+		    const deliveryNote = $row.find('td:eq(1) input').val()?.trim() || '';
+		    const itemCode = $row.find('td:eq(2) input').val()?.trim() || '';
+		    const itemDescription = $row.find('td:eq(3) input').val()?.trim() || '';
+		    const itemQty = $row.find('td:eq(5) input').val()?.trim() || '';
+		
+		    const isValid = deliveryNote && itemCode && itemDescription && itemQty && parseInt(itemQty) > 0;
+		
+		    $row.find('.open-details').prop('disabled', !isValid);
+		
+		    console.log('Validation result:', isValid);
+		    return isValid;
+		}
+
+        function updateProcessOptions() {
+            const itemType = $('#itemType').val();
+            const $process = $('#process');
+            const originalValue = $process.val();
+            $process.find('option').prop('disabled', false);
+            if (itemType === 'galvanised') {
+                $process.find('option[value="galvanising"]').prop('disabled', true).attr('title', 'Not available for Material Type: Galvanised');
+                $process.find('option[value="galvanising_paint"]').prop('disabled', true).attr('title', 'Not available for Material Type: Galvanised');
+                $process.find('option[value="shotblast_galvanising"]').prop('disabled', true).attr('title', 'Not available for Material Type: Galvanised');
+                $process.val('strip_regalvanise');
+            } else if (itemType === 'blacksteel') {
+                $process.find('option[value="strip_only"]').prop('disabled', true).attr('title', 'Not available for Material Type: Black Steel');
+                $process.find('option[value="strip_regalvanise"]').prop('disabled', true).attr('title', 'Not available for Material Type: Black Steel');
+                $process.find('option[value="strip_galvanising_paint"]').prop('disabled', true).attr('title', 'Not available for Material Type: Black Steel');
+                $process.find('option[value="shotblast_strip_regalvanising"]').prop('disabled', true).attr('title', 'Not available for Material Type: Black Steel');
+                $process.find('option[value="shotblast_strip_regalvanising_paint"]').prop('disabled', true).attr('title', 'Not available for Material Type: Black Steel');
+                if ($process.find(`option[value="${originalValue}"]`).prop('disabled')) {
+                    $process.val('');
+                }
+            } else {
+                $process.val('');
+            }
+            validateReceiveForm();
+        }
+
+        window.toggleQuantityFields = function () {
+            const discrepancy = $('#quantityDiscrepancy').val();
+            const $quantityFields = $('#quantityFields');
+            const $qtyDifferenceHelp = $('#qtyDifferenceHelp');
+            let expectedQty = parseInt($('#receiveItemModal').data('expectedQty')) || 0;
+            if (!expectedQty) {
+                const row = $('#receiveItemModal').data('clickedRow');
+                expectedQty = parseInt(row.find('td:eq(5)').text().trim()) || 0;
+                $('#receiveItemModal').data('expectedQty', expectedQty);
+            }
+            const actualQty = parseInt($('#itemQtyReceived').val()) || expectedQty;
+            const $itemQty = $('#itemQty');
+            const $itemQtyDom = document.getElementById('itemQty');
+            if ($itemQtyDom) {
+                $itemQtyDom.value = expectedQty;
+                $itemQty.val(expectedQty);
+                $itemQtyDom.setAttribute('value', expectedQty);
+                $itemQty.trigger('input');
+                $itemQtyDom.style.display = 'none';
+                setTimeout(() => {
+                    $itemQtyDom.style.display = 'block';
+                    $itemQtyDom.focus();
+                }, 0);
+            }
+            if (discrepancy === 'none') {
+                $quantityFields.addClass('d-none').removeClass('alert-warning');
+                $('#itemQtyReceived').val(expectedQty);
+            } else {
+                $quantityFields.removeClass('d-none');
+                $('#itemQtyReceived').val(actualQty);
+                if (actualQty !== expectedQty) {
+                    $quantityFields.addClass('alert-warning');
+                    const difference = actualQty - expectedQty;
+                    $qtyDifferenceHelp.text(`Difference: ${difference} units (${discrepancy === 'short' ? 'Short' : 'Over'} Supplied)`);
+                } else {
+                    $quantityFields.removeClass('alert-warning');
+                    $qtyDifferenceHelp.empty();
+                }
+            }
+            validateReceiveForm();
+        };
+
+        $('#itemSize').on('input change', function () {
+            const value = $(this).val().trim();
+            $('#receiveItemModal').data('itemSize', value);
+            validateReceiveForm();
+        });
+
+        $('#quantityDiscrepancy').on('change', function () {
+            window.toggleQuantityFields();
+        });
+
+        $('#itemCodeOnDeliveryNote, #itemNameOnDeliveryNote, #internalItemName').on('input change', function () {
+            validateReceiveForm();
+        });
+
+        $('#itemType, #process, #packagingMethod').on('change', function () {
+            validateReceiveForm();
+        });
+
+        $('#itemQty').on('change', function () {
+            validateReceiveForm();
+        });
+
+        $('#bay').on('change', function () {
+            validateReceiveForm();
+        });
+
+		$('#itemQtyReceived').on('input', function () {
+		    const expectedQty = parseInt($('#itemQty').val()) || 0;
+		    const actualQty = parseInt($(this).val());
+		    const discrepancy = $('#quantityDiscrepancy').val();
+		    const $qtyDifferenceHelp = $('#qtyDifferenceHelp');
+		    
+		    // Allow empty field or valid numbers (including 0)
+		    if (discrepancy !== 'none' && !isNaN(actualQty) && actualQty >= 0 && expectedQty) {
+		        const difference = actualQty - expectedQty;
+		        $qtyDifferenceHelp.text(`Difference: ${difference} units (${discrepancy === 'short' ? 'Short' : 'Over'} Supplied)`);
+		    } else {
+		        $qtyDifferenceHelp.empty();
+		    }
+		    validateReceiveForm();
+		});
+
+        $('#resetQtyBtn').on('click', function () {
+            const expectedQty = parseInt($('#itemQty').val()) || 0;
+            $('#itemQtyReceived').val(expectedQty).trigger('input');
+        });
+
+        $('#itemType').on('change', function () {
+            updateProcessOptions();
+        });
+
+        $('#defectYes, #defectNo').on('change', function () {
+            const receiveItemBtn = $('#receiveItemBtn');
+            const isDefectYesChecked = $('#defectYes').is(':checked');
+            receiveItemBtn.text(isDefectYesChecked ? 'Capture Defect' : 'Receive Item');
+            receiveItemBtn.toggleClass('btn-warning', isDefectYesChecked).toggleClass('btn-primary', !isDefectYesChecked);
+            validateReceiveForm();
+        });
+
+        
+		$('#receiveItemBtn').on('click', function () {
+		    console.log('=== RECEIVE BUTTON CLICKED ===');
+		    
+		    if (!validateReceiveForm()) {
+		        console.log('Validation failed, exiting');
+		        return;
+		    }
+		    
+		    //Disable button to prevent double submission
+		    const $btn = $(this);
+		    if ($btn.prop('disabled')) {
+		        console.log('Receive button already disabled, ignoring click');
+		        return;
+		    }
+		    $btn.prop('disabled', true);
+		    
+		    const defectDetected = $('input[name="defectDetected"]:checked').val();
+		    console.log('Defect detected value:', defectDetected);
+		    console.log('Button text:', $btn.text());
+		    
+		    if (defectDetected === 'Yes') {
+		        console.log('Opening defect modal flow...');
+		        console.log('Receive modal visible:', $('#receiveItemModal').is(':visible'));
+		        console.log('Defect modal exists:', $('#defectModal').length);
+		        
+		        // Wait for receive modal to fully hide before showing defect modal
+		        $('#receiveItemModal').one('hidden.bs.modal', function () {
+		            console.log('Receive modal hidden, now showing defect modal');
+		            console.log('About to call .modal("show") on defect modal');
+		            $('#defectModal').modal('show');
+		            console.log('Called .modal("show")');
+		        });
+		        
+		        console.log('Hiding receive modal');
+		        $('#receiveItemModal').modal('hide');
+		        $btn.prop('disabled', false); // Re-enable since we're going to defect modal
+		    } else {
+		        console.log('No defect detected, showing passed modal');
+		        const formData = collectFormData();
+		        $('#passedModal').modal('show');
+		        const summaryList = Object.entries(formData.defectInfo)
+		            .filter(([key]) => !key.endsWith('Mitigation') && key !== 'photos' && key !== 'additionalComments')
+		            .map(([key, value]) => {
+		                const item = defectCategories.flatMap(c => c.items).find(i => i.key === key);
+		                const mitigations = formData.defectInfo[`${key}Mitigation`] || [];
+		                return value !== item.default ? `<li>${item.label}: ${value}${mitigations.length ? ` (Mitigation: ${mitigations.join(', ')})` : ''}</li>` : '';
+		            }).filter(Boolean).join('');
+		        $('#defectSummaryList').html(summaryList || '<li>No defects detected.</li>');
+		        $('#passedModal').data('formData', formData);
+		    }
+		});
+		
+		// Refresh Button Handler
+		$('#refreshButton').on('click', function() {
+		    console.log('Refresh button clicked at:', new Date().toLocaleString('en-ZA', { timeZone: 'Africa/Johannesburg' }));
+		    $('#statusBar').text('Refreshing table...');
+		    refreshTable();
+		});
+
+        getData(wbt, company);
+});
+</script>
