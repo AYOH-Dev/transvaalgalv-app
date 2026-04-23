@@ -1,23 +1,45 @@
-Add Caddy include for transvaal.ayai.live
+Transvaal Caddy include
 
-1. Copy the include into the host Caddy config directory (on the server):
+Purpose
+- Caddy site include for `transvaal.ayai.live` and `transvaalgalv.ayai.live`.
 
-   sudo mkdir -p /etc/caddy/sites
-   sudo cp deploy/caddy/transvaal.caddy /etc/caddy/sites/transvaal.caddy
+Best practices applied
+- Proxy API paths only to the dedicated backend on `10.100.0.1:8083` to avoid gateway interference.
+- Apply modern security headers (HSTS, Referrer-Policy, X-Content-Type-Options, X-Frame-Options, Permissions-Policy).
+- Do not set redundant `header_up` values for `X-Forwarded-For`/`X-Forwarded-Proto` — Caddy passes these by default and will warn.
+- Keep host-specific site blocks (or includes) with precise `handle` matchers to avoid unintended routing by other site blocks.
 
-2. Edit `/etc/caddy/Caddyfile` and add the import line (near other `import sites/*` entries):
+Installation
 
-   import sites/transvaal.caddy
+1. Copy the include to the system sites directory:
 
-3. Validate and reload Caddy:
+```bash
+sudo cp deploy/caddy/transvaal.caddy /etc/caddy/sites/transvaal.caddy
+```
 
-   sudo caddy validate --config /etc/caddy/Caddyfile
-   sudo caddy reload --config /etc/caddy/Caddyfile
+2. Validate and reload Caddy:
 
-4. Verify the endpoint from the DocuWare host or from this host:
+```bash
+sudo /usr/bin/caddy validate --config /etc/caddy/Caddyfile
+sudo systemctl reload caddy
+```
 
-   curl -v https://transvaal.ayai.live/integrations/docuware/imports
+Verification
+- Check the readiness endpoint:
 
-Notes:
-- This include proxies first to port 8083, then 8080 as a fallback; adjust ports if your app listens elsewhere.
-- If your Transvaal app is a systemd service or container, ensure it is running and listening on the expected port before reloading Caddy.
+```bash
+curl -sS -w "\nHTTP_CODE:%{http_code}\n" https://transvaalgalv.ayai.live/ready
+```
+
+- Test auth login (use a real admin):
+
+```bash
+curl -v -i -X POST https://transvaalgalv.ayai.live/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"real-admin@transvaal.local","password":"<password>"}'
+```
+
+Notes
+- Keep the include focused on the site hostnames and API paths to prevent other gateway blocks from capturing requests.
+- Prefer a single upstream (8083) for this app; only add fallbacks after deliberate testing.
+- If Caddy logs warnings about `header_up`, remove redundant headers — Caddy sets forwarded headers automatically.

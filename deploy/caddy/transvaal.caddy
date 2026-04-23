@@ -2,39 +2,68 @@
 # Place this file under /etc/caddy/sites/transvaal.caddy and add
 # `import sites/transvaal.caddy` to your main /etc/caddy/Caddyfile, then reload Caddy.
 
-https://transvaal.ayai.live {
+https://transvaal.ayai.live, https://transvaalgalv.ayai.live {
+    # Security headers (apply to all responses) — modern best practices
+    header {
+        Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
+        Referrer-Policy "no-referrer-when-downgrade"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        Permissions-Policy "geolocation=(), microphone=(), camera=()"
+    }
+
     # Health and readiness (exposed without auth)
     handle /health* {
-        reverse_proxy 10.100.0.1:8083 10.100.0.1:8080 {
+        reverse_proxy 10.100.0.1:8083 {
             header_up Host {host}
             header_up X-Real-IP {http.request.remote.host}
-            header_up X-Forwarded-Proto https
         }
     }
 
     handle /ready* {
-        reverse_proxy 10.100.0.1:8083 10.100.0.1:8080 {
+        reverse_proxy 10.100.0.1:8083 {
             header_up Host {host}
             header_up X-Real-IP {http.request.remote.host}
-            header_up X-Forwarded-Proto https
         }
     }
 
     # DocuWare import endpoint
     handle /integrations/docuware/imports {
-        reverse_proxy 10.100.0.1:8083 10.100.0.1:8080 {
+        reverse_proxy 10.100.0.1:8083 {
             header_up Host {host}
             header_up X-Real-IP {http.request.remote.host}
-            header_up X-Forwarded-Proto https
+        }
+    }
+
+    # API endpoints (proxy to backend)
+    handle /auth* {
+        reverse_proxy 10.100.0.1:8083 {
+            header_up Host {host}
+            header_up X-Real-IP {http.request.remote.host}
+        }
+    }
+
+    handle /receipts* {
+        reverse_proxy 10.100.0.1:8083 {
+            header_up Host {host}
+            header_up X-Real-IP {http.request.remote.host}
+        }
+    }
+
+    handle /admin/* {
+        reverse_proxy 10.100.0.1:8083 {
+            header_up Host {host}
+            header_up X-Real-IP {http.request.remote.host}
+            header_up X-Forwarded-For {http.request.remote.host}
+            header_up X-Forwarded-Proto {http.request.scheme}
         }
     }
 
     # All other API requests to the Transvaal backend
+    # Serve the frontend SPA for everything else
     handle {
-        reverse_proxy 10.100.0.1:8083 10.100.0.1:8080 {
-            header_up Host {host}
-            header_up X-Real-IP {http.request.remote.host}
-            header_up X-Forwarded-Proto https
-        }
+        root * /opt/projects/transvaalgalv-app/frontend/dist
+        try_files {path} /index.html
+        file_server
     }
 }
