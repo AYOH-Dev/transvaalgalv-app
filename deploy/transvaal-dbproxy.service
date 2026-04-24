@@ -1,0 +1,14 @@
+[Unit]
+Description=Transvaal Galv DB Proxy
+After=network.target
+
+[Service]
+Type=simple
+User=dane.summers
+EnvironmentFile=/opt/projects/transvaalgalv-app/.env.dev
+ExecStart=/opt/projects/transvaalgalv-app/backend/bin/devdbproxy
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

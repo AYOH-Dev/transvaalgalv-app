@@ -1,0 +1,1914 @@
+{
+    "Links": [
+        {
+            "rel": "documents",
+            "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Documents"
+        },
+        {
+            "rel": "documentsTable",
+            "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Documents?format=table"
+        },
+        {
+            "rel": "advancedDocumentUpload",
+            "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Documents"
+        },
+        {
+            "rel": "importDocuments",
+            "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Archiving/ImportDocument"
+        },
+        {
+            "rel": "unprocessedDocumentUpload",
+            "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Documents?processTextshot=False"
+        },
+        {
+            "rel": "self",
+            "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642"
+        },
+        {
+            "rel": "dialogs",
+            "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Dialogs"
+        },
+        {
+            "rel": "searches",
+            "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Dialogs?dialogType=Search"
+        },
+        {
+            "rel": "customSearch",
+            "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Dialogs/00000000-0000-0000-0000-000000000000"
+        },
+        {
+            "rel": "customInfo",
+            "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Dialogs/i_00000000-0000-0000-0000-000000000000?dialogType=InfoDialog"
+        },
+        {
+            "rel": "resultTrees",
+            "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Dialogs?dialogType=ResultTree"
+        },
+        {
+            "rel": "stores",
+            "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Dialogs?dialogType=Store"
+        },
+        {
+            "rel": "taskLists",
+            "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Dialogs?dialogType=TaskList"
+        },
+        {
+            "rel": "stamps",
+            "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Stamps"
+        },
+        {
+            "rel": "transfer",
+            "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Task/Transfer"
+        },
+        {
+            "rel": "notifications",
+            "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Query/Notifications?timeout=500&notification=newDocuments"
+        },
+        {
+            "rel": "contentMergeOperation",
+            "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Operations/ContentMerge"
+        },
+        {
+            "rel": "batchUpdate",
+            "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Operations/BatchDocumentsUpdateFields"
+        },
+        {
+            "rel": "nextSequenceElement",
+            "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Operations/RetrieveSequenceElement"
+        },
+        {
+            "rel": "versionHistoryResultList",
+            "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Dialogs/vh_3035e14f-37e6-4403-9de2-ed049d26d642"
+        },
+        {
+            "rel": "fieldValueStatistics",
+            "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Query/FieldValueStatistics"
+        },
+        {
+            "rel": "query",
+            "href": "/DocuWare/Search/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Documents/functionExpression?start=0&count=50"
+        },
+        {
+            "rel": "setupReplication",
+            "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Replication/SetupReplication"
+        },
+        {
+            "rel": "replicationData",
+            "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Replication/ReplicationData"
+        },
+        {
+            "rel": "replicationDeleteData",
+            "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Replication/ReplicationDeleteData"
+        },
+        {
+            "rel": "replicationInfo",
+            "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Replication/ReplicationCabinetInfo"
+        }
+    ],
+    "Fields": [
+        {
+            "TableFieldColumns": [],
+            "UsedAsDocumentName": false,
+            "Links": [
+                {
+                    "rel": "selectList",
+                    "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Query/SelectListExpression?fieldName=AMOUNT"
+                }
+            ],
+            "Scope": "User",
+            "DWFieldType": "Numeric",
+            "Length": -1,
+            "DBFieldName": "AMOUNT",
+            "DisplayName": "Amount",
+            "DropLeadingZero": false,
+            "DropLeadingBlanks": false,
+            "NotEmpty": false,
+            "Precision": 2
+        },
+        {
+            "TableFieldColumns": [],
+            "UsedAsDocumentName": true,
+            "Links": [
+                {
+                    "rel": "selectList",
+                    "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Query/SelectListExpression?fieldName=COMPANY"
+                }
+            ],
+            "Scope": "User",
+            "DWFieldType": "Text",
+            "Length": 50,
+            "DBFieldName": "COMPANY",
+            "DisplayName": "Company",
+            "DropLeadingZero": false,
+            "DropLeadingBlanks": false,
+            "NotEmpty": false,
+            "Precision": 0
+        },
+        {
+            "TableFieldColumns": [],
+            "UsedAsDocumentName": false,
+            "Links": [
+                {
+                    "rel": "selectList",
+                    "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Query/SelectListExpression?fieldName=CONTACT"
+                }
+            ],
+            "Scope": "User",
+            "DWFieldType": "Text",
+            "Length": 50,
+            "DBFieldName": "CONTACT",
+            "DisplayName": "Contact",
+            "DropLeadingZero": false,
+            "DropLeadingBlanks": false,
+            "NotEmpty": false,
+            "Precision": 0
+        },
+        {
+            "TableFieldColumns": [],
+            "UsedAsDocumentName": false,
+            "Links": [
+                {
+                    "rel": "selectList",
+                    "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Query/SelectListExpression?fieldName=CUSTOMERID"
+                }
+            ],
+            "Scope": "User",
+            "DWFieldType": "Text",
+            "Length": 20,
+            "DBFieldName": "CUSTOMERID",
+            "DisplayName": "Customer ID",
+            "DropLeadingZero": false,
+            "DropLeadingBlanks": false,
+            "NotEmpty": false,
+            "Precision": 0
+        },
+        {
+            "TableFieldColumns": [],
+            "UsedAsDocumentName": false,
+            "Links": [
+                {
+                    "rel": "selectList",
+                    "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Query/SelectListExpression?fieldName=DATE"
+                }
+            ],
+            "Scope": "User",
+            "DWFieldType": "Date",
+            "Length": -1,
+            "DBFieldName": "DATE",
+            "DisplayName": "Date",
+            "DropLeadingZero": false,
+            "DropLeadingBlanks": false,
+            "NotEmpty": false,
+            "Precision": 0
+        },
+        {
+            "TableFieldColumns": [],
+            "UsedAsDocumentName": false,
+            "Links": [
+                {
+                    "rel": "selectList",
+                    "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Query/SelectListExpression?fieldName=DOCUMENTNO"
+                }
+            ],
+            "Scope": "User",
+            "DWFieldType": "Text",
+            "Length": 20,
+            "DBFieldName": "DOCUMENTNO",
+            "DisplayName": "Document Number",
+            "DropLeadingZero": false,
+            "DropLeadingBlanks": false,
+            "NotEmpty": false,
+            "Precision": 0
+        },
+        {
+            "TableFieldColumns": [],
+            "UsedAsDocumentName": false,
+            "Links": [
+                {
+                    "rel": "selectList",
+                    "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Query/SelectListExpression?fieldName=DOCUMENTTYPE"
+                }
+            ],
+            "Scope": "User",
+            "DWFieldType": "Text",
+            "Length": 50,
+            "DBFieldName": "DOCUMENTTYPE",
+            "DisplayName": "DocumentType",
+            "DropLeadingZero": false,
+            "DropLeadingBlanks": false,
+            "NotEmpty": false,
+            "Precision": 0
+        },
+        {
+            "TableFieldColumns": [],
+            "UsedAsDocumentName": false,
+            "Links": [
+                {
+                    "rel": "selectList",
+                    "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Query/SelectListExpression?fieldName=PROCESSOR"
+                }
+            ],
+            "Scope": "User",
+            "DWFieldType": "Text",
+            "Length": 50,
+            "DBFieldName": "PROCESSOR",
+            "DisplayName": "Processor",
+            "DropLeadingZero": false,
+            "DropLeadingBlanks": false,
+            "NotEmpty": false,
+            "Precision": 0
+        },
+        {
+            "TableFieldColumns": [],
+            "UsedAsDocumentName": false,
+            "Links": [
+                {
+                    "rel": "selectList",
+                    "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Query/SelectListExpression?fieldName=RESUBMISSIONDATE"
+                }
+            ],
+            "Scope": "User",
+            "DWFieldType": "Date",
+            "Length": -1,
+            "DBFieldName": "RESUBMISSIONDATE",
+            "DisplayName": "Resubmission Date",
+            "DropLeadingZero": false,
+            "DropLeadingBlanks": false,
+            "NotEmpty": false,
+            "Precision": 0
+        },
+        {
+            "TableFieldColumns": [],
+            "UsedAsDocumentName": false,
+            "Links": [
+                {
+                    "rel": "selectList",
+                    "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Query/SelectListExpression?fieldName=STATUS"
+                }
+            ],
+            "Scope": "User",
+            "DWFieldType": "Text",
+            "Length": 20,
+            "DBFieldName": "STATUS",
+            "DisplayName": "Status",
+            "DropLeadingZero": false,
+            "DropLeadingBlanks": false,
+            "NotEmpty": false,
+            "Precision": 0
+        },
+        {
+            "TableFieldColumns": [],
+            "UsedAsDocumentName": false,
+            "Links": [
+                {
+                    "rel": "selectList",
+                    "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Query/SelectListExpression?fieldName=SUBJECT"
+                }
+            ],
+            "Scope": "User",
+            "DWFieldType": "Text",
+            "Length": 100,
+            "DBFieldName": "SUBJECT",
+            "DisplayName": "Subject",
+            "DropLeadingZero": false,
+            "DropLeadingBlanks": false,
+            "NotEmpty": false,
+            "Precision": 0
+        },
+        {
+            "TableFieldColumns": [],
+            "UsedAsDocumentName": false,
+            "Links": [
+                {
+                    "rel": "selectList",
+                    "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Query/SelectListExpression?fieldName=DocuWareFulltext"
+                }
+            ],
+            "Scope": "System",
+            "DWFieldType": "Text",
+            "Length": -1,
+            "DBFieldName": "DocuWareFulltext",
+            "DisplayName": "DocuWare Fulltext",
+            "DropLeadingZero": false,
+            "DropLeadingBlanks": false,
+            "NotEmpty": false,
+            "Precision": 0
+        },
+        {
+            "TableFieldColumns": [],
+            "UsedAsDocumentName": false,
+            "Links": [
+                {
+                    "rel": "selectList",
+                    "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Query/SelectListExpression?fieldName=DWEXTENSION"
+                }
+            ],
+            "Scope": "System",
+            "DWFieldType": "Text",
+            "Length": 20,
+            "DBFieldName": "DWEXTENSION",
+            "DisplayName": "File type",
+            "DropLeadingZero": false,
+            "DropLeadingBlanks": false,
+            "NotEmpty": false,
+            "Precision": 0
+        },
+        {
+            "TableFieldColumns": [],
+            "UsedAsDocumentName": false,
+            "Links": [
+                {
+                    "rel": "selectList",
+                    "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Query/SelectListExpression?fieldName=DWDOCSIZE"
+                }
+            ],
+            "Scope": "System",
+            "DWFieldType": "Numeric",
+            "Length": -1,
+            "DBFieldName": "DWDOCSIZE",
+            "DisplayName": "Document size",
+            "DropLeadingZero": false,
+            "DropLeadingBlanks": false,
+            "NotEmpty": false,
+            "Precision": 0
+        },
+        {
+            "TableFieldColumns": [],
+            "UsedAsDocumentName": false,
+            "Links": [
+                {
+                    "rel": "selectList",
+                    "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Query/SelectListExpression?fieldName=DWDOCID"
+                }
+            ],
+            "Scope": "System",
+            "DWFieldType": "Numeric",
+            "Length": -1,
+            "DBFieldName": "DWDOCID",
+            "DisplayName": "Document ID",
+            "DropLeadingZero": false,
+            "DropLeadingBlanks": false,
+            "NotEmpty": false,
+            "Precision": 0
+        },
+        {
+            "TableFieldColumns": [],
+            "UsedAsDocumentName": false,
+            "Links": [
+                {
+                    "rel": "selectList",
+                    "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Query/SelectListExpression?fieldName=DWSTOREDATETIME"
+                }
+            ],
+            "Scope": "System",
+            "DWFieldType": "DateTime",
+            "Length": -1,
+            "DBFieldName": "DWSTOREDATETIME",
+            "DisplayName": "Stored on",
+            "DropLeadingZero": false,
+            "DropLeadingBlanks": false,
+            "NotEmpty": false,
+            "Precision": 0
+        },
+        {
+            "TableFieldColumns": [],
+            "UsedAsDocumentName": false,
+            "Links": [
+                {
+                    "rel": "selectList",
+                    "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Query/SelectListExpression?fieldName=DWSTOREUSER"
+                }
+            ],
+            "Scope": "System",
+            "DWFieldType": "Text",
+            "Length": 20,
+            "DBFieldName": "DWSTOREUSER",
+            "DisplayName": "Stored by",
+            "DropLeadingZero": false,
+            "DropLeadingBlanks": false,
+            "NotEmpty": false,
+            "Precision": 0
+        },
+        {
+            "TableFieldColumns": [],
+            "UsedAsDocumentName": false,
+            "Links": [
+                {
+                    "rel": "selectList",
+                    "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Query/SelectListExpression?fieldName=DWMODDATETIME"
+                }
+            ],
+            "Scope": "System",
+            "DWFieldType": "DateTime",
+            "Length": -1,
+            "DBFieldName": "DWMODDATETIME",
+            "DisplayName": "Modified on",
+            "DropLeadingZero": false,
+            "DropLeadingBlanks": false,
+            "NotEmpty": false,
+            "Precision": 0
+        },
+        {
+            "TableFieldColumns": [],
+            "UsedAsDocumentName": false,
+            "Links": [
+                {
+                    "rel": "selectList",
+                    "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Query/SelectListExpression?fieldName=DWMODUSER"
+                }
+            ],
+            "Scope": "System",
+            "DWFieldType": "Text",
+            "Length": 20,
+            "DBFieldName": "DWMODUSER",
+            "DisplayName": "Modified by",
+            "DropLeadingZero": false,
+            "DropLeadingBlanks": false,
+            "NotEmpty": false,
+            "Precision": 0
+        },
+        {
+            "TableFieldColumns": [],
+            "UsedAsDocumentName": false,
+            "Links": [
+                {
+                    "rel": "selectList",
+                    "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Query/SelectListExpression?fieldName=DWLASTACCESSDATETIME"
+                }
+            ],
+            "Scope": "System",
+            "DWFieldType": "DateTime",
+            "Length": -1,
+            "DBFieldName": "DWLASTACCESSDATETIME",
+            "DisplayName": "Last accessed on",
+            "DropLeadingZero": false,
+            "DropLeadingBlanks": false,
+            "NotEmpty": false,
+            "Precision": 0
+        },
+        {
+            "TableFieldColumns": [],
+            "UsedAsDocumentName": false,
+            "Links": [
+                {
+                    "rel": "selectList",
+                    "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Query/SelectListExpression?fieldName=DWLASTACCESSUSER"
+                }
+            ],
+            "Scope": "System",
+            "DWFieldType": "Text",
+            "Length": 20,
+            "DBFieldName": "DWLASTACCESSUSER",
+            "DisplayName": "Last accessed by",
+            "DropLeadingZero": false,
+            "DropLeadingBlanks": false,
+            "NotEmpty": false,
+            "Precision": 0
+        },
+        {
+            "TableFieldColumns": [],
+            "UsedAsDocumentName": false,
+            "Links": [
+                {
+                    "rel": "selectList",
+                    "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Query/SelectListExpression?fieldName=DWSYSTEMFLAGS"
+                }
+            ],
+            "Scope": "System",
+            "DWFieldType": "Numeric",
+            "Length": -1,
+            "DBFieldName": "DWSYSTEMFLAGS",
+            "DisplayName": "System flags",
+            "DropLeadingZero": false,
+            "DropLeadingBlanks": false,
+            "NotEmpty": false,
+            "Precision": 0
+        },
+        {
+            "TableFieldColumns": [],
+            "UsedAsDocumentName": false,
+            "Links": [
+                {
+                    "rel": "selectList",
+                    "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Query/SelectListExpression?fieldName=DWFORMAT"
+                }
+            ],
+            "Scope": "System",
+            "DWFieldType": "Numeric",
+            "Length": -1,
+            "DBFieldName": "DWFORMAT",
+            "DisplayName": "Format",
+            "DropLeadingZero": false,
+            "DropLeadingBlanks": false,
+            "NotEmpty": false,
+            "Precision": 0
+        },
+        {
+            "TableFieldColumns": [],
+            "UsedAsDocumentName": false,
+            "Links": [
+                {
+                    "rel": "selectList",
+                    "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Query/SelectListExpression?fieldName=DWTOTALPAGES"
+                }
+            ],
+            "Scope": "System",
+            "DWFieldType": "Numeric",
+            "Length": -1,
+            "DBFieldName": "DWTOTALPAGES",
+            "DisplayName": "Total pages",
+            "DropLeadingZero": false,
+            "DropLeadingBlanks": false,
+            "NotEmpty": false,
+            "Precision": 0
+        },
+        {
+            "TableFieldColumns": [],
+            "UsedAsDocumentName": false,
+            "Links": [
+                {
+                    "rel": "selectList",
+                    "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Query/SelectListExpression?fieldName=DWLOCKUSERID"
+                }
+            ],
+            "Scope": "System",
+            "DWFieldType": "Text",
+            "Length": -1,
+            "DBFieldName": "DWLOCKUSERID",
+            "DisplayName": "Locked user ID",
+            "DropLeadingZero": false,
+            "DropLeadingBlanks": false,
+            "NotEmpty": false,
+            "Precision": 0
+        },
+        {
+            "TableFieldColumns": [],
+            "UsedAsDocumentName": false,
+            "Links": [
+                {
+                    "rel": "selectList",
+                    "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Query/SelectListExpression?fieldName=DWCHECKOUTINFO"
+                }
+            ],
+            "Scope": "System",
+            "DWFieldType": "Text",
+            "Length": -1,
+            "DBFieldName": "DWCHECKOUTINFO",
+            "DisplayName": "Checkout info",
+            "DropLeadingZero": false,
+            "DropLeadingBlanks": false,
+            "NotEmpty": false,
+            "Precision": 0
+        },
+        {
+            "TableFieldColumns": [],
+            "UsedAsDocumentName": false,
+            "Links": [
+                {
+                    "rel": "selectList",
+                    "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Query/SelectListExpression?fieldName=DWSTORAGESETTINGS"
+                }
+            ],
+            "Scope": "System",
+            "DWFieldType": "Text",
+            "Length": -1,
+            "DBFieldName": "DWSTORAGESETTINGS",
+            "DisplayName": "Storage settings",
+            "DropLeadingZero": false,
+            "DropLeadingBlanks": false,
+            "NotEmpty": false,
+            "Precision": 0
+        },
+        {
+            "TableFieldColumns": [],
+            "UsedAsDocumentName": false,
+            "Links": [
+                {
+                    "rel": "selectList",
+                    "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Query/SelectListExpression?fieldName=DWDOCUMENTTAG"
+                }
+            ],
+            "Scope": "System",
+            "DWFieldType": "Numeric",
+            "Length": -1,
+            "DBFieldName": "DWDOCUMENTTAG",
+            "DisplayName": "Document tag",
+            "DropLeadingZero": false,
+            "DropLeadingBlanks": false,
+            "NotEmpty": false,
+            "Precision": 0
+        },
+        {
+            "TableFieldColumns": [],
+            "UsedAsDocumentName": false,
+            "Links": [
+                {
+                    "rel": "selectList",
+                    "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Query/SelectListExpression?fieldName=DWFIELDSTAG"
+                }
+            ],
+            "Scope": "System",
+            "DWFieldType": "Numeric",
+            "Length": -1,
+            "DBFieldName": "DWFIELDSTAG",
+            "DisplayName": "Fields tag",
+            "DropLeadingZero": false,
+            "DropLeadingBlanks": false,
+            "NotEmpty": false,
+            "Precision": 0
+        },
+        {
+            "TableFieldColumns": [],
+            "UsedAsDocumentName": false,
+            "Links": [
+                {
+                    "rel": "selectList",
+                    "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Query/SelectListExpression?fieldName=DWSECTIONSTAG"
+                }
+            ],
+            "Scope": "System",
+            "DWFieldType": "Numeric",
+            "Length": -1,
+            "DBFieldName": "DWSECTIONSTAG",
+            "DisplayName": "Sections tag",
+            "DropLeadingZero": false,
+            "DropLeadingBlanks": false,
+            "NotEmpty": false,
+            "Precision": 0
+        },
+        {
+            "TableFieldColumns": [],
+            "UsedAsDocumentName": false,
+            "Links": [
+                {
+                    "rel": "selectList",
+                    "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Query/SelectListExpression?fieldName=DWCONTENTTAG"
+                }
+            ],
+            "Scope": "System",
+            "DWFieldType": "Numeric",
+            "Length": -1,
+            "DBFieldName": "DWCONTENTTAG",
+            "DisplayName": "Content tag",
+            "DropLeadingZero": false,
+            "DropLeadingBlanks": false,
+            "NotEmpty": false,
+            "Precision": 0
+        },
+        {
+            "TableFieldColumns": [],
+            "UsedAsDocumentName": false,
+            "Links": [
+                {
+                    "rel": "selectList",
+                    "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Query/SelectListExpression?fieldName=DWANNOTATIONSTAG"
+                }
+            ],
+            "Scope": "System",
+            "DWFieldType": "Numeric",
+            "Length": -1,
+            "DBFieldName": "DWANNOTATIONSTAG",
+            "DisplayName": "Annotations tag",
+            "DropLeadingZero": false,
+            "DropLeadingBlanks": false,
+            "NotEmpty": false,
+            "Precision": 0
+        },
+        {
+            "TableFieldColumns": [],
+            "UsedAsDocumentName": false,
+            "Links": [
+                {
+                    "rel": "selectList",
+                    "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Query/SelectListExpression?fieldName=DWNAME"
+                }
+            ],
+            "Scope": "System",
+            "DWFieldType": "Text",
+            "Length": 255,
+            "DBFieldName": "DWNAME",
+            "DisplayName": "Name",
+            "DropLeadingZero": false,
+            "DropLeadingBlanks": false,
+            "NotEmpty": false,
+            "Precision": 0
+        },
+        {
+            "TableFieldColumns": [],
+            "UsedAsDocumentName": false,
+            "Links": [
+                {
+                    "rel": "selectList",
+                    "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Query/SelectListExpression?fieldName=DWSECTIONCOUNT"
+                }
+            ],
+            "Scope": "System",
+            "DWFieldType": "Numeric",
+            "Length": -1,
+            "DBFieldName": "DWSECTIONCOUNT",
+            "DisplayName": "Section count",
+            "DropLeadingZero": false,
+            "DropLeadingBlanks": false,
+            "NotEmpty": false,
+            "Precision": 0
+        },
+        {
+            "TableFieldColumns": [],
+            "UsedAsDocumentName": false,
+            "Links": [
+                {
+                    "rel": "selectList",
+                    "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Query/SelectListExpression?fieldName=DWDISK"
+                }
+            ],
+            "Scope": "System",
+            "DWFieldType": "Numeric",
+            "Length": -1,
+            "DBFieldName": "DWDISK",
+            "DisplayName": "Disk number",
+            "DropLeadingZero": false,
+            "DropLeadingBlanks": false,
+            "NotEmpty": false,
+            "Precision": 0
+        },
+        {
+            "TableFieldColumns": [],
+            "UsedAsDocumentName": false,
+            "Links": [
+                {
+                    "rel": "selectList",
+                    "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Query/SelectListExpression?fieldName=DWVERSIONSTATE"
+                }
+            ],
+            "Scope": "System",
+            "DWFieldType": "Text",
+            "Length": 0,
+            "DBFieldName": "DWVERSIONSTATE",
+            "DisplayName": "Version state",
+            "DropLeadingZero": false,
+            "DropLeadingBlanks": false,
+            "NotEmpty": false,
+            "Precision": 0
+        },
+        {
+            "TableFieldColumns": [],
+            "UsedAsDocumentName": false,
+            "Links": [
+                {
+                    "rel": "selectList",
+                    "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Query/SelectListExpression?fieldName=DWMAJORVERSION"
+                }
+            ],
+            "Scope": "System",
+            "DWFieldType": "Numeric",
+            "Length": 0,
+            "DBFieldName": "DWMAJORVERSION",
+            "DisplayName": "Major version",
+            "DropLeadingZero": false,
+            "DropLeadingBlanks": false,
+            "NotEmpty": false,
+            "Precision": 0
+        },
+        {
+            "TableFieldColumns": [],
+            "UsedAsDocumentName": false,
+            "Links": [
+                {
+                    "rel": "selectList",
+                    "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Query/SelectListExpression?fieldName=DWMINORVERSION"
+                }
+            ],
+            "Scope": "System",
+            "DWFieldType": "Numeric",
+            "Length": 0,
+            "DBFieldName": "DWMINORVERSION",
+            "DisplayName": "Minor version",
+            "DropLeadingZero": false,
+            "DropLeadingBlanks": false,
+            "NotEmpty": false,
+            "Precision": 0
+        },
+        {
+            "TableFieldColumns": [],
+            "UsedAsDocumentName": false,
+            "Links": [
+                {
+                    "rel": "selectList",
+                    "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Query/SelectListExpression?fieldName=DWVERSIONCOMMENT"
+                }
+            ],
+            "Scope": "System",
+            "DWFieldType": "Text",
+            "Length": 255,
+            "DBFieldName": "DWVERSIONCOMMENT",
+            "DisplayName": "Change comment",
+            "DropLeadingZero": false,
+            "DropLeadingBlanks": false,
+            "NotEmpty": false,
+            "Precision": 0
+        },
+        {
+            "TableFieldColumns": [],
+            "UsedAsDocumentName": false,
+            "Links": [
+                {
+                    "rel": "selectList",
+                    "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Query/SelectListExpression?fieldName=DWVERSTATUS"
+                }
+            ],
+            "Scope": "System",
+            "DWFieldType": "Text",
+            "Length": 15,
+            "DBFieldName": "DWVERSTATUS",
+            "DisplayName": "Version status",
+            "DropLeadingZero": false,
+            "DropLeadingBlanks": false,
+            "NotEmpty": false,
+            "Precision": 0
+        },
+        {
+            "TableFieldColumns": [],
+            "UsedAsDocumentName": false,
+            "Links": [
+                {
+                    "rel": "selectList",
+                    "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Query/SelectListExpression?fieldName=DWUSRVERSION"
+                }
+            ],
+            "Scope": "System",
+            "DWFieldType": "Text",
+            "Length": 10,
+            "DBFieldName": "DWUSRVERSION",
+            "DisplayName": "Version number",
+            "DropLeadingZero": false,
+            "DropLeadingBlanks": false,
+            "NotEmpty": false,
+            "Precision": 0
+        },
+        {
+            "TableFieldColumns": [],
+            "UsedAsDocumentName": false,
+            "Links": [
+                {
+                    "rel": "selectList",
+                    "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Query/SelectListExpression?fieldName=DELIVERY_NOTE_NUMBER"
+                }
+            ],
+            "Scope": "User",
+            "DWFieldType": "Text",
+            "Length": 255,
+            "DBFieldName": "DELIVERY_NOTE_NUMBER",
+            "DisplayName": "Delivery Note Number",
+            "DropLeadingZero": false,
+            "DropLeadingBlanks": false,
+            "NotEmpty": false,
+            "Precision": 0
+        },
+        {
+            "TableFieldColumns": [],
+            "UsedAsDocumentName": false,
+            "Links": [
+                {
+                    "rel": "selectList",
+                    "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Query/SelectListExpression?fieldName=WEIGHBRIDGE_TICKET_NUMBER"
+                }
+            ],
+            "Scope": "User",
+            "DWFieldType": "Text",
+            "Length": 255,
+            "DBFieldName": "WEIGHBRIDGE_TICKET_NUMBER",
+            "DisplayName": "Weighbridge ticket Number",
+            "DropLeadingZero": false,
+            "DropLeadingBlanks": false,
+            "NotEmpty": false,
+            "Precision": 0
+        },
+        {
+            "TableFieldColumns": [],
+            "UsedAsDocumentName": false,
+            "Links": [
+                {
+                    "rel": "selectList",
+                    "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Query/SelectListExpression?fieldName=PRODUCT_NAME"
+                }
+            ],
+            "Scope": "User",
+            "DWFieldType": "Text",
+            "Length": 255,
+            "DBFieldName": "PRODUCT_NAME",
+            "DisplayName": "Product Name",
+            "DropLeadingZero": false,
+            "DropLeadingBlanks": false,
+            "NotEmpty": false,
+            "Precision": 0
+        },
+        {
+            "TableFieldColumns": [],
+            "UsedAsDocumentName": false,
+            "Links": [
+                {
+                    "rel": "selectList",
+                    "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Query/SelectListExpression?fieldName=ORDER_NUMBER"
+                }
+            ],
+            "Scope": "User",
+            "DWFieldType": "Text",
+            "Length": 255,
+            "DBFieldName": "ORDER_NUMBER",
+            "DisplayName": "Order Number",
+            "DropLeadingZero": false,
+            "DropLeadingBlanks": false,
+            "NotEmpty": false,
+            "Precision": 0
+        },
+        {
+            "TableFieldColumns": [],
+            "UsedAsDocumentName": false,
+            "Links": [
+                {
+                    "rel": "selectList",
+                    "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Query/SelectListExpression?fieldName=OPERATOR_IN"
+                }
+            ],
+            "Scope": "User",
+            "DWFieldType": "Text",
+            "Length": 255,
+            "DBFieldName": "OPERATOR_IN",
+            "DisplayName": "Operator In",
+            "DropLeadingZero": false,
+            "DropLeadingBlanks": false,
+            "NotEmpty": false,
+            "Precision": 0
+        },
+        {
+            "TableFieldColumns": [],
+            "UsedAsDocumentName": false,
+            "Links": [
+                {
+                    "rel": "selectList",
+                    "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Query/SelectListExpression?fieldName=OPERATOR_OUT"
+                }
+            ],
+            "Scope": "User",
+            "DWFieldType": "Text",
+            "Length": 255,
+            "DBFieldName": "OPERATOR_OUT",
+            "DisplayName": "Operator Out",
+            "DropLeadingZero": false,
+            "DropLeadingBlanks": false,
+            "NotEmpty": false,
+            "Precision": 0
+        },
+        {
+            "TableFieldColumns": [],
+            "UsedAsDocumentName": false,
+            "Links": [
+                {
+                    "rel": "selectList",
+                    "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Query/SelectListExpression?fieldName=VEHICLE_REGISTRATION_"
+                }
+            ],
+            "Scope": "User",
+            "DWFieldType": "Text",
+            "Length": 255,
+            "DBFieldName": "VEHICLE_REGISTRATION_",
+            "DisplayName": "Vehicle Registration ",
+            "DropLeadingZero": false,
+            "DropLeadingBlanks": false,
+            "NotEmpty": false,
+            "Precision": 0
+        },
+        {
+            "TableFieldColumns": [
+                {
+                    "$type": "FileCabinetFieldBase",
+                    "Links": [
+                        {
+                            "rel": "selectList",
+                            "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Query/SelectListExpression?fieldName=PRODU_ITEM_CODE&parentFieldName=PRODUCT_TABLE"
+                        }
+                    ],
+                    "Scope": "User",
+                    "DWFieldType": "Text",
+                    "Length": 255,
+                    "DBFieldName": "PRODU_ITEM_CODE",
+                    "DisplayName": "Item Code",
+                    "DropLeadingZero": false,
+                    "DropLeadingBlanks": false,
+                    "NotEmpty": false,
+                    "Precision": 0
+                },
+                {
+                    "$type": "FileCabinetFieldBase",
+                    "Links": [
+                        {
+                            "rel": "selectList",
+                            "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Query/SelectListExpression?fieldName=PRODU_ITEM_DESCRIPTION&parentFieldName=PRODUCT_TABLE"
+                        }
+                    ],
+                    "Scope": "User",
+                    "DWFieldType": "Text",
+                    "Length": 255,
+                    "DBFieldName": "PRODU_ITEM_DESCRIPTION",
+                    "DisplayName": "Item Description",
+                    "DropLeadingZero": false,
+                    "DropLeadingBlanks": false,
+                    "NotEmpty": false,
+                    "Precision": 0
+                },
+                {
+                    "$type": "FileCabinetFieldBase",
+                    "Links": [
+                        {
+                            "rel": "selectList",
+                            "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Query/SelectListExpression?fieldName=PRODU_ITEM_SIZE&parentFieldName=PRODUCT_TABLE"
+                        }
+                    ],
+                    "Scope": "User",
+                    "DWFieldType": "Text",
+                    "Length": 255,
+                    "DBFieldName": "PRODU_ITEM_SIZE",
+                    "DisplayName": "Item Size",
+                    "DropLeadingZero": false,
+                    "DropLeadingBlanks": false,
+                    "NotEmpty": false,
+                    "Precision": 0
+                },
+                {
+                    "$type": "FileCabinetFieldBase",
+                    "Links": [
+                        {
+                            "rel": "selectList",
+                            "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Query/SelectListExpression?fieldName=PRODU_ITEM_QUANTITY&parentFieldName=PRODUCT_TABLE"
+                        }
+                    ],
+                    "Scope": "User",
+                    "DWFieldType": "Text",
+                    "Length": 255,
+                    "DBFieldName": "PRODU_ITEM_QUANTITY",
+                    "DisplayName": "Item Quantity",
+                    "DropLeadingZero": false,
+                    "DropLeadingBlanks": false,
+                    "NotEmpty": false,
+                    "Precision": 0
+                },
+                {
+                    "$type": "FileCabinetFieldBase",
+                    "Links": [
+                        {
+                            "rel": "selectList",
+                            "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Query/SelectListExpression?fieldName=PRODU_OTHER&parentFieldName=PRODUCT_TABLE"
+                        }
+                    ],
+                    "Scope": "User",
+                    "DWFieldType": "Text",
+                    "Length": 255,
+                    "DBFieldName": "PRODU_OTHER",
+                    "DisplayName": "Other",
+                    "DropLeadingZero": false,
+                    "DropLeadingBlanks": false,
+                    "NotEmpty": false,
+                    "Precision": 0
+                },
+                {
+                    "$type": "FileCabinetFieldBase",
+                    "Links": [
+                        {
+                            "rel": "selectList",
+                            "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Query/SelectListExpression?fieldName=PRODU_JOB_NUMBER&parentFieldName=PRODUCT_TABLE"
+                        }
+                    ],
+                    "Scope": "User",
+                    "DWFieldType": "Text",
+                    "Length": 255,
+                    "DBFieldName": "PRODU_JOB_NUMBER",
+                    "DisplayName": "Job Number",
+                    "DropLeadingZero": false,
+                    "DropLeadingBlanks": false,
+                    "NotEmpty": false,
+                    "Precision": 0
+                },
+                {
+                    "$type": "FileCabinetFieldBase",
+                    "Links": [
+                        {
+                            "rel": "selectList",
+                            "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Query/SelectListExpression?fieldName=PRODU_WEIGHBRIDGE_TICKET_NUMB&parentFieldName=PRODUCT_TABLE"
+                        }
+                    ],
+                    "Scope": "User",
+                    "DWFieldType": "Text",
+                    "Length": 255,
+                    "DBFieldName": "PRODU_WEIGHBRIDGE_TICKET_NUMB",
+                    "DisplayName": "Weighbridge Ticket Number",
+                    "DropLeadingZero": false,
+                    "DropLeadingBlanks": false,
+                    "NotEmpty": false,
+                    "Precision": 0
+                },
+                {
+                    "$type": "FileCabinetFieldBase",
+                    "Links": [
+                        {
+                            "rel": "selectList",
+                            "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Query/SelectListExpression?fieldName=PRODU_DELIVERY_NOTE&parentFieldName=PRODUCT_TABLE"
+                        }
+                    ],
+                    "Scope": "User",
+                    "DWFieldType": "Text",
+                    "Length": 255,
+                    "DBFieldName": "PRODU_DELIVERY_NOTE",
+                    "DisplayName": "Delivery Note",
+                    "DropLeadingZero": false,
+                    "DropLeadingBlanks": false,
+                    "NotEmpty": false,
+                    "Precision": 0
+                },
+                {
+                    "$type": "FileCabinetFieldBase",
+                    "Links": [
+                        {
+                            "rel": "selectList",
+                            "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Query/SelectListExpression?fieldName=PRODU_MATERIAL_MARKINGS&parentFieldName=PRODUCT_TABLE"
+                        }
+                    ],
+                    "Scope": "User",
+                    "DWFieldType": "Text",
+                    "Length": 255,
+                    "DBFieldName": "PRODU_MATERIAL_MARKINGS",
+                    "DisplayName": "Material Markings",
+                    "DropLeadingZero": false,
+                    "DropLeadingBlanks": false,
+                    "NotEmpty": false,
+                    "Precision": 0
+                },
+                {
+                    "$type": "FileCabinetFieldBase",
+                    "Links": [
+                        {
+                            "rel": "selectList",
+                            "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Query/SelectListExpression?fieldName=PRODU_MATERIAL_LENGTH&parentFieldName=PRODUCT_TABLE"
+                        }
+                    ],
+                    "Scope": "User",
+                    "DWFieldType": "Text",
+                    "Length": 255,
+                    "DBFieldName": "PRODU_MATERIAL_LENGTH",
+                    "DisplayName": "Material Length",
+                    "DropLeadingZero": false,
+                    "DropLeadingBlanks": false,
+                    "NotEmpty": false,
+                    "Precision": 0
+                },
+                {
+                    "$type": "FileCabinetFieldBase",
+                    "Links": [
+                        {
+                            "rel": "selectList",
+                            "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Query/SelectListExpression?fieldName=PRODU_STATUS&parentFieldName=PRODUCT_TABLE"
+                        }
+                    ],
+                    "Scope": "User",
+                    "DWFieldType": "Text",
+                    "Length": 255,
+                    "DBFieldName": "PRODU_STATUS",
+                    "DisplayName": "Status",
+                    "DropLeadingZero": false,
+                    "DropLeadingBlanks": false,
+                    "NotEmpty": false,
+                    "Precision": 0
+                },
+                {
+                    "$type": "FileCabinetFieldBase",
+                    "Links": [
+                        {
+                            "rel": "selectList",
+                            "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Query/SelectListExpression?fieldName=PRODU_UNIQUE_NUMBER&parentFieldName=PRODUCT_TABLE"
+                        }
+                    ],
+                    "Scope": "User",
+                    "DWFieldType": "Text",
+                    "Length": 255,
+                    "DBFieldName": "PRODU_UNIQUE_NUMBER",
+                    "DisplayName": "Unique Number",
+                    "DropLeadingZero": false,
+                    "DropLeadingBlanks": false,
+                    "NotEmpty": false,
+                    "Precision": 0
+                },
+                {
+                    "$type": "FileCabinetFieldBase",
+                    "Links": [
+                        {
+                            "rel": "selectList",
+                            "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Query/SelectListExpression?fieldName=PRODU_WEIGHT&parentFieldName=PRODUCT_TABLE"
+                        }
+                    ],
+                    "Scope": "User",
+                    "DWFieldType": "Text",
+                    "Length": 255,
+                    "DBFieldName": "PRODU_WEIGHT",
+                    "DisplayName": "Weight",
+                    "DropLeadingZero": false,
+                    "DropLeadingBlanks": false,
+                    "NotEmpty": false,
+                    "Precision": 0
+                }
+            ],
+            "UsedAsDocumentName": false,
+            "Scope": "User",
+            "DWFieldType": "Table",
+            "Length": -1,
+            "DBFieldName": "PRODUCT_TABLE",
+            "DisplayName": "Product Table",
+            "DropLeadingZero": false,
+            "DropLeadingBlanks": false,
+            "NotEmpty": false,
+            "Precision": 0
+        },
+        {
+            "TableFieldColumns": [],
+            "UsedAsDocumentName": false,
+            "Links": [
+                {
+                    "rel": "selectList",
+                    "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Query/SelectListExpression?fieldName=STORED_DATE"
+                }
+            ],
+            "Scope": "User",
+            "DWFieldType": "DateTime",
+            "Length": -1,
+            "DBFieldName": "STORED_DATE",
+            "DisplayName": "Stored Date",
+            "DropLeadingZero": false,
+            "DropLeadingBlanks": false,
+            "NotEmpty": false,
+            "Precision": 0
+        },
+        {
+            "TableFieldColumns": [],
+            "UsedAsDocumentName": false,
+            "Links": [
+                {
+                    "rel": "selectList",
+                    "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Query/SelectListExpression?fieldName=COMPLETION_DATE"
+                }
+            ],
+            "Scope": "User",
+            "DWFieldType": "DateTime",
+            "Length": -1,
+            "DBFieldName": "COMPLETION_DATE",
+            "DisplayName": "Completion DateTime",
+            "DropLeadingZero": false,
+            "DropLeadingBlanks": false,
+            "NotEmpty": false,
+            "Precision": 0
+        },
+        {
+            "TableFieldColumns": [],
+            "UsedAsDocumentName": false,
+            "Links": [
+                {
+                    "rel": "selectList",
+                    "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Query/SelectListExpression?fieldName=JOB_STATUS"
+                }
+            ],
+            "Scope": "User",
+            "DWFieldType": "Text",
+            "Length": 255,
+            "DBFieldName": "JOB_STATUS",
+            "DisplayName": "Job Status",
+            "DropLeadingZero": false,
+            "DropLeadingBlanks": false,
+            "NotEmpty": false,
+            "Precision": 0
+        },
+        {
+            "TableFieldColumns": [],
+            "UsedAsDocumentName": false,
+            "Links": [
+                {
+                    "rel": "selectList",
+                    "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Query/SelectListExpression?fieldName=CONTACT_NUMBER"
+                }
+            ],
+            "Scope": "User",
+            "DWFieldType": "Text",
+            "Length": 255,
+            "DBFieldName": "CONTACT_NUMBER",
+            "DisplayName": "Contact Number",
+            "DropLeadingZero": false,
+            "DropLeadingBlanks": false,
+            "NotEmpty": false,
+            "Precision": 0
+        },
+        {
+            "TableFieldColumns": [],
+            "UsedAsDocumentName": false,
+            "Links": [
+                {
+                    "rel": "selectList",
+                    "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Query/SelectListExpression?fieldName=CONTACT_EMAIL"
+                }
+            ],
+            "Scope": "User",
+            "DWFieldType": "Text",
+            "Length": 255,
+            "DBFieldName": "CONTACT_EMAIL",
+            "DisplayName": "Contact Email",
+            "DropLeadingZero": false,
+            "DropLeadingBlanks": false,
+            "NotEmpty": false,
+            "Precision": 0
+        },
+        {
+            "TableFieldColumns": [],
+            "UsedAsDocumentName": false,
+            "Links": [
+                {
+                    "rel": "selectList",
+                    "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Query/SelectListExpression?fieldName=ACTION"
+                }
+            ],
+            "Scope": "User",
+            "DWFieldType": "Text",
+            "Length": 255,
+            "DBFieldName": "ACTION",
+            "DisplayName": "Action",
+            "DropLeadingZero": false,
+            "DropLeadingBlanks": false,
+            "NotEmpty": false,
+            "Precision": 0
+        },
+        {
+            "TableFieldColumns": [],
+            "UsedAsDocumentName": false,
+            "Links": [
+                {
+                    "rel": "selectList",
+                    "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Query/SelectListExpression?fieldName=TOTAL_WEIGHT"
+                }
+            ],
+            "Scope": "User",
+            "DWFieldType": "Text",
+            "Length": 255,
+            "DBFieldName": "TOTAL_WEIGHT",
+            "DisplayName": "Total Weight",
+            "DropLeadingZero": false,
+            "DropLeadingBlanks": false,
+            "NotEmpty": false,
+            "Precision": 0
+        },
+        {
+            "TableFieldColumns": [],
+            "UsedAsDocumentName": false,
+            "Links": [
+                {
+                    "rel": "selectList",
+                    "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Query/SelectListExpression?fieldName=FABRICATOR"
+                }
+            ],
+            "Scope": "User",
+            "DWFieldType": "Text",
+            "Length": 255,
+            "DBFieldName": "FABRICATOR",
+            "DisplayName": "Fabricator",
+            "DropLeadingZero": false,
+            "DropLeadingBlanks": false,
+            "NotEmpty": false,
+            "Precision": 0
+        },
+        {
+            "TableFieldColumns": [],
+            "UsedAsDocumentName": false,
+            "Links": [
+                {
+                    "rel": "selectList",
+                    "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Query/SelectListExpression?fieldName=STORED_BY"
+                }
+            ],
+            "Scope": "User",
+            "DWFieldType": "Text",
+            "Length": 255,
+            "DBFieldName": "STORED_BY",
+            "DisplayName": "Stored By",
+            "DropLeadingZero": false,
+            "DropLeadingBlanks": false,
+            "NotEmpty": false,
+            "Precision": 0
+        },
+        {
+            "TableFieldColumns": [],
+            "UsedAsDocumentName": false,
+            "Links": [
+                {
+                    "rel": "selectList",
+                    "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Query/SelectListExpression?fieldName=COD"
+                }
+            ],
+            "Scope": "User",
+            "DWFieldType": "Text",
+            "Length": 255,
+            "DBFieldName": "COD",
+            "DisplayName": "COD",
+            "DropLeadingZero": false,
+            "DropLeadingBlanks": false,
+            "NotEmpty": false,
+            "Precision": 0
+        },
+        {
+            "TableFieldColumns": [],
+            "UsedAsDocumentName": false,
+            "Links": [
+                {
+                    "rel": "selectList",
+                    "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Query/SelectListExpression?fieldName=WEIGHT_DISPATCHED"
+                }
+            ],
+            "Scope": "User",
+            "DWFieldType": "Text",
+            "Length": 255,
+            "DBFieldName": "WEIGHT_DISPATCHED",
+            "DisplayName": "Weight Dispatched",
+            "DropLeadingZero": false,
+            "DropLeadingBlanks": false,
+            "NotEmpty": false,
+            "Precision": 0
+        },
+        {
+            "TableFieldColumns": [],
+            "UsedAsDocumentName": false,
+            "Links": [
+                {
+                    "rel": "selectList",
+                    "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Query/SelectListExpression?fieldName=TVL_DELIVERY_NOTE"
+                }
+            ],
+            "Scope": "User",
+            "DWFieldType": "Text",
+            "Length": 255,
+            "DBFieldName": "TVL_DELIVERY_NOTE",
+            "DisplayName": "TVL Delivery Note",
+            "DropLeadingZero": false,
+            "DropLeadingBlanks": false,
+            "NotEmpty": false,
+            "Precision": 0
+        },
+        {
+            "TableFieldColumns": [],
+            "UsedAsDocumentName": false,
+            "Links": [
+                {
+                    "rel": "selectList",
+                    "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Query/SelectListExpression?fieldName=DISPATCHED_WEIGHBRIDGE_TICKET"
+                }
+            ],
+            "Scope": "User",
+            "DWFieldType": "Text",
+            "Length": 255,
+            "DBFieldName": "DISPATCHED_WEIGHBRIDGE_TICKET",
+            "DisplayName": "Dispatched Weighbridge Ticket",
+            "DropLeadingZero": false,
+            "DropLeadingBlanks": false,
+            "NotEmpty": false,
+            "Precision": 0
+        },
+        {
+            "TableFieldColumns": [],
+            "UsedAsDocumentName": false,
+            "Links": [
+                {
+                    "rel": "selectList",
+                    "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Query/SelectListExpression?fieldName=JOB_COMMENTS"
+                }
+            ],
+            "Scope": "User",
+            "DWFieldType": "Text",
+            "Length": 255,
+            "DBFieldName": "JOB_COMMENTS",
+            "DisplayName": "Job Comments",
+            "DropLeadingZero": false,
+            "DropLeadingBlanks": false,
+            "NotEmpty": false,
+            "Precision": 0
+        },
+        {
+            "TableFieldColumns": [],
+            "UsedAsDocumentName": false,
+            "Links": [
+                {
+                    "rel": "selectList",
+                    "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Query/SelectListExpression?fieldName=LA_NUMBER"
+                }
+            ],
+            "Scope": "User",
+            "DWFieldType": "Text",
+            "Length": 255,
+            "DBFieldName": "LA_NUMBER",
+            "DisplayName": "LA Number",
+            "DropLeadingZero": false,
+            "DropLeadingBlanks": false,
+            "NotEmpty": false,
+            "Precision": 0
+        },
+        {
+            "TableFieldColumns": [],
+            "UsedAsDocumentName": false,
+            "Links": [
+                {
+                    "rel": "selectList",
+                    "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Query/SelectListExpression?fieldName=WEIGHBRIDGE_NETT_WEIGHT"
+                }
+            ],
+            "Scope": "User",
+            "DWFieldType": "Numeric",
+            "Length": -1,
+            "DBFieldName": "WEIGHBRIDGE_NETT_WEIGHT",
+            "DisplayName": "Weighbridge Nett Weight",
+            "DropLeadingZero": false,
+            "DropLeadingBlanks": false,
+            "NotEmpty": false,
+            "Precision": 0
+        },
+        {
+            "TableFieldColumns": [],
+            "UsedAsDocumentName": false,
+            "Links": [
+                {
+                    "rel": "selectList",
+                    "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Query/SelectListExpression?fieldName=WEIGHBRIDGE_VEHICLE_TYPE"
+                }
+            ],
+            "Scope": "User",
+            "DWFieldType": "Text",
+            "Length": 255,
+            "DBFieldName": "WEIGHBRIDGE_VEHICLE_TYPE",
+            "DisplayName": "Weighbridge Vehicle Type",
+            "DropLeadingZero": false,
+            "DropLeadingBlanks": false,
+            "NotEmpty": false,
+            "Precision": 0
+        },
+        {
+            "TableFieldColumns": [],
+            "UsedAsDocumentName": false,
+            "Links": [
+                {
+                    "rel": "selectList",
+                    "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Query/SelectListExpression?fieldName=WEIGHBRIDGE_TRANSPORTER"
+                }
+            ],
+            "Scope": "User",
+            "DWFieldType": "Text",
+            "Length": 255,
+            "DBFieldName": "WEIGHBRIDGE_TRANSPORTER",
+            "DisplayName": "Weighbridge Transporter",
+            "DropLeadingZero": false,
+            "DropLeadingBlanks": false,
+            "NotEmpty": false,
+            "Precision": 0
+        },
+        {
+            "TableFieldColumns": [],
+            "UsedAsDocumentName": false,
+            "Links": [
+                {
+                    "rel": "selectList",
+                    "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Query/SelectListExpression?fieldName=WEIGHBRIDGE_DRIVER_NAME"
+                }
+            ],
+            "Scope": "User",
+            "DWFieldType": "Text",
+            "Length": 255,
+            "DBFieldName": "WEIGHBRIDGE_DRIVER_NAME",
+            "DisplayName": "Weighbridge Driver Name",
+            "DropLeadingZero": false,
+            "DropLeadingBlanks": false,
+            "NotEmpty": false,
+            "Precision": 0
+        },
+        {
+            "TableFieldColumns": [],
+            "UsedAsDocumentName": false,
+            "Links": [
+                {
+                    "rel": "selectList",
+                    "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Query/SelectListExpression?fieldName=WEIGHBRIDGE_WEIGHT_IN"
+                }
+            ],
+            "Scope": "User",
+            "DWFieldType": "Numeric",
+            "Length": -1,
+            "DBFieldName": "WEIGHBRIDGE_WEIGHT_IN",
+            "DisplayName": "Weighbridge Weight In",
+            "DropLeadingZero": false,
+            "DropLeadingBlanks": false,
+            "NotEmpty": false,
+            "Precision": 0
+        },
+        {
+            "TableFieldColumns": [],
+            "UsedAsDocumentName": false,
+            "Links": [
+                {
+                    "rel": "selectList",
+                    "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Query/SelectListExpression?fieldName=WEIGHBRIDGE_WEIGHT_OUT"
+                }
+            ],
+            "Scope": "User",
+            "DWFieldType": "Numeric",
+            "Length": -1,
+            "DBFieldName": "WEIGHBRIDGE_WEIGHT_OUT",
+            "DisplayName": "Weighbridge Weight Out",
+            "DropLeadingZero": false,
+            "DropLeadingBlanks": false,
+            "NotEmpty": false,
+            "Precision": 0
+        },
+        {
+            "TableFieldColumns": [],
+            "UsedAsDocumentName": false,
+            "Links": [
+                {
+                    "rel": "selectList",
+                    "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Query/SelectListExpression?fieldName=WEIGHBRIDGE_OPERATOR"
+                }
+            ],
+            "Scope": "User",
+            "DWFieldType": "Text",
+            "Length": 255,
+            "DBFieldName": "WEIGHBRIDGE_OPERATOR",
+            "DisplayName": "Weighbridge Operator",
+            "DropLeadingZero": false,
+            "DropLeadingBlanks": false,
+            "NotEmpty": false,
+            "Precision": 0
+        },
+        {
+            "TableFieldColumns": [],
+            "UsedAsDocumentName": false,
+            "Links": [
+                {
+                    "rel": "selectList",
+                    "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Query/SelectListExpression?fieldName=WEIGHBRIDGE_TICKET_NUM_INT"
+                }
+            ],
+            "Scope": "User",
+            "DWFieldType": "Numeric",
+            "Length": -1,
+            "DBFieldName": "WEIGHBRIDGE_TICKET_NUM_INT",
+            "DisplayName": "Weighbridge Ticket Num Int",
+            "DropLeadingZero": false,
+            "DropLeadingBlanks": false,
+            "NotEmpty": false,
+            "Precision": 0
+        },
+        {
+            "TableFieldColumns": [],
+            "UsedAsDocumentName": false,
+            "Links": [
+                {
+                    "rel": "selectList",
+                    "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Query/SelectListExpression?fieldName=DWCONTENTMODUSER"
+                }
+            ],
+            "Scope": "System",
+            "DWFieldType": "Text",
+            "Length": 20,
+            "DBFieldName": "DWCONTENTMODUSER",
+            "DisplayName": "Content modified by",
+            "DropLeadingZero": false,
+            "DropLeadingBlanks": false,
+            "NotEmpty": false,
+            "Precision": 0
+        },
+        {
+            "TableFieldColumns": [],
+            "UsedAsDocumentName": false,
+            "Links": [
+                {
+                    "rel": "selectList",
+                    "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Query/SelectListExpression?fieldName=DWCONTENTMODDATETIME"
+                }
+            ],
+            "Scope": "System",
+            "DWFieldType": "DateTime",
+            "Length": -1,
+            "DBFieldName": "DWCONTENTMODDATETIME",
+            "DisplayName": "Content modified on",
+            "DropLeadingZero": false,
+            "DropLeadingBlanks": false,
+            "NotEmpty": false,
+            "Precision": 0
+        },
+        {
+            "TableFieldColumns": [],
+            "UsedAsDocumentName": false,
+            "Links": [
+                {
+                    "rel": "selectList",
+                    "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Query/SelectListExpression?fieldName=COMPLETION_DATE1"
+                }
+            ],
+            "Scope": "User",
+            "DWFieldType": "Date",
+            "Length": -1,
+            "DBFieldName": "COMPLETION_DATE1",
+            "DisplayName": "Completion Date",
+            "DropLeadingZero": false,
+            "DropLeadingBlanks": false,
+            "NotEmpty": false,
+            "Precision": 0
+        },
+        {
+            "TableFieldColumns": [],
+            "UsedAsDocumentName": false,
+            "Links": [
+                {
+                    "rel": "selectList",
+                    "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Query/SelectListExpression?fieldName=PROCESSING_STATUS"
+                }
+            ],
+            "Scope": "User",
+            "DWFieldType": "Text",
+            "Length": 255,
+            "DBFieldName": "PROCESSING_STATUS",
+            "DisplayName": "Processing Status",
+            "DropLeadingZero": false,
+            "DropLeadingBlanks": false,
+            "NotEmpty": false,
+            "Precision": 0
+        },
+        {
+            "TableFieldColumns": [],
+            "UsedAsDocumentName": false,
+            "Links": [
+                {
+                    "rel": "selectList",
+                    "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Query/SelectListExpression?fieldName=DELIVERY_NOTE_NUMBERS"
+                }
+            ],
+            "Scope": "User",
+            "DWFieldType": "Keyword",
+            "Length": 255,
+            "DBFieldName": "DELIVERY_NOTE_NUMBERS",
+            "DisplayName": "Delivery Note Numbers",
+            "DropLeadingZero": false,
+            "DropLeadingBlanks": false,
+            "NotEmpty": false,
+            "Precision": 0
+        },
+        {
+            "TableFieldColumns": [],
+            "UsedAsDocumentName": false,
+            "Links": [
+                {
+                    "rel": "selectList",
+                    "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Query/SelectListExpression?fieldName=WEIGHBRIDGE_TICKET_NUMBERS"
+                }
+            ],
+            "Scope": "User",
+            "DWFieldType": "Keyword",
+            "Length": 255,
+            "DBFieldName": "WEIGHBRIDGE_TICKET_NUMBERS",
+            "DisplayName": "Weighbridge Ticket Numbers",
+            "DropLeadingZero": false,
+            "DropLeadingBlanks": false,
+            "NotEmpty": false,
+            "Precision": 0
+        },
+        {
+            "TableFieldColumns": [],
+            "UsedAsDocumentName": false,
+            "Links": [
+                {
+                    "rel": "selectList",
+                    "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Query/SelectListExpression?fieldName=JOB_NUMBER"
+                }
+            ],
+            "Scope": "User",
+            "DWFieldType": "Text",
+            "Length": 255,
+            "DBFieldName": "JOB_NUMBER",
+            "DisplayName": "Job Number",
+            "DropLeadingZero": false,
+            "DropLeadingBlanks": false,
+            "NotEmpty": false,
+            "Precision": 0
+        },
+        {
+            "TableFieldColumns": [],
+            "UsedAsDocumentName": false,
+            "Links": [
+                {
+                    "rel": "selectList",
+                    "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Query/SelectListExpression?fieldName=TEXTSHOT"
+                }
+            ],
+            "Scope": "User",
+            "DWFieldType": "Memo",
+            "Length": -1,
+            "DBFieldName": "TEXTSHOT",
+            "DisplayName": "TextShot",
+            "DropLeadingZero": false,
+            "DropLeadingBlanks": false,
+            "NotEmpty": false,
+            "Precision": 0
+        },
+        {
+            "TableFieldColumns": [],
+            "UsedAsDocumentName": false,
+            "Links": [
+                {
+                    "rel": "selectList",
+                    "href": "/DocuWare/Platform/FileCabinets/3035e14f-37e6-4403-9de2-ed049d26d642/Query/SelectListExpression?fieldName=DOCUMENT_TYPE"
+                }
+            ],
+            "Scope": "User",
+            "DWFieldType": "Text",
+            "Length": 255,
+            "DBFieldName": "DOCUMENT_TYPE",
+            "DisplayName": "Document Type",
+            "DropLeadingZero": false,
+            "DropLeadingBlanks": false,
+            "NotEmpty": false,
+            "Precision": 0
+        }
+    ],
+    "Rights": [
+        "Admin_Owner",
+        "Admin_ModifyRight",
+        "Admin_Operator",
+        "Admin_EditDialogs",
+        "General_Store",
+        "General_Append",
+        "General_Search",
+        "General_Edit",
+        "General_DisplayDocument",
+        "General_EditDocuments",
+        "General_DeleteDocuments",
+        "General_Export",
+        "General_Checkout",
+        "Annotation_New",
+        "Annotation_Delete",
+        "Annotation_All",
+        "Annotation_Stamp_New",
+        "Annotation_Hide",
+        "Annotation_Stamp_Hide"
+    ],
+    "ExtendedUserRights": {
+        "AllowViewAuditData": true
+    },
+    "Color": "Black",
+    "Name": "Documents",
+    "Id": "3035e14f-37e6-4403-9de2-ed049d26d642",
+    "IsBasket": false,
+    "Usable": true,
+    "Default": false,
+    "VersionManagement": "Manual",
+    "VersionHistoryResultListId": "vh_3035e14f-37e6-4403-9de2-ed049d26d642",
+    "WindowsExplorerClientAccess": true,
+    "AddIndexEntriesInUpperCase": false,
+    "DocumentAuditingEnabled": true,
+    "HasFullTextSupport": true
+}

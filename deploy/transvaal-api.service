@@ -1,0 +1,16 @@
+[Unit]
+Description=Transvaal Galv API
+After=network.target transvaal-dbproxy.service
+Requires=transvaal-dbproxy.service
+
+[Service]
+Type=simple
+User=dane.summers
+EnvironmentFile=/opt/projects/transvaalgalv-app/.env.dev
+Environment=TRANSVAAL_DATABASE_URL=postgres://transvaal_user_dev:TransvaalDevDbPwdSecurePass123456789Later!@127.0.0.1:6543/transvaalgalv_app_db_dev?sslmode=require
+ExecStart=/opt/projects/transvaalgalv-app/backend/bin/api
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

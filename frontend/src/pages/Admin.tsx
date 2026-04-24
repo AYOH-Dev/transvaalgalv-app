@@ -276,16 +276,16 @@ export default function Admin() {
 
       {/* Create user modal */}
       {showCreate && (
-        <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) setShowCreate(false) }} role="dialog" aria-modal="true" aria-labelledby="create-title">
-          <div className="modal">
-            <div className="modal__header">
-              <h2 className="modal__title" id="create-title">Create User</h2>
+        <div className="app-modal-overlay" onClick={e => { if (e.target === e.currentTarget) setShowCreate(false) }} role="dialog" aria-modal="true" aria-labelledby="create-title">
+          <div className="app-modal">
+            <div className="app-modal__header">
+              <h2 className="app-modal__title" id="create-title">Create User</h2>
               <button className="btn btn-icon" onClick={() => setShowCreate(false)} aria-label="Close">
                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
               </button>
             </div>
             <form id="create-form" onSubmit={submitCreate}>
-              <div className="modal__body">
+              <div className="app-modal__body">
                 <div className="form">
                   <div className="form-row">
                     <div className="form-field">
@@ -310,7 +310,7 @@ export default function Admin() {
                 </div>
               </div>
             </form>
-            <div className="modal__footer">
+            <div className="app-modal__footer">
               <button className="btn btn-ghost" type="button" onClick={() => setShowCreate(false)}>Cancel</button>
               <button className="btn btn-primary" type="submit" form="create-form" disabled={creating}>
                 {creating && <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="spin" aria-hidden="true"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>}
@@ -323,16 +323,16 @@ export default function Admin() {
 
       {/* Edit user modal */}
       {editUser && (
-        <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) setEditUser(null) }} role="dialog" aria-modal="true" aria-labelledby="edit-title">
-          <div className="modal">
-            <div className="modal__header">
-              <h2 className="modal__title" id="edit-title">Edit User</h2>
+        <div className="app-modal-overlay" onClick={e => { if (e.target === e.currentTarget) setEditUser(null) }} role="dialog" aria-modal="true" aria-labelledby="edit-title">
+          <div className="app-modal">
+            <div className="app-modal__header">
+              <h2 className="app-modal__title" id="edit-title">Edit User</h2>
               <button className="btn btn-icon" onClick={() => setEditUser(null)} aria-label="Close">
                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
               </button>
             </div>
             <form id="edit-form" onSubmit={submitEdit}>
-              <div className="modal__body">
+              <div className="app-modal__body">
                 <p style={{ margin: '0 0 1.25rem', fontSize: '0.875rem', color: 'var(--text-muted)', background: 'var(--surface-2)', padding: '0.625rem 0.875rem', borderRadius: 'var(--radius)', fontFamily: 'monospace' }}>
                   {editUser.email}
                 </p>
@@ -356,7 +356,7 @@ export default function Admin() {
                 </div>
               </div>
             </form>
-            <div className="modal__footer">
+            <div className="app-modal__footer">
               <button className="btn btn-ghost" type="button" onClick={() => setEditUser(null)}>Cancel</button>
               <button className="btn btn-primary" type="submit" form="edit-form" disabled={saving}>
                 {saving ? 'Saving…' : 'Save Changes'}

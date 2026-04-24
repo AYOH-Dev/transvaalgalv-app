@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/AYOH-Dev/transvaalgalv-app/backend/internal/receiving"
 )
@@ -34,7 +36,58 @@ func (a *App) handleGetReceipt(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, receipt)
 }
 
+func (a *App) handleUpdateReceipt(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+
+	var input receiving.UpdateReceiptInput
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	receipt, err := a.receiving.UpdateReceipt(r.Context(), id, input)
+	if err != nil {
+		mapReceivingError(w, err)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, receipt)
+}
+
+func (a *App) handleUpdateReceiptLine(w http.ResponseWriter, r *http.Request) {
+	receiptID := r.PathValue("id")
+	lineID := r.PathValue("lineId")
+
+	var input receiving.UpdateReceiptLineInput
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	line, err := a.receiving.UpdateReceiptLine(r.Context(), receiptID, lineID, input)
+	if err != nil {
+		mapReceivingError(w, err)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, line)
+}
+
 func (a *App) handleImportDocuWareRows(w http.ResponseWriter, r *http.Request) {
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	r.Body = io.NopCloser(bytes.NewReader(body))
+
+	log.Printf("[docuware-import] received at=%s remote=%s content-type=%s body=%s",
+		time.Now().UTC().Format(time.RFC3339),
+		r.RemoteAddr,
+		r.Header.Get("Content-Type"),
+		body,
+	)
+
 	request, err := decodeDocuWareImportInput(r, a.cfg.DocuWareFileCabinetID)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request body")

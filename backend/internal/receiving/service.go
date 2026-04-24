@@ -16,6 +16,8 @@ type Repository interface {
 	ListReceipts(ctx context.Context) ([]Receipt, error)
 	GetReceipt(ctx context.Context, id string) (Receipt, error)
 	ImportDocuWareReceipts(ctx context.Context, receipts []importedReceipt) ([]Receipt, error)
+	UpdateReceipt(ctx context.Context, id string, input UpdateReceiptInput) (Receipt, error)
+	UpdateReceiptLine(ctx context.Context, receiptID, lineID string, input UpdateReceiptLineInput) (ReceiptLine, error)
 }
 
 type Service struct {
@@ -23,35 +25,53 @@ type Service struct {
 }
 
 type importedReceipt struct {
-	ReceiptNumber          string
-	SupplierName           string
-	SupplierReference      string
-	PurchaseOrderNumber    string
-	DeliveryNoteNumber     string
-	SourceDocuWareDocument string
-	SourceDocuWareCabinet  string
-	DocuWareRecordID       string
-	DocuWareGroupReference string
-	ReceivedAt             time.Time
-	Status                 ReceiptStatus
-	SyncStatus             string
-	Notes                  string
-	SourcePayload          map[string]any
-	Lines                  []importedReceiptLine
+	ReceiptNumber           string
+	SupplierName            string
+	CustomerName            string
+	SupplierReference       string
+	PurchaseOrderNumber     string
+	DeliveryNoteNumber      string
+	WeighbridgeTicketNumber string
+	VehicleRegistration     string
+	JobNumber               string
+	SourceDocuWareDocument  string
+	SourceDocuWareCabinet   string
+	DocuWareRecordID        string
+	DocuWareGroupReference  string
+	DocuWareDocURL          string
+	ReceivedAt              time.Time
+	Status                  ReceiptStatus
+	SyncStatus              string
+	Notes                   string
+	SourcePayload           map[string]any
+	Lines                   []importedReceiptLine
 }
 
 type importedReceiptLine struct {
-	LineNumber         int
-	ItemCode           string
-	Description        string
-	ExpectedQuantity   float64
-	ReceivedQuantity   float64
-	UnitOfMeasure      string
-	ConditionNotes     string
-	DocuWareRecordLine string
-	DocuWareUniqueNo   string
-	DocuWarePrimaryKey string
-	SourcePayload      map[string]any
+	LineNumber          int
+	ItemCode            string
+	Description         string
+	MaterialCode        string
+	MaterialDescription string
+	MaterialSize        string
+	MaterialMarkings    string
+	MaterialThickness   string
+	MaterialLength      string
+	Weight              string
+	Process             string
+	StoredIn            string
+	Bay                 string
+	ExpectedQuantity    float64
+	ReceivedQuantity    float64
+	UnitOfMeasure       string
+	ReceivingStatus     string
+	Discrepancy         string
+	QuantityDiscrepancy string
+	ConditionNotes      string
+	DocuWareRecordLine  string
+	DocuWareUniqueNo    string
+	DocuWarePrimaryKey  string
+	SourcePayload       map[string]any
 }
 
 func NewService(repository Repository) *Service {
@@ -142,6 +162,61 @@ func (s *Service) ImportDocuWareRows(ctx context.Context, input DocuWareImportIn
 	}, nil
 }
 
+var validStatusTransitions = map[ReceiptStatus][]ReceiptStatus{
+	ReceiptStatusDraft:       {ReceiptStatusReceived},
+	ReceiptStatusReceived:    {ReceiptStatusMatched, ReceiptStatusQualityHold},
+	ReceiptStatusQualityHold: {ReceiptStatusReceived, ReceiptStatusMatched},
+	ReceiptStatusMatched:     {ReceiptStatusArchived},
+	ReceiptStatusArchived:    {},
+}
+
+func (s *Service) UpdateReceipt(ctx context.Context, id string, input UpdateReceiptInput) (Receipt, error) {
+	if s.repository == nil {
+		return Receipt{}, ErrUnavailable
+	}
+
+	if strings.TrimSpace(id) == "" {
+		return Receipt{}, fmt.Errorf("%w: receipt id is required", ErrInvalidInput)
+	}
+
+	if input.Status != nil {
+		current, err := s.repository.GetReceipt(ctx, id)
+		if err != nil {
+			return Receipt{}, err
+		}
+
+		allowed := validStatusTransitions[current.Status]
+		ok := false
+		for _, s := range allowed {
+			if s == *input.Status {
+				ok = true
+				break
+			}
+		}
+		if !ok {
+			return Receipt{}, fmt.Errorf("%w: cannot transition from %s to %s", ErrInvalidInput, current.Status, *input.Status)
+		}
+	}
+
+	return s.repository.UpdateReceipt(ctx, id, input)
+}
+
+func (s *Service) UpdateReceiptLine(ctx context.Context, receiptID, lineID string, input UpdateReceiptLineInput) (ReceiptLine, error) {
+	if s.repository == nil {
+		return ReceiptLine{}, ErrUnavailable
+	}
+
+	if strings.TrimSpace(receiptID) == "" {
+		return ReceiptLine{}, fmt.Errorf("%w: receipt id is required", ErrInvalidInput)
+	}
+
+	if strings.TrimSpace(lineID) == "" {
+		return ReceiptLine{}, fmt.Errorf("%w: line id is required", ErrInvalidInput)
+	}
+
+	return s.repository.UpdateReceiptLine(ctx, receiptID, lineID, input)
+}
+
 func buildImportedReceipt(input DocuWareImportInput, groupReference string, payload map[string]any) *importedReceipt {
 	sourceDocumentID := firstNonEmpty(
 		strings.TrimSpace(input.SourceDocumentID),
@@ -161,30 +236,42 @@ func buildImportedReceipt(input DocuWareImportInput, groupReference string, payl
 		time.Now().UTC(),
 	)
 
+	// COMPANY is the customer who sent the goods.
+	// FABRICATOR is an internal processing tag, stored for reference but not the display name.
+	customerName := payloadString(payload, "COMPANY")
+	supplierName := firstNonEmpty(payloadString(payload, "FABRICATOR"), customerName, "DocuWare Import")
+
 	return &importedReceipt{
-		ReceiptNumber:          buildReceiptNumber(groupReference, payload),
-		SupplierName:           firstNonEmpty(payloadString(payload, "FABRICATOR"), payloadString(payload, "COMPANY"), "DocuWare Import"),
-		SupplierReference:      firstNonEmpty(payloadString(payload, "DNDOCID"), payloadString(payload, "DNDOCIDI"), payloadString(payload, "JOB_NUMBER")),
-		PurchaseOrderNumber:    firstNonEmpty(payloadString(payload, "ORDER_NUMBER"), payloadString(payload, "DOCUMENTNO")),
-		DeliveryNoteNumber:     firstNonEmpty(payloadString(payload, "DELIVERY_NOTE"), payloadString(payload, "DELIVERY_NOTE_NUMBER")),
-		SourceDocuWareDocument: sourceDocumentID,
-		SourceDocuWareCabinet:  sourceCabinetID,
-		DocuWareRecordID:       groupRecordID,
-		DocuWareGroupReference: groupReference,
-		ReceivedAt:             receivedAt,
-		Status:                 ReceiptStatusDraft,
-		SyncStatus:             "imported",
-		Notes:                  "",
+		ReceiptNumber:           buildReceiptNumber(groupReference, payload),
+		SupplierName:            supplierName,
+		CustomerName:            customerName,
+		SupplierReference:       firstNonEmpty(payloadString(payload, "DNDOCID"), payloadString(payload, "DNDOCIDI"), payloadString(payload, "JOB_NUMBER")),
+		PurchaseOrderNumber:     firstNonEmpty(payloadString(payload, "ORDER_NUMBER"), payloadString(payload, "DOCUMENTNO")),
+		DeliveryNoteNumber:      firstNonEmpty(payloadString(payload, "DELIVERY_NOTE"), payloadString(payload, "DELIVERY_NOTE_NUMBER")),
+		WeighbridgeTicketNumber: payloadString(payload, "WEIGHBRIDGE_TICKET_NUMBER"),
+		VehicleRegistration:     payloadString(payload, "VEHICLE_REGISTRATION"),
+		JobNumber:               payloadString(payload, "JOB_NUMBER"),
+		SourceDocuWareDocument:  sourceDocumentID,
+		SourceDocuWareCabinet:   sourceCabinetID,
+		DocuWareRecordID:        groupRecordID,
+		DocuWareGroupReference:  groupReference,
+		DocuWareDocURL:          payloadString(payload, "DWSYS_DOC_URL"),
+		ReceivedAt:              receivedAt,
+		Status:                  ReceiptStatusDraft,
+		SyncStatus:              "imported",
+		Notes:                   "",
 		SourcePayload: map[string]any{
-			"source_cabinet_id":    sourceCabinetID,
-			"source_document_id":   sourceDocumentID,
-			"docuware_group_ref":   groupReference,
-			"delivery_note_number": firstNonEmpty(payloadString(payload, "DELIVERY_NOTE"), payloadString(payload, "DELIVERY_NOTE_NUMBER")),
-			"order_number":         payloadString(payload, "ORDER_NUMBER"),
-			"weighbridge_ticket":   payloadString(payload, "WEIGHBRIDGE_TICKET_NUMBER"),
-			"job_number":           payloadString(payload, "JOB_NUMBER"),
-			"company":              payloadString(payload, "COMPANY"),
-			"fabricator":           payloadString(payload, "FABRICATOR"),
+			"source_cabinet_id":         sourceCabinetID,
+			"source_document_id":        sourceDocumentID,
+			"docuware_group_ref":        groupReference,
+			"delivery_note_number":      firstNonEmpty(payloadString(payload, "DELIVERY_NOTE"), payloadString(payload, "DELIVERY_NOTE_NUMBER")),
+			"order_number":              payloadString(payload, "ORDER_NUMBER"),
+			"weighbridge_ticket_number": payloadString(payload, "WEIGHBRIDGE_TICKET_NUMBER"),
+			"vehicle_registration":      payloadString(payload, "VEHICLE_REGISTRATION"),
+			"job_number":                payloadString(payload, "JOB_NUMBER"),
+			"company":                   payloadString(payload, "COMPANY"),
+			"fabricator":                payloadString(payload, "FABRICATOR"),
+			"docuware_doc_url":          payloadString(payload, "DWSYS_DOC_URL"),
 		},
 	}
 }
@@ -210,18 +297,39 @@ func buildImportedLine(payload map[string]any, recordID string, fallbackLineNumb
 		itemCode,
 	)
 
+	// UNIQUE_NUMBER is the true per-line DocuWare key (e.g. "112457_SUB0491_6976_11").
+	// Use it as the dedup/sync-back identifier. Fall back to PRIMARY_KEY, then recordID.
+	docuWareRecordLine := firstNonEmpty(
+		payloadString(payload, "UNIQUE_NUMBER"),
+		payloadString(payload, "PRIMARY_KEY"),
+		recordID,
+	)
+
 	return importedReceiptLine{
-		LineNumber:         lineNumber,
-		ItemCode:           itemCode,
-		Description:        description,
-		ExpectedQuantity:   payloadFloat(payload, "QUANTITY"),
-		ReceivedQuantity:   payloadFloat(payload, "QUANTITY_RECEIVED"),
-		UnitOfMeasure:      payloadString(payload, "ITEM_TYPE"),
-		ConditionNotes:     joinNonEmpty(" | ", payloadString(payload, "COMMENTS"), payloadString(payload, "ADDITIONAL_COMMENTS"), payloadString(payload, "DISCREPANCY"), payloadString(payload, "OTHER")),
-		DocuWareRecordLine: recordID,
-		DocuWareUniqueNo:   payloadString(payload, "UNIQUE_NUMBER"),
-		DocuWarePrimaryKey: payloadString(payload, "PRIMARY_KEY"),
-		SourcePayload:      payload,
+		LineNumber:          lineNumber,
+		ItemCode:            itemCode,
+		Description:         description,
+		MaterialCode:        payloadString(payload, "MATERIAL_CODE"),
+		MaterialDescription: payloadString(payload, "MATERIAL_DESCRIPTION"),
+		MaterialSize:        payloadString(payload, "MATERIAL_SIZE"),
+		MaterialMarkings:    payloadString(payload, "MATERIAL_MARKINGS"),
+		MaterialThickness:   payloadString(payload, "MATERIAL_THICKNESS"),
+		MaterialLength:      payloadString(payload, "MATERIAL_LENGTH"),
+		Weight:              payloadString(payload, "WEIGHT"),
+		Process:             payloadString(payload, "PROCESS"),
+		StoredIn:            payloadString(payload, "STORED_IN"),
+		Bay:                 payloadString(payload, "BAY"),
+		ExpectedQuantity:    payloadFloat(payload, "QUANTITY"),
+		ReceivedQuantity:    payloadFloat(payload, "QUANTITY_RECEIVED"),
+		UnitOfMeasure:       payloadString(payload, "ITEM_TYPE"),
+		ReceivingStatus:     payloadString(payload, "RECEIVING_STATUS"),
+		Discrepancy:         payloadString(payload, "DISCREPANCY"),
+		QuantityDiscrepancy: payloadString(payload, "QUANTITY_DISCREPANCY"),
+		ConditionNotes:      joinNonEmpty(" | ", payloadString(payload, "COMMENTS"), payloadString(payload, "ADDITIONAL_COMMENTS"), payloadString(payload, "OTHER")),
+		DocuWareRecordLine:  docuWareRecordLine,
+		DocuWareUniqueNo:    payloadString(payload, "UNIQUE_NUMBER"),
+		DocuWarePrimaryKey:  payloadString(payload, "PRIMARY_KEY"),
+		SourcePayload:       payload,
 	}
 }
 

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -28,13 +29,18 @@ func (r *PostgresRepository) ListReceipts(ctx context.Context) ([]Receipt, error
 		SELECT id::text,
 		       receipt_number,
 		       supplier_name,
+		       customer_name,
 		       supplier_reference,
 		       purchase_order_number,
 		       delivery_note_number,
+		       weighbridge_ticket_number,
+		       vehicle_registration,
+		       job_number,
 		       source_docuware_document_id,
 		       source_docuware_cabinet_id,
 		       docuware_record_id,
 		       docuware_group_reference,
+		       docuware_doc_url,
 		       received_at,
 		       status::text,
 		       sync_status,
@@ -68,13 +74,18 @@ func (r *PostgresRepository) GetReceipt(ctx context.Context, id string) (Receipt
 		SELECT id::text,
 		       receipt_number,
 		       supplier_name,
+		       customer_name,
 		       supplier_reference,
 		       purchase_order_number,
 		       delivery_note_number,
+		       weighbridge_ticket_number,
+		       vehicle_registration,
+		       job_number,
 		       source_docuware_document_id,
 		       source_docuware_cabinet_id,
 		       docuware_record_id,
 		       docuware_group_reference,
+		       docuware_doc_url,
 		       received_at,
 		       status::text,
 		       sync_status,
@@ -180,9 +191,13 @@ func (r *PostgresRepository) upsertImportedReceipt(ctx context.Context, tx pgx.T
 			INSERT INTO receipts (
 				receipt_number,
 				supplier_name,
+				customer_name,
 				supplier_reference,
 				purchase_order_number,
 				delivery_note_number,
+				weighbridge_ticket_number,
+				vehicle_registration,
+				job_number,
 				received_at,
 				status,
 				notes,
@@ -190,18 +205,23 @@ func (r *PostgresRepository) upsertImportedReceipt(ctx context.Context, tx pgx.T
 				source_docuware_cabinet_id,
 				docuware_record_id,
 				docuware_group_reference,
+				docuware_doc_url,
 				imported_at,
 				sync_status,
 				docuware_source_payload
 			)
-			VALUES ($1, $2, $3, $4, $5, $6, $7::receipt_status, $8, $9, $10, $11, $12, NOW(), $13, $14::jsonb)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::receipt_status, $12, $13, $14, $15, $16, $17, NOW(), $18, $19::jsonb)
 			RETURNING id::text
 		`,
 			imported.ReceiptNumber,
 			imported.SupplierName,
+			imported.CustomerName,
 			imported.SupplierReference,
 			imported.PurchaseOrderNumber,
 			imported.DeliveryNoteNumber,
+			imported.WeighbridgeTicketNumber,
+			imported.VehicleRegistration,
+			imported.JobNumber,
 			imported.ReceivedAt,
 			string(imported.Status),
 			imported.Notes,
@@ -209,6 +229,7 @@ func (r *PostgresRepository) upsertImportedReceipt(ctx context.Context, tx pgx.T
 			imported.SourceDocuWareCabinet,
 			imported.DocuWareRecordID,
 			imported.DocuWareGroupReference,
+			imported.DocuWareDocURL,
 			imported.SyncStatus,
 			payloadJSON,
 		)
@@ -227,31 +248,41 @@ func (r *PostgresRepository) upsertImportedReceipt(ctx context.Context, tx pgx.T
 	row := tx.QueryRow(ctx, `
 		UPDATE receipts
 		SET supplier_name = $2,
-		    supplier_reference = $3,
-		    purchase_order_number = $4,
-		    delivery_note_number = $5,
-		    received_at = $6,
-		    notes = $7,
-		    source_docuware_document_id = $8,
-		    source_docuware_cabinet_id = $9,
-		    docuware_record_id = $10,
+		    customer_name = $3,
+		    supplier_reference = $4,
+		    purchase_order_number = $5,
+		    delivery_note_number = $6,
+		    weighbridge_ticket_number = $7,
+		    vehicle_registration = $8,
+		    job_number = $9,
+		    received_at = $10,
+		    notes = $11,
+		    source_docuware_document_id = $12,
+		    source_docuware_cabinet_id = $13,
+		    docuware_record_id = $14,
+		    docuware_doc_url = $15,
 		    imported_at = NOW(),
-		    sync_status = $11,
-		    docuware_source_payload = $12::jsonb,
+		    sync_status = $16,
+		    docuware_source_payload = $17::jsonb,
 		    updated_at = NOW()
 		WHERE id = $1::uuid
 		RETURNING id::text
 	`,
 		existingID,
 		imported.SupplierName,
+		imported.CustomerName,
 		imported.SupplierReference,
 		imported.PurchaseOrderNumber,
 		imported.DeliveryNoteNumber,
+		imported.WeighbridgeTicketNumber,
+		imported.VehicleRegistration,
+		imported.JobNumber,
 		imported.ReceivedAt,
 		imported.Notes,
 		imported.SourceDocuWareDocument,
 		imported.SourceDocuWareCabinet,
 		imported.DocuWareRecordID,
+		imported.DocuWareDocURL,
 		imported.SyncStatus,
 		payloadJSON,
 	)
@@ -302,24 +333,50 @@ func (r *PostgresRepository) upsertImportedReceiptLine(ctx context.Context, tx p
 				line_number,
 				item_code,
 				description,
+				material_code,
+				material_description,
+				material_size,
+				material_markings,
+				material_thickness,
+				material_length,
+				weight,
+				process,
+				stored_in,
+				bay,
 				expected_quantity,
 				received_quantity,
 				unit_of_measure,
+				receiving_status,
+				discrepancy,
+				quantity_discrepancy,
 				condition_notes,
 				docuware_record_line_id,
 				docuware_unique_number,
 				docuware_primary_key,
 				docuware_source_payload
 			)
-			VALUES ($1::uuid, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12::jsonb)
+			VALUES ($1::uuid, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25::jsonb)
 		`,
 			receiptID,
 			line.LineNumber,
 			line.ItemCode,
 			line.Description,
+			line.MaterialCode,
+			line.MaterialDescription,
+			line.MaterialSize,
+			line.MaterialMarkings,
+			line.MaterialThickness,
+			line.MaterialLength,
+			line.Weight,
+			line.Process,
+			line.StoredIn,
+			line.Bay,
 			line.ExpectedQuantity,
 			line.ReceivedQuantity,
 			line.UnitOfMeasure,
+			line.ReceivingStatus,
+			line.Discrepancy,
+			line.QuantityDiscrepancy,
 			line.ConditionNotes,
 			line.DocuWareRecordLine,
 			line.DocuWareUniqueNo,
@@ -338,13 +395,26 @@ func (r *PostgresRepository) upsertImportedReceiptLine(ctx context.Context, tx p
 		    line_number = $3,
 		    item_code = $4,
 		    description = $5,
-		    expected_quantity = $6,
-		    received_quantity = $7,
-		    unit_of_measure = $8,
-		    condition_notes = $9,
-		    docuware_unique_number = $10,
-		    docuware_primary_key = $11,
-		    docuware_source_payload = $12::jsonb,
+		    material_code = $6,
+		    material_description = $7,
+		    material_size = $8,
+		    material_markings = $9,
+		    material_thickness = $10,
+		    material_length = $11,
+		    weight = $12,
+		    process = $13,
+		    stored_in = $14,
+		    bay = $15,
+		    expected_quantity = $16,
+		    received_quantity = $17,
+		    unit_of_measure = $18,
+		    receiving_status = $19,
+		    discrepancy = $20,
+		    quantity_discrepancy = $21,
+		    condition_notes = $22,
+		    docuware_unique_number = $23,
+		    docuware_primary_key = $24,
+		    docuware_source_payload = $25::jsonb,
 		    updated_at = NOW()
 		WHERE id = $1::uuid
 	`,
@@ -353,9 +423,22 @@ func (r *PostgresRepository) upsertImportedReceiptLine(ctx context.Context, tx p
 		line.LineNumber,
 		line.ItemCode,
 		line.Description,
+		line.MaterialCode,
+		line.MaterialDescription,
+		line.MaterialSize,
+		line.MaterialMarkings,
+		line.MaterialThickness,
+		line.MaterialLength,
+		line.Weight,
+		line.Process,
+		line.StoredIn,
+		line.Bay,
 		line.ExpectedQuantity,
 		line.ReceivedQuantity,
 		line.UnitOfMeasure,
+		line.ReceivingStatus,
+		line.Discrepancy,
+		line.QuantityDiscrepancy,
 		line.ConditionNotes,
 		line.DocuWareUniqueNo,
 		line.DocuWarePrimaryKey,
@@ -374,9 +457,28 @@ func (r *PostgresRepository) listReceiptLines(ctx context.Context, receiptID str
 		       line_number,
 		       item_code,
 		       description,
+		       material_code,
+		       material_description,
+		       material_size,
+		       material_markings,
+		       material_thickness,
+		       material_length,
+		       weight,
+		       internal_description,
+		       item_type,
+		       packaging_method,
+		       accessories,
+		       comments,
+		       required_galv_thickness,
+		       process,
+		       stored_in,
+		       bay,
 		       expected_quantity,
 		       received_quantity,
 		       unit_of_measure,
+		       receiving_status,
+		       discrepancy,
+		       quantity_discrepancy,
 		       condition_notes,
 		       docuware_record_line_id,
 		       docuware_unique_number,
@@ -487,6 +589,219 @@ func (r *PostgresRepository) listReceiptExceptions(ctx context.Context, receiptI
 	return exceptions, rows.Err()
 }
 
+func (r *PostgresRepository) UpdateReceipt(ctx context.Context, id string, input UpdateReceiptInput) (Receipt, error) {
+	setClauses := []string{"updated_at = NOW()"}
+	args := []any{id}
+	argIdx := 2
+
+	if input.Status != nil {
+		setClauses = append(setClauses, fmt.Sprintf("status = $%d::receipt_status", argIdx))
+		args = append(args, string(*input.Status))
+		argIdx++
+	}
+
+	if input.Notes != nil {
+		setClauses = append(setClauses, fmt.Sprintf("notes = $%d", argIdx))
+		args = append(args, *input.Notes)
+		argIdx++
+	}
+
+	if input.CustomerName != nil {
+		setClauses = append(setClauses, fmt.Sprintf("customer_name = $%d", argIdx))
+		args = append(args, *input.CustomerName)
+		argIdx++
+	}
+
+	if input.SupplierName != nil {
+		setClauses = append(setClauses, fmt.Sprintf("supplier_name = $%d", argIdx))
+		args = append(args, *input.SupplierName)
+		argIdx++
+	}
+
+	if input.PurchaseOrderNumber != nil {
+		setClauses = append(setClauses, fmt.Sprintf("purchase_order_number = $%d", argIdx))
+		args = append(args, *input.PurchaseOrderNumber)
+		argIdx++
+	}
+
+	if input.DeliveryNoteNumber != nil {
+		setClauses = append(setClauses, fmt.Sprintf("delivery_note_number = $%d", argIdx))
+		args = append(args, *input.DeliveryNoteNumber)
+		argIdx++
+	}
+
+	if input.WeighbridgeTicketNumber != nil {
+		setClauses = append(setClauses, fmt.Sprintf("weighbridge_ticket_number = $%d", argIdx))
+		args = append(args, *input.WeighbridgeTicketNumber)
+		argIdx++
+	}
+
+	if input.VehicleRegistration != nil {
+		setClauses = append(setClauses, fmt.Sprintf("vehicle_registration = $%d", argIdx))
+		args = append(args, *input.VehicleRegistration)
+		argIdx++
+	}
+
+	if input.JobNumber != nil {
+		setClauses = append(setClauses, fmt.Sprintf("job_number = $%d", argIdx))
+		args = append(args, *input.JobNumber)
+		argIdx++
+	}
+
+	if len(setClauses) == 1 {
+		return r.GetReceipt(ctx, id)
+	}
+
+	query := fmt.Sprintf("UPDATE receipts SET %s WHERE id = $1::uuid", strings.Join(setClauses, ", "))
+	_, err := r.pool.Exec(ctx, query, args...)
+	if err != nil {
+		return Receipt{}, fmt.Errorf("update receipt: %w", err)
+	}
+
+	return r.GetReceipt(ctx, id)
+}
+
+func (r *PostgresRepository) UpdateReceiptLine(ctx context.Context, receiptID, lineID string, input UpdateReceiptLineInput) (ReceiptLine, error) {
+	setClauses := []string{"updated_at = NOW()"}
+	args := []any{lineID, receiptID}
+	argIdx := 3
+
+	if input.ReceivedQuantity != nil {
+		setClauses = append(setClauses, fmt.Sprintf("received_quantity = $%d", argIdx))
+		args = append(args, *input.ReceivedQuantity)
+		argIdx++
+	}
+
+	if input.QuantityDiscrepancy != nil {
+		setClauses = append(setClauses, fmt.Sprintf("quantity_discrepancy = $%d", argIdx))
+		args = append(args, *input.QuantityDiscrepancy)
+		argIdx++
+	}
+
+	if input.InternalDescription != nil {
+		setClauses = append(setClauses, fmt.Sprintf("internal_description = $%d", argIdx))
+		args = append(args, *input.InternalDescription)
+		argIdx++
+	}
+
+	if input.Process != nil {
+		setClauses = append(setClauses, fmt.Sprintf("process = $%d", argIdx))
+		args = append(args, *input.Process)
+		argIdx++
+	}
+
+	if input.ItemType != nil {
+		setClauses = append(setClauses, fmt.Sprintf("item_type = $%d", argIdx))
+		args = append(args, *input.ItemType)
+		argIdx++
+	}
+
+	if input.PackagingMethod != nil {
+		setClauses = append(setClauses, fmt.Sprintf("packaging_method = $%d", argIdx))
+		args = append(args, *input.PackagingMethod)
+		argIdx++
+	}
+
+	if input.Accessories != nil {
+		setClauses = append(setClauses, fmt.Sprintf("accessories = $%d", argIdx))
+		args = append(args, *input.Accessories)
+		argIdx++
+	}
+
+	if input.Comments != nil {
+		setClauses = append(setClauses, fmt.Sprintf("comments = $%d", argIdx))
+		args = append(args, *input.Comments)
+		argIdx++
+	}
+
+	if input.RequiredGalvThickness != nil {
+		setClauses = append(setClauses, fmt.Sprintf("required_galv_thickness = $%d", argIdx))
+		args = append(args, *input.RequiredGalvThickness)
+		argIdx++
+	}
+
+	if input.StoredIn != nil {
+		setClauses = append(setClauses, fmt.Sprintf("stored_in = $%d", argIdx))
+		args = append(args, *input.StoredIn)
+		argIdx++
+	}
+
+	if input.Bay != nil {
+		setClauses = append(setClauses, fmt.Sprintf("bay = $%d", argIdx))
+		args = append(args, *input.Bay)
+		argIdx++
+	}
+
+	if input.ReceivingStatus != nil {
+		setClauses = append(setClauses, fmt.Sprintf("receiving_status = $%d", argIdx))
+		args = append(args, *input.ReceivingStatus)
+		argIdx++
+	}
+
+	if input.Discrepancy != nil {
+		setClauses = append(setClauses, fmt.Sprintf("discrepancy = $%d", argIdx))
+		args = append(args, *input.Discrepancy)
+		argIdx++
+	}
+
+	if input.ConditionNotes != nil {
+		setClauses = append(setClauses, fmt.Sprintf("condition_notes = $%d", argIdx))
+		args = append(args, *input.ConditionNotes)
+		argIdx++
+	}
+
+	query := fmt.Sprintf(
+		"UPDATE receipt_lines SET %s WHERE id = $1::uuid AND receipt_id = $2::uuid",
+		strings.Join(setClauses, ", "),
+	)
+	tag, err := r.pool.Exec(ctx, query, args...)
+	if err != nil {
+		return ReceiptLine{}, fmt.Errorf("update receipt line: %w", err)
+	}
+
+	if tag.RowsAffected() == 0 {
+		return ReceiptLine{}, ErrNotFound
+	}
+
+	row := r.pool.QueryRow(ctx, `
+		SELECT id::text,
+		       line_number,
+		       item_code,
+		       description,
+		       material_code,
+		       material_description,
+		       material_size,
+		       material_markings,
+		       material_thickness,
+		       material_length,
+		       weight,
+		       internal_description,
+		       item_type,
+		       packaging_method,
+		       accessories,
+		       comments,
+		       required_galv_thickness,
+		       process,
+		       stored_in,
+		       bay,
+		       expected_quantity,
+		       received_quantity,
+		       unit_of_measure,
+		       receiving_status,
+		       discrepancy,
+		       quantity_discrepancy,
+		       condition_notes,
+		       docuware_record_line_id,
+		       docuware_unique_number,
+		       docuware_primary_key,
+		       last_synced_at
+		FROM receipt_lines
+		WHERE id = $1::uuid
+	`, lineID)
+
+	return scanReceiptLine(row)
+}
+
 func scanReceipt(row rowScanner) (Receipt, error) {
 	var receipt Receipt
 	var status string
@@ -497,13 +812,18 @@ func scanReceipt(row rowScanner) (Receipt, error) {
 		&receipt.ID,
 		&receipt.ReceiptNumber,
 		&receipt.SupplierName,
+		&receipt.CustomerName,
 		&receipt.SupplierReference,
 		&receipt.PurchaseOrderNumber,
 		&receipt.DeliveryNoteNumber,
+		&receipt.WeighbridgeTicketNumber,
+		&receipt.VehicleRegistration,
+		&receipt.JobNumber,
 		&receipt.SourceDocuWareDocument,
 		&receipt.SourceDocuWareCabinet,
 		&receipt.DocuWareRecordID,
 		&receipt.DocuWareGroupReference,
+		&receipt.DocuWareDocURL,
 		&receipt.ReceivedAt,
 		&status,
 		&receipt.SyncStatus,
@@ -542,9 +862,28 @@ func scanReceiptLine(row rowScanner) (ReceiptLine, error) {
 		&line.LineNumber,
 		&line.ItemCode,
 		&line.Description,
+		&line.MaterialCode,
+		&line.MaterialDescription,
+		&line.MaterialSize,
+		&line.MaterialMarkings,
+		&line.MaterialThickness,
+		&line.MaterialLength,
+		&line.Weight,
+		&line.InternalDescription,
+		&line.ItemType,
+		&line.PackagingMethod,
+		&line.Accessories,
+		&line.Comments,
+		&line.RequiredGalvThickness,
+		&line.Process,
+		&line.StoredIn,
+		&line.Bay,
 		&line.ExpectedQuantity,
 		&line.ReceivedQuantity,
 		&line.UnitOfMeasure,
+		&line.ReceivingStatus,
+		&line.Discrepancy,
+		&line.QuantityDiscrepancy,
 		&line.ConditionNotes,
 		&line.DocuWareRecordLine,
 		&line.DocuWareUniqueNo,

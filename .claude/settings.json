@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -s http://localhost:*)",
+      "Bash(curl -s http://localhost:* *)",
+      "Bash(curl -s https://transvaal.ayai.live*)",
+      "Bash(curl -s -X POST http://localhost:* *)",
+      "Bash(curl -X POST http://localhost:* *)",
+      "Bash(psql *)",
+      "Bash(cd /opt/projects/transvaalgalv-app/frontend && npm run build*)",
+      "Bash(cd /opt/projects/transvaalgalv-app/backend && go build *)",
+      "Bash(nohup /opt/projects/transvaalgalv-app/backend/start-dev.sh*)",
+      "Bash(ps aux*)",
+      "Bash(ss -tlnp*)",
+      "Bash(systemctl status *)"
+    ]
+  }
+}
