@@ -1,0 +1,117 @@
+// Mocked PODs served from DocuWare (shape mirrors frontend/src/pages/Receipts.tsx).
+
+const PODS = [
+  {
+    id: "r_01",
+    receipt_number: "R-2026-04821",
+    customer_name: "Scatec Solar SA (Pty) Ltd",
+    supplier_name: "Scatec Solar SA (Pty) Ltd",
+    purchase_order_number: "PO-44219",
+    delivery_note_number: "DN-8842",
+    weighbridge_ticket_number: "WB-44281",
+    vehicle_registration: "JDV 218 GP",
+    job_number: "",
+    status: "draft",
+    sync_status: "synced",
+    received_at: "2026-04-24T08:12:00Z",
+    docuware_doc_url: "#",
+    notes: "",
+    lines: [
+      { id: "L1", line_number: 1, item_code: "IMB-W4000", description: "Guardrail W-beam 4.0m", material_code: "HRS-355JR", material_size: "310×83", material_length: "4000", weight: "27.6", item_type: "blacksteel", packaging_method: "bundle", expected_quantity: 64, received_quantity: 64, unit_of_measure: "pcs", receiving_status: "pending", discrepancy: "", quantity_discrepancy: "none", condition_notes: "", accessories: "", process: "galvanising", required_galv_thickness: "85" },
+      { id: "L2", line_number: 2, item_code: "IMB-P2000", description: "Post 2.0m", material_code: "HRS-300", material_size: "120×55", material_length: "2000", weight: "14.4", item_type: "blacksteel", packaging_method: "bundle", expected_quantity: 128, received_quantity: 128, unit_of_measure: "pcs", receiving_status: "pending", discrepancy: "", quantity_discrepancy: "none", condition_notes: "", accessories: "", process: "galvanising", required_galv_thickness: "85" },
+      { id: "L3", line_number: 3, item_code: "IMB-BKT", description: "Mounting bracket — standard", material_code: "HRS-MS", material_size: "160×120×6", material_length: "—", weight: "2.1", item_type: "blacksteel", packaging_method: "crate", expected_quantity: 256, received_quantity: 240, unit_of_measure: "pcs", receiving_status: "pending", discrepancy: "", quantity_discrepancy: "short", condition_notes: "", accessories: "", process: "galvanising", required_galv_thickness: "85" },
+      { id: "L4", line_number: 4, item_code: "IMB-BLT-M16", description: "M16 × 80 bolt — pre-cut thread", material_code: "BLT-M16", material_size: "M16×80", material_length: "—", weight: "0.18", item_type: "blacksteel", packaging_method: "bin", expected_quantity: 512, received_quantity: 512, unit_of_measure: "pcs", receiving_status: "pending", discrepancy: "", quantity_discrepancy: "none", condition_notes: "", accessories: "", process: "galvanising", required_galv_thickness: "65" },
+    ],
+  },
+  {
+    id: "r_02",
+    receipt_number: "R-2026-04820",
+    customer_name: "Consolidated Steel Industries",
+    supplier_name: "Consolidated Steel Industries",
+    purchase_order_number: "PO-11942",
+    delivery_note_number: "DN-2208",
+    weighbridge_ticket_number: "WB-44280",
+    vehicle_registration: "DHC 410 GP",
+    status: "received",
+    sync_status: "synced",
+    received_at: "2026-04-24T07:10:00Z",
+    notes: "",
+    lines: [
+      { id: "L1", line_number: 1, item_code: "CSI-HEA200", description: "HEA 200 — 12m", material_size: "200×200", material_length: "12000", weight: "507", expected_quantity: 12, received_quantity: 12, unit_of_measure: "pcs", quantity_discrepancy: "none", condition_notes: "" },
+      { id: "L2", line_number: 2, item_code: "CSI-IPE180", description: "IPE 180 — 6m", material_size: "180×91", material_length: "6000", weight: "112", expected_quantity: 24, received_quantity: 24, unit_of_measure: "pcs", quantity_discrepancy: "none", condition_notes: "" },
+    ],
+  },
+  {
+    id: "r_03",
+    receipt_number: "R-2026-04819",
+    customer_name: "Highveld Fabrication",
+    supplier_name: "Highveld Fabrication",
+    purchase_order_number: "PO-88104",
+    delivery_note_number: "DN-9911",
+    vehicle_registration: "KTR 992 MP",
+    status: "quality_hold",
+    sync_status: "synced",
+    received_at: "2026-04-23T14:40:00Z",
+    notes: "Rust on L1 flanges noted at receipt — awaiting QC decision.",
+    lines: [
+      { id: "L1", line_number: 1, item_code: "HVF-PLT12", description: "Plate 12mm — 2400×1200", material_size: "2400×1200", weight: "226", expected_quantity: 18, received_quantity: 18, unit_of_measure: "pcs", quantity_discrepancy: "none", condition_notes: "Surface rust — requires shotblast before galv" },
+    ],
+  },
+  {
+    id: "r_04",
+    receipt_number: "R-2026-04818",
+    customer_name: "Tshwane Transmission",
+    supplier_name: "Tshwane Transmission",
+    purchase_order_number: "PO-44110",
+    delivery_note_number: "DN-5521",
+    vehicle_registration: "FMR 116 GP",
+    status: "matched",
+    sync_status: "synced",
+    received_at: "2026-04-23T11:05:00Z",
+    notes: "",
+    lines: [
+      { id: "L1", line_number: 1, item_code: "TT-TWR-SEC", description: "Tower section C-leg", material_size: "varies", weight: "840", expected_quantity: 8, received_quantity: 8, unit_of_measure: "pcs", quantity_discrepancy: "none", condition_notes: "" },
+    ],
+  },
+  {
+    id: "r_05",
+    receipt_number: "R-2026-04812",
+    customer_name: "Eskom Holdings — Megawatt Park",
+    supplier_name: "Eskom Holdings — Megawatt Park",
+    purchase_order_number: "PO-77231",
+    delivery_note_number: "DN-1109",
+    weighbridge_ticket_number: "WB-44272",
+    vehicle_registration: "BNV 884 GP",
+    status: "archived",
+    sync_status: "synced",
+    received_at: "2026-04-22T09:30:00Z",
+    grn_number: "GRN-202604812",
+    grn_issued_at: "2026-04-22T16:14:00Z",
+    notes: "",
+    lines: [
+      { id: "L1", line_number: 1, item_code: "ESK-LAT-A", description: "Lattice tower brace — type A", material_size: "100×100×8", weight: "42.5", expected_quantity: 96, received_quantity: 96, unit_of_measure: "pcs", quantity_discrepancy: "none", condition_notes: "" },
+      { id: "L2", line_number: 2, item_code: "ESK-LAT-B", description: "Lattice tower brace — type B", material_size: "75×75×6", weight: "24.1", expected_quantity: 144, received_quantity: 144, unit_of_measure: "pcs", quantity_discrepancy: "none", condition_notes: "" },
+    ],
+  },
+];
+
+const DEFECT_CHIPS = [
+  { id: "rust",      label: "Surface rust",    sev: "warn" },
+  { id: "damage",    label: "Damaged",         sev: "danger" },
+  { id: "paint",     label: "Paint contamination", sev: "warn" },
+  { id: "weld",      label: "Weld spatter",    sev: "warn" },
+  { id: "vent",      label: "Needs vent hole", sev: "info" },
+  { id: "drain",     label: "Needs drain hole", sev: "info" },
+  { id: "thread",    label: "Threaded article", sev: "warn" },
+  { id: "oil",       label: "Oily / greasy",   sev: "warn" },
+];
+
+const STATUS_META = {
+  draft:        { label: "Draft",         badge: "badge-default" },
+  received:     { label: "Received",      badge: "badge-blue" },
+  quality_hold: { label: "Quality Hold",  badge: "badge-amber" },
+  matched:      { label: "Matched",       badge: "badge-green" },
+  archived:     { label: "Archived",      badge: "badge-purple" },
+};
+
+Object.assign(window, { PODS, DEFECT_CHIPS, STATUS_META });
