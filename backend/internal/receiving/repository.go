@@ -168,107 +168,45 @@ func (r *PostgresRepository) ImportDocuWareReceipts(ctx context.Context, imports
 }
 
 func (r *PostgresRepository) upsertImportedReceipt(ctx context.Context, tx pgx.Tx, imported importedReceipt) (string, error) {
-	var existingID string
-	var existingStatus string
-	lookupErr := tx.QueryRow(ctx, `
-		SELECT id::text, status::text
-		FROM receipts
-		WHERE docuware_group_reference = $1
-	`, imported.DocuWareGroupReference).Scan(&existingID, &existingStatus)
-
-	insertNew, err := resolveImportedReceiptLookup(lookupErr, existingStatus)
-	if err != nil {
-		return "", err
-	}
+	// Upsert by receipt_number. Multiple DocuWare docs that share delivery/order/weighbridge
+	// identifiers map to the same receipt_number (see buildReceiptNumber/buildGroupReference)
+	// and should merge into one receipt with lines from each doc. First doc wins for header
+	// fields — subsequent imports leave the header untouched and just add/update lines.
+	// If the header needs to change, it happens via the app UI or an explicit re-import.
 
 	payloadJSON, err := json.Marshal(imported.SourcePayload)
 	if err != nil {
 		return "", fmt.Errorf("marshal receipt payload: %w", err)
 	}
 
-	if insertNew {
-		row := tx.QueryRow(ctx, `
-			INSERT INTO receipts (
-				receipt_number,
-				supplier_name,
-				customer_name,
-				supplier_reference,
-				purchase_order_number,
-				delivery_note_number,
-				weighbridge_ticket_number,
-				vehicle_registration,
-				job_number,
-				received_at,
-				status,
-				notes,
-				source_docuware_document_id,
-				source_docuware_cabinet_id,
-				docuware_record_id,
-				docuware_group_reference,
-				docuware_doc_url,
-				imported_at,
-				sync_status,
-				docuware_source_payload
-			)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::receipt_status, $12, $13, $14, $15, $16, $17, NOW(), $18, $19::jsonb)
-			RETURNING id::text
-		`,
-			imported.ReceiptNumber,
-			imported.SupplierName,
-			imported.CustomerName,
-			imported.SupplierReference,
-			imported.PurchaseOrderNumber,
-			imported.DeliveryNoteNumber,
-			imported.WeighbridgeTicketNumber,
-			imported.VehicleRegistration,
-			imported.JobNumber,
-			imported.ReceivedAt,
-			string(imported.Status),
-			imported.Notes,
-			imported.SourceDocuWareDocument,
-			imported.SourceDocuWareCabinet,
-			imported.DocuWareRecordID,
-			imported.DocuWareGroupReference,
-			imported.DocuWareDocURL,
-			imported.SyncStatus,
-			payloadJSON,
-		)
-
-		var id string
-		if err := row.Scan(&id); err != nil {
-			return "", fmt.Errorf("insert imported receipt: %w", err)
-		}
-		return id, nil
-	}
-
-	if existingStatus != string(ReceiptStatusDraft) {
-		return "", ErrConflict
-	}
-
 	row := tx.QueryRow(ctx, `
-		UPDATE receipts
-		SET supplier_name = $2,
-		    customer_name = $3,
-		    supplier_reference = $4,
-		    purchase_order_number = $5,
-		    delivery_note_number = $6,
-		    weighbridge_ticket_number = $7,
-		    vehicle_registration = $8,
-		    job_number = $9,
-		    received_at = $10,
-		    notes = $11,
-		    source_docuware_document_id = $12,
-		    source_docuware_cabinet_id = $13,
-		    docuware_record_id = $14,
-		    docuware_doc_url = $15,
-		    imported_at = NOW(),
-		    sync_status = $16,
-		    docuware_source_payload = $17::jsonb,
-		    updated_at = NOW()
-		WHERE id = $1::uuid
+		INSERT INTO receipts (
+			receipt_number,
+			supplier_name,
+			customer_name,
+			supplier_reference,
+			purchase_order_number,
+			delivery_note_number,
+			weighbridge_ticket_number,
+			vehicle_registration,
+			job_number,
+			received_at,
+			status,
+			notes,
+			source_docuware_document_id,
+			source_docuware_cabinet_id,
+			docuware_record_id,
+			docuware_group_reference,
+			docuware_doc_url,
+			imported_at,
+			sync_status,
+			docuware_source_payload
+		)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::receipt_status, $12, $13, $14, $15, $16, $17, NOW(), $18, $19::jsonb)
+		ON CONFLICT (receipt_number) DO UPDATE SET updated_at = NOW()
 		RETURNING id::text
 	`,
-		existingID,
+		imported.ReceiptNumber,
 		imported.SupplierName,
 		imported.CustomerName,
 		imported.SupplierReference,
@@ -278,10 +216,12 @@ func (r *PostgresRepository) upsertImportedReceipt(ctx context.Context, tx pgx.T
 		imported.VehicleRegistration,
 		imported.JobNumber,
 		imported.ReceivedAt,
+		string(imported.Status),
 		imported.Notes,
 		imported.SourceDocuWareDocument,
 		imported.SourceDocuWareCabinet,
 		imported.DocuWareRecordID,
+		imported.DocuWareGroupReference,
 		imported.DocuWareDocURL,
 		imported.SyncStatus,
 		payloadJSON,
@@ -353,9 +293,10 @@ func (r *PostgresRepository) upsertImportedReceiptLine(ctx context.Context, tx p
 				docuware_record_line_id,
 				docuware_unique_number,
 				docuware_primary_key,
+				docuware_doc_id,
 				docuware_source_payload
 			)
-			VALUES ($1::uuid, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25::jsonb)
+			VALUES ($1::uuid, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26::jsonb)
 		`,
 			receiptID,
 			line.LineNumber,
@@ -381,6 +322,7 @@ func (r *PostgresRepository) upsertImportedReceiptLine(ctx context.Context, tx p
 			line.DocuWareRecordLine,
 			line.DocuWareUniqueNo,
 			line.DocuWarePrimaryKey,
+			line.DocuWareDocID,
 			payloadJSON,
 		)
 		if err != nil {
@@ -391,36 +333,33 @@ func (r *PostgresRepository) upsertImportedReceiptLine(ctx context.Context, tx p
 
 	_, err = tx.Exec(ctx, `
 		UPDATE receipt_lines
-		SET receipt_id = $2::uuid,
-		    line_number = $3,
-		    item_code = $4,
-		    description = $5,
-		    material_code = $6,
-		    material_description = $7,
-		    material_size = $8,
-		    material_markings = $9,
-		    material_thickness = $10,
-		    material_length = $11,
-		    weight = $12,
-		    process = $13,
-		    stored_in = $14,
-		    bay = $15,
-		    expected_quantity = $16,
-		    received_quantity = $17,
-		    unit_of_measure = $18,
-		    receiving_status = $19,
-		    discrepancy = $20,
-		    quantity_discrepancy = $21,
-		    condition_notes = $22,
-		    docuware_unique_number = $23,
-		    docuware_primary_key = $24,
-		    docuware_source_payload = $25::jsonb,
+		SET item_code = $2,
+		    description = $3,
+		    material_code = $4,
+		    material_description = $5,
+		    material_size = $6,
+		    material_markings = $7,
+		    material_thickness = $8,
+		    material_length = $9,
+		    weight = $10,
+		    process = $11,
+		    stored_in = $12,
+		    bay = $13,
+		    expected_quantity = $14,
+		    received_quantity = $15,
+		    unit_of_measure = $16,
+		    receiving_status = $17,
+		    discrepancy = $18,
+		    quantity_discrepancy = $19,
+		    condition_notes = $20,
+		    docuware_unique_number = $21,
+		    docuware_primary_key = $22,
+		    docuware_source_payload = $23::jsonb,
+		    docuware_doc_id = COALESCE(NULLIF($24, ''), docuware_doc_id),
 		    updated_at = NOW()
 		WHERE id = $1::uuid
 	`,
 		existingID,
-		receiptID,
-		line.LineNumber,
 		line.ItemCode,
 		line.Description,
 		line.MaterialCode,
@@ -443,6 +382,7 @@ func (r *PostgresRepository) upsertImportedReceiptLine(ctx context.Context, tx p
 		line.DocuWareUniqueNo,
 		line.DocuWarePrimaryKey,
 		payloadJSON,
+		line.DocuWareDocID,
 	)
 	if err != nil {
 		return fmt.Errorf("update imported receipt line: %w", err)
@@ -483,6 +423,7 @@ func (r *PostgresRepository) listReceiptLines(ctx context.Context, receiptID str
 		       docuware_record_line_id,
 		       docuware_unique_number,
 		       docuware_primary_key,
+		       docuware_doc_id,
 		       last_synced_at
 		FROM receipt_lines
 		WHERE receipt_id = $1::uuid
@@ -794,6 +735,7 @@ func (r *PostgresRepository) UpdateReceiptLine(ctx context.Context, receiptID, l
 		       docuware_record_line_id,
 		       docuware_unique_number,
 		       docuware_primary_key,
+		       docuware_doc_id,
 		       last_synced_at
 		FROM receipt_lines
 		WHERE id = $1::uuid
@@ -888,6 +830,7 @@ func scanReceiptLine(row rowScanner) (ReceiptLine, error) {
 		&line.DocuWareRecordLine,
 		&line.DocuWareUniqueNo,
 		&line.DocuWarePrimaryKey,
+		&line.DocuWareDocID,
 		&lastSyncedAt,
 	)
 	if err != nil {

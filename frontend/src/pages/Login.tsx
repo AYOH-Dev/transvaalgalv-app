@@ -35,7 +35,7 @@ export default function Login({ onLogin }: { onLogin?: () => void }) {
   }
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(160deg, #f0f9ff 0%, #e0f2fe 40%, #f8fafc 100%)', padding: '1.5rem' }}>
+    <div className="login-bg" style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.5rem' }}>
       <div style={{ width: '100%', maxWidth: 400 }}>
         <div className="card" style={{ padding: '2.25rem 2rem', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
 

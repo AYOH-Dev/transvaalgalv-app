@@ -4,7 +4,9 @@ import (
 	"context"
 	"crypto/sha1"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
+	"log"
 	"math"
 	"sort"
 	"strconv"
@@ -22,6 +24,12 @@ type Repository interface {
 
 type Service struct {
 	repository Repository
+	syncEnqueuer SyncEnqueuer
+}
+
+type SyncEnqueuer interface {
+	EnqueueLineSync(ctx context.Context, receiptID, lineID string) error
+	SyncLineNow(ctx context.Context, receiptID, lineID string) error
 }
 
 type importedReceipt struct {
@@ -71,11 +79,23 @@ type importedReceiptLine struct {
 	DocuWareRecordLine  string
 	DocuWareUniqueNo    string
 	DocuWarePrimaryKey  string
+	DocuWareDocID       string
 	SourcePayload       map[string]any
 }
 
 func NewService(repository Repository) *Service {
-	return &Service{repository: repository}
+	return &Service{repository: repository, syncEnqueuer: nil}
+}
+
+func (s *Service) SetSyncEnqueuer(enqueuer SyncEnqueuer) {
+	s.syncEnqueuer = enqueuer
+}
+
+func (s *Service) EnqueueLineSync(ctx context.Context, receiptID, lineID string) error {
+	if s.syncEnqueuer == nil {
+		return fmt.Errorf("%w: sync enqueuer not configured", ErrUnavailable)
+	}
+	return s.syncEnqueuer.EnqueueLineSync(ctx, receiptID, lineID)
 }
 
 func (s *Service) ListReceipts(ctx context.Context) ([]Receipt, error) {
@@ -110,6 +130,7 @@ func (s *Service) ImportDocuWareRows(ctx context.Context, input DocuWareImportIn
 	grouped := map[string]*importedReceipt{}
 	groupOrder := []string{}
 	groupLineCount := map[string]int{}
+	seenUniqueNumbers := map[string]bool{} // Deduplicate by UNIQUE_NUMBER (the true business key)
 
 	for _, row := range input.Rows {
 		payload := clonePayload(row.Payload)
@@ -125,6 +146,15 @@ func (s *Service) ImportDocuWareRows(ctx context.Context, input DocuWareImportIn
 		groupReference := buildGroupReference(payload)
 		if groupReference == "" {
 			return DocuWareImportResult{}, fmt.Errorf("%w: could not derive a receipt grouping key", ErrInvalidInput)
+		}
+
+		// Skip duplicate lines by UNIQUE_NUMBER (the most unique field to the solution)
+		uniqueNumber := payloadString(payload, "UNIQUE_NUMBER")
+		if uniqueNumber != "" && seenUniqueNumbers[uniqueNumber] {
+			continue
+		}
+		if uniqueNumber != "" {
+			seenUniqueNumbers[uniqueNumber] = true
 		}
 
 		receipt, ok := grouped[groupReference]
@@ -153,6 +183,20 @@ func (s *Service) ImportDocuWareRows(ctx context.Context, input DocuWareImportIn
 	receipts, err := s.repository.ImportDocuWareReceipts(ctx, imports)
 	if err != nil {
 		return DocuWareImportResult{}, err
+	}
+
+	// Enqueue sync-back for every imported line. The queue worker picks these up
+	// off the request path, which matters when DocuWare pushes many docs concurrently:
+	// inline syncing caused O(N²) calls (each doc re-syncing the whole receipt) and
+	// context-cancellation storms. EnqueueLineSync is idempotent on (receipt,line).
+	if s.syncEnqueuer != nil {
+		for _, receipt := range receipts {
+			for _, line := range receipt.Lines {
+				if err := s.syncEnqueuer.EnqueueLineSync(ctx, receipt.ID, line.ID); err != nil {
+					log.Printf("enqueue sync failed for line %s: %v", line.ID, err)
+				}
+			}
+		}
 	}
 
 	return DocuWareImportResult{
@@ -198,7 +242,19 @@ func (s *Service) UpdateReceipt(ctx context.Context, id string, input UpdateRece
 		}
 	}
 
-	return s.repository.UpdateReceipt(ctx, id, input)
+	receipt, err := s.repository.UpdateReceipt(ctx, id, input)
+	if err != nil {
+		return Receipt{}, err
+	}
+
+	// Enqueue syncs for all lines when status changes (sync back to DocuWare)
+	if input.Status != nil && s.syncEnqueuer != nil {
+		for _, line := range receipt.Lines {
+			_ = s.syncEnqueuer.EnqueueLineSync(ctx, receipt.ID, line.ID)
+		}
+	}
+
+	return receipt, nil
 }
 
 func (s *Service) UpdateReceiptLine(ctx context.Context, receiptID, lineID string, input UpdateReceiptLineInput) (ReceiptLine, error) {
@@ -214,7 +270,41 @@ func (s *Service) UpdateReceiptLine(ctx context.Context, receiptID, lineID strin
 		return ReceiptLine{}, fmt.Errorf("%w: line id is required", ErrInvalidInput)
 	}
 
-	return s.repository.UpdateReceiptLine(ctx, receiptID, lineID, input)
+	line, err := s.repository.UpdateReceiptLine(ctx, receiptID, lineID, input)
+	if err != nil {
+		return ReceiptLine{}, err
+	}
+
+	// Sync immediately if receiving_status is set (triggers when line is marked received)
+	if input.ReceivingStatus != nil && s.syncEnqueuer != nil {
+		if err := s.syncEnqueuer.SyncLineNow(ctx, receiptID, lineID); err != nil {
+			// Log but don't fail the update — sync can be retried later
+			log.Printf("warn: failed to sync line to docuware (receipt=%s, line=%s): %v", receiptID, lineID, err)
+		}
+	}
+
+	// Auto-advance receipt from draft → received once every line is marked received.
+	if input.ReceivingStatus != nil && *input.ReceivingStatus == "received" {
+		if receipt, err := s.repository.GetReceipt(ctx, receiptID); err == nil {
+			if receipt.Status == ReceiptStatusDraft && len(receipt.Lines) > 0 && allLinesReceived(receipt.Lines) {
+				newStatus := ReceiptStatusReceived
+				if _, err := s.repository.UpdateReceipt(ctx, receiptID, UpdateReceiptInput{Status: &newStatus}); err != nil {
+					log.Printf("warn: failed to auto-advance receipt to received (receipt=%s): %v", receiptID, err)
+				}
+			}
+		}
+	}
+
+	return line, nil
+}
+
+func allLinesReceived(lines []ReceiptLine) bool {
+	for _, l := range lines {
+		if l.ReceivingStatus != "received" {
+			return false
+		}
+	}
+	return true
 }
 
 func buildImportedReceipt(input DocuWareImportInput, groupReference string, payload map[string]any) *importedReceipt {
@@ -228,7 +318,6 @@ func buildImportedReceipt(input DocuWareImportInput, groupReference string, payl
 		strings.TrimSpace(input.SourceCabinetID),
 		payloadString(payload, "DWSYS_FC_GUID"),
 	)
-	groupRecordID := firstNonEmpty(payloadString(payload, "DNDOCID"), payloadString(payload, "DNDOCIDI"))
 	receivedAt := firstNonZeroTime(
 		payloadTime(payload, "DWSTOREDATETIME"),
 		payloadTime(payload, "STORED_DATE"),
@@ -253,7 +342,7 @@ func buildImportedReceipt(input DocuWareImportInput, groupReference string, payl
 		JobNumber:               payloadString(payload, "JOB_NUMBER"),
 		SourceDocuWareDocument:  sourceDocumentID,
 		SourceDocuWareCabinet:   sourceCabinetID,
-		DocuWareRecordID:        groupRecordID,
+		DocuWareRecordID:        payloadString(payload, "DWDOCID"),
 		DocuWareGroupReference:  groupReference,
 		DocuWareDocURL:          payloadString(payload, "DWSYS_DOC_URL"),
 		ReceivedAt:              receivedAt,
@@ -322,28 +411,26 @@ func buildImportedLine(payload map[string]any, recordID string, fallbackLineNumb
 		ExpectedQuantity:    payloadFloat(payload, "QUANTITY"),
 		ReceivedQuantity:    payloadFloat(payload, "QUANTITY_RECEIVED"),
 		UnitOfMeasure:       payloadString(payload, "ITEM_TYPE"),
-		ReceivingStatus:     payloadString(payload, "RECEIVING_STATUS"),
+		ReceivingStatus:     firstNonEmpty(payloadString(payload, "RECEIVING_STATUS"), "draft"),
 		Discrepancy:         payloadString(payload, "DISCREPANCY"),
 		QuantityDiscrepancy: payloadString(payload, "QUANTITY_DISCREPANCY"),
-		ConditionNotes:      joinNonEmpty(" | ", payloadString(payload, "COMMENTS"), payloadString(payload, "ADDITIONAL_COMMENTS"), payloadString(payload, "OTHER")),
+		ConditionNotes:      buildConditionNotesJSON(payload),
 		DocuWareRecordLine:  docuWareRecordLine,
 		DocuWareUniqueNo:    payloadString(payload, "UNIQUE_NUMBER"),
 		DocuWarePrimaryKey:  payloadString(payload, "PRIMARY_KEY"),
+		DocuWareDocID:       payloadString(payload, "DWDOCID"),
 		SourcePayload:       payload,
 	}
 }
 
 func buildGroupReference(payload map[string]any) string {
+	// Only stable POD-level identifiers. DocuWare sometimes varies job_number/fabricator
+	// across rows of the same physical POD, which would split one POD into multiple
+	// receipts. Delivery note + weighbridge ticket + company are consistent.
 	parts := []string{
-		payloadString(payload, "DNDOCID"),
-		payloadString(payload, "DNDOCIDI"),
-		payloadString(payload, "DELIVERY_NOTE"),
-		payloadString(payload, "DELIVERY_NOTE_NUMBER"),
-		payloadString(payload, "ORDER_NUMBER"),
+		firstNonEmpty(payloadString(payload, "DELIVERY_NOTE"), payloadString(payload, "DELIVERY_NOTE_NUMBER")),
 		payloadString(payload, "WEIGHBRIDGE_TICKET_NUMBER"),
-		payloadString(payload, "JOB_NUMBER"),
 		payloadString(payload, "COMPANY"),
-		payloadString(payload, "FABRICATOR"),
 	}
 
 	parts = compactStrings(parts)
@@ -556,4 +643,91 @@ func slugify(value string) string {
 	}
 
 	return result
+}
+
+// buildConditionNotesJSON transforms DocuWare defect fields into structured JSON for condition_notes.
+func buildConditionNotesJSON(payload map[string]any) string {
+	conditionData := make(map[string]any)
+
+	// Map DocuWare defect flags to wizard format
+	defectFlags := map[string]string{
+		"PAINT":                      "paint",
+		"DAMAGED":                    "damaged",
+		"RUST":                       "rust",
+		"DELAMINATION":               "delamination",
+		"NON_CONFORMING_PRE_GALV":    "nonConformingPreGalv",
+		"ENCLOSED_CAVITY":            "enclosedCavity",
+		"THREADED_ARTICLE":           "threadedArticle",
+		"BURR":                       "burr",
+		"PIN_HOLES":                  "pinHoles",
+		"WELD_SPLATTER":              "weldSplatter",
+		"WELDING_FLUX":               "weldingFlux",
+		"CONTINUOUS_WELD":            "continuousWeld",
+		"ARTICLE_OVERLAPPED":         "articleOverlapped",
+		"POSSIBLE_DISTORTION":        "possibleDistortion",
+		"OIL_GREASE_DIESEL":          "oilGreaseDiesel",
+		"SHARP_EDGES":                "sharpEdges",
+		"HOLES_INADEQUATE":           "holesInadequate",
+		"NO_HANGING_METHOD":          "noHangingMethod",
+	}
+
+	for dwField, wizardKey := range defectFlags {
+		if val := payloadString(payload, dwField); val != "" && strings.ToLower(val) == "yes" {
+			conditionData[wizardKey] = true
+		}
+	}
+
+	// Map mitigation fields
+	mitigationFields := map[string]string{
+		"PAINT_MITIGATION":                   "paintMitigation",
+		"DAMAGE_MITIGATION":                  "damagedMitigation",
+		"RUST_MITIGATION":                    "rustMitigation",
+		"DELAMINATION_MITIGATION":            "delaminationMitigation",
+		"NON_CONFORMING_PRE_GALV_MITIG":      "nonConformingPreGalvMitigation",
+		"THREADED_ARTICLE_MITIGATION":        "threadedArticleMitigation",
+		"ENCLOSED_CAVITY_HOLES_REQUIRE":      "enclosedCavityMitigation",
+	}
+
+	for dwField, wizardKey := range mitigationFields {
+		if val := payloadString(payload, dwField); val != "" {
+			mitigations := strings.Split(val, ",")
+			trimmedMitigations := make([]string, 0, len(mitigations))
+			for _, m := range mitigations {
+				if trimmed := strings.TrimSpace(m); trimmed != "" {
+					trimmedMitigations = append(trimmedMitigations, trimmed)
+				}
+			}
+			if len(trimmedMitigations) > 0 {
+				conditionData[wizardKey] = trimmedMitigations
+			}
+		}
+	}
+
+	// Map hole quantity fields
+	holeQtyFields := map[string]string{
+		"DRAIN_HOLES":          "drainHolesQty",
+		"VENT_HOLES":           "ventHolesQty",
+		"JIG_HOLES":            "jigHolesQty",
+		"CAVITY_VENT_HOLES":    "cavityVentHolesQty",
+	}
+
+	for dwField, wizardKey := range holeQtyFields {
+		if val, ok := floatValue(payload[dwField]); ok && val > 0 {
+			conditionData[wizardKey] = val
+		}
+	}
+
+	// Add additional comments if present
+	if val := payloadString(payload, "ADDITIONAL_COMMENTS"); val != "" {
+		conditionData["additionalComments"] = val
+	}
+
+	// If no defect data, return empty string
+	if len(conditionData) == 0 {
+		return ""
+	}
+
+	// Marshal to JSON
+	data, _ := json.Marshal(conditionData)
+	return string(data)
 }

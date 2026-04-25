@@ -2,6 +2,28 @@ import React, { useState } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import Logo from '../assets/transvaal-logo.svg'
 import AyohLogo from '../assets/ayoh.png'
+import { useTheme } from '../theme'
+
+function ThemeToggleButton() {
+  const { resolved, toggle } = useTheme()
+  const isDark = resolved === 'dark'
+  return (
+    <button
+      type="button"
+      className="theme-toggle"
+      onClick={toggle}
+      aria-pressed={isDark}
+      aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+      title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+    >
+      {isDark ? (
+        <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+      ) : (
+        <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      )}
+    </button>
+  )
+}
 
 const NAV = [
   {
@@ -54,13 +76,16 @@ export default function Layout({ children, onLogout }: { children: React.ReactNo
               </div>
             </div>
           )}
-          <button className="sidebar__toggle" onClick={() => setCollapsed(c => !c)} aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}>
-            <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              {collapsed
-                ? <polyline points="9 18 15 12 9 6"/>
-                : <polyline points="15 18 9 12 15 6"/>}
-            </svg>
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.125rem' }}>
+            {!collapsed && <ThemeToggleButton />}
+            <button className="sidebar__toggle" onClick={() => setCollapsed(c => !c)} aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}>
+              <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                {collapsed
+                  ? <polyline points="9 18 15 12 9 6"/>
+                  : <polyline points="15 18 9 12 15 6"/>}
+              </svg>
+            </button>
+          </div>
         </div>
 
         <nav className="sidebar__nav" aria-label="Navigation links">
@@ -106,6 +131,9 @@ export default function Layout({ children, onLogout }: { children: React.ReactNo
             <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
           </button>
           <span className="mobile-bar__title">{currentLabel}</span>
+          <div style={{ marginLeft: 'auto' }}>
+            <ThemeToggleButton />
+          </div>
         </header>
 
         <main className="page-wrap" id="main-content">

@@ -73,6 +73,54 @@ func (a *App) handleUpdateReceiptLine(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, line)
 }
 
+func (a *App) handleSyncReceiptLineDocuWare(w http.ResponseWriter, r *http.Request) {
+	receiptID := r.PathValue("id")
+	var payload struct {
+		LineID string `json:"line_id"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body (line_id required)")
+		return
+	}
+
+	if strings.TrimSpace(payload.LineID) == "" {
+		writeError(w, http.StatusBadRequest, "line_id is required")
+		return
+	}
+
+	// Verify the line belongs to this receipt
+	receipt, err := a.receiving.GetReceipt(r.Context(), receiptID)
+	if err != nil {
+		mapReceivingError(w, err)
+		return
+	}
+
+	lineFound := false
+	for _, line := range receipt.Lines {
+		if line.ID == payload.LineID {
+			lineFound = true
+			break
+		}
+	}
+
+	if !lineFound {
+		writeError(w, http.StatusNotFound, "line not found in receipt")
+		return
+	}
+
+	// Attempt to enqueue the sync
+	if err := a.receiving.EnqueueLineSync(r.Context(), receiptID, payload.LineID); err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("failed to enqueue sync: %v", err))
+		return
+	}
+
+	writeJSON(w, http.StatusAccepted, map[string]string{
+		"status": "queued",
+		"message": "Line sync queued for DocuWare",
+	})
+}
+
 func (a *App) handleImportDocuWareRows(w http.ResponseWriter, r *http.Request) {
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -96,10 +144,12 @@ func (a *App) handleImportDocuWareRows(w http.ResponseWriter, r *http.Request) {
 
 	result, err := a.receiving.ImportDocuWareRows(r.Context(), request)
 	if err != nil {
+		log.Printf("[docuware-import] error: %v", err)
 		mapReceivingError(w, err)
 		return
 	}
 
+	log.Printf("[docuware-import] success: %d receipts, %d rows", result.ImportedReceiptCount, result.ImportedRowCount)
 	writeJSON(w, http.StatusCreated, result)
 }
 

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -21,12 +22,31 @@ type Config struct {
 	DocuWareFileCabinetID string
 	DocuWarePushUsername  string
 	DocuWarePushPassword  string
+	DocuWareUsername      string
+	DocuWarePassword      string
+	DocuWareSyncInterval  time.Duration
+	DocuWareSyncMaxWorkers int
 }
 
 func Load() (Config, error) {
 	accessTokenTTL, err := time.ParseDuration(getenv("ACCESS_TOKEN_TTL", "15m"))
 	if err != nil {
 		return Config{}, fmt.Errorf("invalid ACCESS_TOKEN_TTL: %w", err)
+	}
+
+	syncInterval, err := time.ParseDuration(getenv("DOCUWARE_SYNC_INTERVAL", "30s"))
+	if err != nil {
+		return Config{}, fmt.Errorf("invalid DOCUWARE_SYNC_INTERVAL: %w", err)
+	}
+
+	maxWorkers := 0
+	if mw := strings.TrimSpace(os.Getenv("DOCUWARE_SYNC_MAX_WORKERS")); mw != "" {
+		if parsed, err := strconv.Atoi(mw); err == nil {
+			maxWorkers = parsed
+		}
+	}
+	if maxWorkers <= 0 {
+		maxWorkers = 3
 	}
 
 	cfg := Config{
@@ -42,6 +62,10 @@ func Load() (Config, error) {
 		DocuWareFileCabinetID: os.Getenv("DOCUWARE_FILE_CABINET_ID"),
 		DocuWarePushUsername:  strings.TrimSpace(os.Getenv("DOCUWARE_PUSH_USERNAME")),
 		DocuWarePushPassword:  strings.TrimSpace(os.Getenv("DOCUWARE_PUSH_PASSWORD")),
+		DocuWareUsername:      os.Getenv("DOCUWARE_USERNAME"),
+		DocuWarePassword:      os.Getenv("DOCUWARE_PASSWORD"),
+		DocuWareSyncInterval:  syncInterval,
+		DocuWareSyncMaxWorkers: maxWorkers,
 	}
 
 	if err := validateDatabaseURL(cfg.DatabaseURL); err != nil {

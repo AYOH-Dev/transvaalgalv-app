@@ -260,10 +260,10 @@ export default function Admin() {
                         Edit
                       </button>
                       {u.is_active !== false
-                        ? <button className="btn btn-sm" style={{ flex: 1, background: 'var(--red-dim)', color: '#991b1b', border: '1px solid rgba(239,68,68,.25)' }} onClick={() => setConfirmUser(u)}>
+                        ? <button className="btn btn-sm" style={{ flex: 1, background: 'var(--red-dim)', color: 'var(--red-fg)', border: '1px solid rgba(239,68,68,.25)' }} onClick={() => setConfirmUser(u)}>
                             Deactivate
                           </button>
-                        : <button className="btn btn-sm" style={{ flex: 1, background: 'var(--green-dim)', color: '#065f46', border: '1px solid rgba(16,185,129,.25)' }} onClick={() => openEdit({ ...u })}>
+                        : <button className="btn btn-sm" style={{ flex: 1, background: 'var(--green-dim)', color: 'var(--green-fg)', border: '1px solid rgba(16,185,129,.25)' }} onClick={() => openEdit({ ...u })}>
                             Reactivate
                           </button>
                       }

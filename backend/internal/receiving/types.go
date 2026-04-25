@@ -82,6 +82,7 @@ type ReceiptLine struct {
 	DocuWareRecordLine  string     `json:"docuware_record_line_id"`
 	DocuWareUniqueNo    string     `json:"docuware_unique_number"`
 	DocuWarePrimaryKey  string     `json:"docuware_primary_key"`
+	DocuWareDocID       string     `json:"docuware_doc_id"`
 	LastSyncedAt        *time.Time `json:"last_synced_at,omitempty"`
 }
 
