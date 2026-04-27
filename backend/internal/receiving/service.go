@@ -15,16 +15,21 @@ import (
 )
 
 type Repository interface {
-	ListReceipts(ctx context.Context) ([]Receipt, error)
+	ListReceipts(ctx context.Context, includeArchived bool) ([]Receipt, error)
 	GetReceipt(ctx context.Context, id string) (Receipt, error)
 	ImportDocuWareReceipts(ctx context.Context, receipts []importedReceipt) ([]Receipt, error)
+	CreateReceipt(ctx context.Context, receipt importedReceipt) (Receipt, error)
 	UpdateReceipt(ctx context.Context, id string, input UpdateReceiptInput) (Receipt, error)
 	UpdateReceiptLine(ctx context.Context, receiptID, lineID string, input UpdateReceiptLineInput) (ReceiptLine, error)
+	ArchiveStaleMatched(ctx context.Context, olderThan time.Duration) (int64, error)
 }
 
 type Service struct {
-	repository Repository
-	syncEnqueuer SyncEnqueuer
+	repository        Repository
+	syncEnqueuer      SyncEnqueuer
+	grnService        *GRNService
+	grnPushNotify     func(receiptID string)
+	podStatusEnqueuer PODStatusEnqueuer
 }
 
 type SyncEnqueuer interface {
@@ -48,6 +53,8 @@ type importedReceipt struct {
 	DocuWareGroupReference  string
 	DocuWareDocURL          string
 	ReceivedAt              time.Time
+	ReceivedByUserID        string
+	ReceivedByName          string
 	Status                  ReceiptStatus
 	SyncStatus              string
 	Notes                   string
@@ -91,6 +98,21 @@ func (s *Service) SetSyncEnqueuer(enqueuer SyncEnqueuer) {
 	s.syncEnqueuer = enqueuer
 }
 
+// SetGRNService wires the GRN PDF generator. When configured, the service
+// auto-generates a GRN PDF and queues the DocuWare push on receipt status
+// transitions to 'matched'. Optional — if nil, GRN generation is skipped.
+func (s *Service) SetGRNService(g *GRNService, pushNotify func(receiptID string)) {
+	s.grnService = g
+	s.grnPushNotify = pushNotify
+}
+
+// SetPODStatusEnqueuer wires the POD-status sync. When configured, line
+// state changes recompute the POD's "Partially Received"/"Received"
+// status and enqueue a DocuWare update if it has changed.
+func (s *Service) SetPODStatusEnqueuer(e PODStatusEnqueuer) {
+	s.podStatusEnqueuer = e
+}
+
 func (s *Service) EnqueueLineSync(ctx context.Context, receiptID, lineID string) error {
 	if s.syncEnqueuer == nil {
 		return fmt.Errorf("%w: sync enqueuer not configured", ErrUnavailable)
@@ -98,12 +120,12 @@ func (s *Service) EnqueueLineSync(ctx context.Context, receiptID, lineID string)
 	return s.syncEnqueuer.EnqueueLineSync(ctx, receiptID, lineID)
 }
 
-func (s *Service) ListReceipts(ctx context.Context) ([]Receipt, error) {
+func (s *Service) ListReceipts(ctx context.Context, includeArchived bool) ([]Receipt, error) {
 	if s.repository == nil {
 		return []Receipt{}, nil
 	}
 
-	return s.repository.ListReceipts(ctx)
+	return s.repository.ListReceipts(ctx, includeArchived)
 }
 
 func (s *Service) GetReceipt(ctx context.Context, id string) (Receipt, error) {
@@ -206,6 +228,186 @@ func (s *Service) ImportDocuWareRows(ctx context.Context, input DocuWareImportIn
 	}, nil
 }
 
+// CreateGRN captures a Goods Received Note for an arrival without a pre-imported
+// POD (after-hours capture, walk-in deliveries, or any case where the customer
+// didn't supply paperwork up front). Saves a fresh receipt with status=draft
+// and sync_status=pending_grn_upload — a follow-up worker pushes the generated
+// GRN document to the DocuWare Documents cabinet (not yet implemented).
+//
+// GRN-originated receipts use a GRN- prefixed receipt_number to avoid colliding
+// with the receipt_number scheme used by DocuWare POD imports (see
+// buildReceiptNumber).
+func (s *Service) CreateGRN(ctx context.Context, input CreateGRNInput) (Receipt, error) {
+	if s.repository == nil {
+		return Receipt{}, ErrUnavailable
+	}
+
+	deliveryNote := strings.TrimSpace(input.DeliveryNoteNumber)
+	orderNumber := strings.TrimSpace(input.OrderNumber)
+	vehicleReg := strings.TrimSpace(input.VehicleRegistration)
+	weighbridge := strings.TrimSpace(input.WeighbridgeTicketNumber)
+	company := strings.TrimSpace(input.Company)
+	storedBy := strings.TrimSpace(input.StoredBy)
+
+	if deliveryNote == "" {
+		return Receipt{}, fmt.Errorf("%w: delivery_note_number is required", ErrInvalidInput)
+	}
+	if orderNumber == "" {
+		return Receipt{}, fmt.Errorf("%w: order_number is required", ErrInvalidInput)
+	}
+	if vehicleReg == "" {
+		return Receipt{}, fmt.Errorf("%w: vehicle_registration is required", ErrInvalidInput)
+	}
+	if weighbridge == "" {
+		return Receipt{}, fmt.Errorf("%w: weighbridge_ticket_number is required", ErrInvalidInput)
+	}
+	if company == "" {
+		return Receipt{}, fmt.Errorf("%w: company is required", ErrInvalidInput)
+	}
+	if storedBy == "" {
+		return Receipt{}, fmt.Errorf("%w: stored_by is required", ErrInvalidInput)
+	}
+	if len(input.Lines) == 0 {
+		return Receipt{}, fmt.Errorf("%w: at least one line is required", ErrInvalidInput)
+	}
+
+	deliveryDate := parseFormDate(input.DeliveryDate)
+	if deliveryDate.IsZero() {
+		deliveryDate = time.Now().UTC()
+	}
+
+	notes := buildGRNNotes(input)
+
+	lines := make([]importedReceiptLine, 0, len(input.Lines))
+	for index, raw := range input.Lines {
+		quantity, _ := floatValue(raw.ItemQuantity)
+		if quantity < 0 {
+			return Receipt{}, fmt.Errorf("%w: line %d quantity must be non-negative", ErrInvalidInput, index+1)
+		}
+
+		lineDeliveryNote := firstNonEmpty(strings.TrimSpace(raw.DeliveryNote), deliveryNote)
+		itemCode := strings.TrimSpace(raw.ItemCode)
+		description := firstNonEmpty(strings.TrimSpace(raw.ItemDescription), itemCode)
+
+		lines = append(lines, importedReceiptLine{
+			LineNumber:       index + 1,
+			ItemCode:         itemCode,
+			Description:      description,
+			MaterialSize:     strings.TrimSpace(raw.ItemSize),
+			MaterialMarkings: strings.TrimSpace(raw.MaterialMarkings),
+			MaterialLength:   strings.TrimSpace(raw.MaterialLength),
+			Weight:           strings.TrimSpace(raw.Weight),
+			ExpectedQuantity: quantity,
+			ReceivingStatus:  "draft",
+			SourcePayload: map[string]any{
+				"source":          "manual_pod",
+				"delivery_note":   lineDeliveryNote,
+				"item_code":       itemCode,
+				"item_description": description,
+				"item_size":       strings.TrimSpace(raw.ItemSize),
+				"item_quantity":   strings.TrimSpace(raw.ItemQuantity),
+				"weight":          strings.TrimSpace(raw.Weight),
+				"material_markings": strings.TrimSpace(raw.MaterialMarkings),
+				"material_length":   strings.TrimSpace(raw.MaterialLength),
+				"job_number":      strings.TrimSpace(raw.JobNumber),
+				"other":           strings.TrimSpace(raw.Other),
+			},
+		})
+	}
+
+	receipt := importedReceipt{
+		ReceiptNumber:           buildGRNReceiptNumber(deliveryNote, weighbridge),
+		SupplierName:            firstNonEmpty(strings.TrimSpace(input.Fabricator), company),
+		CustomerName:            company,
+		SupplierReference:       deliveryNote,
+		PurchaseOrderNumber:     orderNumber,
+		DeliveryNoteNumber:      deliveryNote,
+		WeighbridgeTicketNumber: weighbridge,
+		VehicleRegistration:     vehicleReg,
+		ReceivedAt:              deliveryDate,
+		ReceivedByUserID:        strings.TrimSpace(input.ReceivedByUserID),
+		ReceivedByName:          strings.TrimSpace(input.ReceivedByName),
+		Status:                  ReceiptStatusDraft,
+		SyncStatus:              "pending_grn_upload",
+		Notes:                   notes,
+		SourcePayload: map[string]any{
+			"source":                    "manual_pod",
+			"delivery_note_number":      deliveryNote,
+			"order_number":              orderNumber,
+			"weighbridge_ticket_number": weighbridge,
+			"vehicle_registration":      vehicleReg,
+			"company":                   company,
+			"fabricator":                strings.TrimSpace(input.Fabricator),
+			"product_name":              strings.TrimSpace(input.ProductName),
+			"processing_status":         strings.TrimSpace(input.ProcessingStatus),
+			"stored_by":                 storedBy,
+			"completion_date":           strings.TrimSpace(input.CompletionDate),
+			"job_comments":              strings.TrimSpace(input.JobComments),
+		},
+		Lines: lines,
+	}
+
+	created, err := s.repository.CreateReceipt(ctx, receipt)
+	if err != nil {
+		return Receipt{}, err
+	}
+
+	// TODO(grn-upload): push a generated GRN document to the DocuWare Documents
+	// cabinet. Requires a CreateDocument method on docuware.Client (multipart
+	// POST to /FileCabinets/{id}/Documents). Tracked via sync_status=pending_grn_upload.
+	log.Printf("[create-pod] receipt=%s lines=%d sync_status=%s — DocuWare GRN push pending implementation",
+		created.ID, len(created.Lines), created.SyncStatus)
+
+	return created, nil
+}
+
+// buildGRNReceiptNumber yields a stable, collision-free receipt_number for
+// GRN-originated receipts. The GRN- prefix keeps these out of the auto-merge
+// path that DocuWare POD imports use (which upserts on receipt_number).
+func buildGRNReceiptNumber(deliveryNote, weighbridge string) string {
+	base := firstNonEmpty(deliveryNote, weighbridge, "grn")
+	base = strings.ToUpper(slugify(base))
+	if len(base) > 24 {
+		base = base[:24]
+	}
+	digest := sha1.Sum([]byte(deliveryNote + "|" + weighbridge + "|" + time.Now().UTC().Format(time.RFC3339Nano)))
+	return fmt.Sprintf("GRN-%s-%s", base, strings.ToUpper(hex.EncodeToString(digest[:4])))
+}
+
+// parseFormDate accepts the YYYY-MM-DD date strings the form sends.
+func parseFormDate(value string) time.Time {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return time.Time{}
+	}
+	if parsed, err := time.Parse("2006-01-02", value); err == nil {
+		return parsed
+	}
+	return time.Time{}
+}
+
+// buildGRNNotes folds the free-text fields the form captures into a single
+// notes string we can render on the receipt detail page.
+func buildGRNNotes(input CreateGRNInput) string {
+	parts := []string{}
+	if comments := strings.TrimSpace(input.JobComments); comments != "" {
+		parts = append(parts, "Job comments: "+comments)
+	}
+	if storedBy := strings.TrimSpace(input.StoredBy); storedBy != "" {
+		parts = append(parts, "Stored by: "+storedBy)
+	}
+	if productName := strings.TrimSpace(input.ProductName); productName != "" {
+		parts = append(parts, "Product: "+productName)
+	}
+	if status := strings.TrimSpace(input.ProcessingStatus); status != "" {
+		parts = append(parts, "Processing status: "+status)
+	}
+	if completion := strings.TrimSpace(input.CompletionDate); completion != "" {
+		parts = append(parts, "Completion date: "+completion)
+	}
+	return strings.Join(parts, "\n")
+}
+
 var validStatusTransitions = map[ReceiptStatus][]ReceiptStatus{
 	ReceiptStatusDraft:       {ReceiptStatusReceived},
 	ReceiptStatusReceived:    {ReceiptStatusMatched, ReceiptStatusQualityHold},
@@ -214,19 +416,27 @@ var validStatusTransitions = map[ReceiptStatus][]ReceiptStatus{
 	ReceiptStatusArchived:    {},
 }
 
-func (s *Service) UpdateReceipt(ctx context.Context, id string, input UpdateReceiptInput) (Receipt, error) {
+// UpdateReceiptResult is what UpdateReceipt returns. ResyncedLines counts how
+// many already-synced lines were re-enqueued because the caller changed a
+// receipt-header field — this gives the UI something to surface to the user.
+type UpdateReceiptResult struct {
+	Receipt       Receipt
+	ResyncedLines int
+}
+
+func (s *Service) UpdateReceipt(ctx context.Context, id string, input UpdateReceiptInput) (UpdateReceiptResult, error) {
 	if s.repository == nil {
-		return Receipt{}, ErrUnavailable
+		return UpdateReceiptResult{}, ErrUnavailable
 	}
 
 	if strings.TrimSpace(id) == "" {
-		return Receipt{}, fmt.Errorf("%w: receipt id is required", ErrInvalidInput)
+		return UpdateReceiptResult{}, fmt.Errorf("%w: receipt id is required", ErrInvalidInput)
 	}
 
 	if input.Status != nil {
 		current, err := s.repository.GetReceipt(ctx, id)
 		if err != nil {
-			return Receipt{}, err
+			return UpdateReceiptResult{}, err
 		}
 
 		allowed := validStatusTransitions[current.Status]
@@ -238,14 +448,16 @@ func (s *Service) UpdateReceipt(ctx context.Context, id string, input UpdateRece
 			}
 		}
 		if !ok {
-			return Receipt{}, fmt.Errorf("%w: cannot transition from %s to %s", ErrInvalidInput, current.Status, *input.Status)
+			return UpdateReceiptResult{}, fmt.Errorf("%w: cannot transition from %s to %s", ErrInvalidInput, current.Status, *input.Status)
 		}
 	}
 
 	receipt, err := s.repository.UpdateReceipt(ctx, id, input)
 	if err != nil {
-		return Receipt{}, err
+		return UpdateReceiptResult{}, err
 	}
+
+	resynced := 0
 
 	// Enqueue syncs for all lines when status changes (sync back to DocuWare)
 	if input.Status != nil && s.syncEnqueuer != nil {
@@ -254,7 +466,47 @@ func (s *Service) UpdateReceipt(ctx context.Context, id string, input UpdateRece
 		}
 	}
 
-	return receipt, nil
+	// Status -> 'matched': generate the GRN PDF + queue a DocuWare push.
+	// Idempotent — MaybeGenerate is a no-op if a GRN already exists.
+	if input.Status != nil && *input.Status == ReceiptStatusMatched && s.grnService != nil {
+		if err := s.grnService.MaybeGenerate(ctx, receipt.ID); err != nil {
+			// Log only — we don't fail the user's status update because the
+			// GRN can be regenerated later (manual retry, or a re-trigger
+			// once the underlying issue is fixed).
+			log.Printf("grn generation failed for receipt %s: %v", receipt.ID, err)
+		} else if s.grnPushNotify != nil {
+			s.grnPushNotify(receipt.ID)
+		}
+	}
+
+	// Header-field edits propagate to lines via the worker — receipts captured
+	// from the POD often have wrong header data and the receiver fixes it after
+	// some lines have already been pushed. Re-enqueue every already-synced line
+	// so the worker re-snapshots the corrected header onto its DocuWare doc.
+	if hasHeaderFieldChange(input) && s.syncEnqueuer != nil {
+		for _, line := range receipt.Lines {
+			if line.LastSyncedAt == nil {
+				continue
+			}
+			if err := s.syncEnqueuer.EnqueueLineSync(ctx, receipt.ID, line.ID); err == nil {
+				resynced++
+			}
+		}
+	}
+
+	return UpdateReceiptResult{Receipt: receipt, ResyncedLines: resynced}, nil
+}
+
+// hasHeaderFieldChange returns true if the caller is editing any receipt-level
+// field that gets snapshotted onto each line's DocuWare document.
+func hasHeaderFieldChange(input UpdateReceiptInput) bool {
+	return input.CustomerName != nil ||
+		input.SupplierName != nil ||
+		input.DeliveryNoteNumber != nil ||
+		input.WeighbridgeTicketNumber != nil ||
+		input.VehicleRegistration != nil ||
+		input.JobNumber != nil ||
+		input.PurchaseOrderNumber != nil
 }
 
 func (s *Service) UpdateReceiptLine(ctx context.Context, receiptID, lineID string, input UpdateReceiptLineInput) (ReceiptLine, error) {
@@ -295,6 +547,15 @@ func (s *Service) UpdateReceiptLine(ctx context.Context, receiptID, lineID strin
 		}
 	}
 
+	// POD-status sync: any line transitioning to/from received re-evaluates
+	// the POD's Documents-cabinet STATUS field. Best-effort; failures are
+	// logged but don't fail the line update.
+	if input.ReceivingStatus != nil {
+		if err := s.MaybeUpdatePODStatus(ctx, receiptID); err != nil {
+			log.Printf("warn: failed to enqueue pod status update (receipt=%s): %v", receiptID, err)
+		}
+	}
+
 	return line, nil
 }
 
@@ -308,8 +569,11 @@ func allLinesReceived(lines []ReceiptLine) bool {
 }
 
 func buildImportedReceipt(input DocuWareImportInput, groupReference string, payload map[string]any) *importedReceipt {
+	// DocuWare sends DNDocID (mixed case) as the POD's DWDOCID — the key we'll
+	// query the POD cabinet by. Older payloads use DNDOCID/DNDOCIDI; keep both.
 	sourceDocumentID := firstNonEmpty(
 		strings.TrimSpace(input.SourceDocumentID),
+		payloadString(payload, "DNDocID"),
 		payloadString(payload, "DNDOCID"),
 		payloadString(payload, "DNDOCIDI"),
 		payloadString(payload, "DWDOCID"),
@@ -334,7 +598,7 @@ func buildImportedReceipt(input DocuWareImportInput, groupReference string, payl
 		ReceiptNumber:           buildReceiptNumber(groupReference, payload),
 		SupplierName:            supplierName,
 		CustomerName:            customerName,
-		SupplierReference:       firstNonEmpty(payloadString(payload, "DNDOCID"), payloadString(payload, "DNDOCIDI"), payloadString(payload, "JOB_NUMBER")),
+		SupplierReference:       firstNonEmpty(payloadString(payload, "DNDocID"), payloadString(payload, "DNDOCID"), payloadString(payload, "DNDOCIDI"), payloadString(payload, "JOB_NUMBER")),
 		PurchaseOrderNumber:     firstNonEmpty(payloadString(payload, "ORDER_NUMBER"), payloadString(payload, "DOCUMENTNO")),
 		DeliveryNoteNumber:      firstNonEmpty(payloadString(payload, "DELIVERY_NOTE"), payloadString(payload, "DELIVERY_NOTE_NUMBER")),
 		WeighbridgeTicketNumber: payloadString(payload, "WEIGHBRIDGE_TICKET_NUMBER"),

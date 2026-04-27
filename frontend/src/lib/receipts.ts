@@ -3,6 +3,8 @@
 // stay aligned on item-type/process coupling, defect schema, and condition_notes
 // serialisation.
 
+import { apiFetch } from '../auth'
+
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 export type ReceiptLine = {
@@ -49,8 +51,33 @@ export type Receipt = {
   sync_status: string
   received_at: string
   docuware_doc_url: string
+  source_docuware_document_id?: string
   notes: string
   lines: ReceiptLine[]
+  documents?: ReceiptDocument[]
+  grn_document_id?: string
+  grn_docuware_doc_id?: string
+  grn_generated_at?: string
+}
+
+// Server-side photo / attachment record. Phase 1 only emits defect photos
+// (category = 'defect_photo'); other categories will surface here as new
+// capture flows ship.
+export type ReceiptDocument = {
+  id: string
+  receipt_line_id?: string
+  category?: string
+  document_type: string
+  filename: string
+  content_type: string
+  storage_key: string
+  file_size?: number
+  source: string
+  docuware_document_id: string
+  docuware_status: 'pending' | 'in_progress' | 'synced' | 'failed' | string
+  docuware_error?: string
+  uploaded_by?: string
+  created_at: string
 }
 
 export type LineEdit = {
@@ -493,4 +520,104 @@ export function fmtDate(iso: string) {
 export function qty(n: number) {
   if (!n && n !== 0) return '—'
   return Number.isInteger(n) ? String(n) : n.toFixed(2)
+}
+
+// ─── GRN creation ────────────────────────────────────────────────────────────
+// "Create GRN" is the no-POD-on-arrival path — used for after-hours captures or
+// walk-in deliveries where DocuWare doesn't yet have a POD record. Posts to
+// the backend which creates a fresh receipt and queues a GRN document upload
+// to the DocuWare Documents cabinet.
+
+export type CreateGRNLine = {
+  delivery_note: string
+  item_code: string
+  item_description: string
+  item_size: string
+  item_quantity: string
+  weight: string
+  material_markings: string
+  material_length: string
+  job_number: string
+  other: string
+}
+
+export type CreateGRNInput = {
+  delivery_note_number: string
+  order_number: string
+  vehicle_registration: string
+  delivery_date: string
+  weighbridge_ticket_number: string
+  company: string
+  fabricator: string
+  job_comments: string
+  stored_by: string
+  completion_date: string
+  product_name: string
+  processing_status: string
+  lines: CreateGRNLine[]
+}
+
+export async function createGRN(input: CreateGRNInput): Promise<Receipt> {
+  const res = await apiFetch('/grns', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  })
+  if (!res.ok) {
+    const errBody = await res.json().catch(() => ({ error: 'failed to create GRN' }))
+    throw new Error(errBody.error || `failed to create GRN (${res.status})`)
+  }
+  return res.json()
+}
+
+// ─── Defect photos ────────────────────────────────────────────────────────────
+
+export async function uploadDefectPhoto(
+  receiptId: string,
+  lineId: string,
+  file: File,
+): Promise<ReceiptDocument> {
+  const form = new FormData()
+  form.append('photo', file, file.name || 'defect.jpg')
+  const res = await apiFetch(`/receipts/${receiptId}/lines/${lineId}/photos`, {
+    method: 'POST',
+    body: form,
+  })
+  if (!res.ok) {
+    const errBody = await res.json().catch(() => ({ error: 'failed to upload photo' }))
+    throw new Error(errBody.error || `failed to upload photo (${res.status})`)
+  }
+  return res.json()
+}
+
+export async function deleteDefectPhoto(receiptId: string, photoId: string): Promise<void> {
+  const res = await apiFetch(`/receipts/${receiptId}/photos/${photoId}`, { method: 'DELETE' })
+  if (!res.ok && res.status !== 204) {
+    const errBody = await res.json().catch(() => ({ error: 'failed to delete photo' }))
+    throw new Error(errBody.error || `failed to delete photo (${res.status})`)
+  }
+}
+
+// Returns a URL the <img> tag can use. The endpoint is auth-required, so
+// we have to fetch it as a blob and build an object URL — direct <img src>
+// won't carry the bearer token.
+export async function fetchDefectPhotoBlobUrl(
+  receiptId: string,
+  photoId: string,
+): Promise<string> {
+  const res = await apiFetch(`/receipts/${receiptId}/photos/${photoId}`, { method: 'GET' })
+  if (!res.ok) throw new Error(`failed to fetch photo (${res.status})`)
+  const blob = await res.blob()
+  return URL.createObjectURL(blob)
+}
+
+// Fetch the generated GRN PDF as a blob URL the caller can hand to a new
+// tab via window.open(...). Same auth-token-via-blob trick as photos.
+export async function fetchGRNBlobUrl(receiptId: string): Promise<string> {
+  const res = await apiFetch(`/receipts/${receiptId}/grn`, { method: 'GET' })
+  if (!res.ok) {
+    if (res.status === 404) throw new Error('GRN not generated yet')
+    throw new Error(`failed to fetch GRN (${res.status})`)
+  }
+  const blob = await res.blob()
+  return URL.createObjectURL(blob)
 }

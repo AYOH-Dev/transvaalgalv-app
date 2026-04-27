@@ -1,47 +1,32 @@
 import React, { useCallback, useEffect, useState } from 'react'
-import { apiFetch, clearToken } from '../auth'
+import { apiBaseUrl, apiFetch, clearToken } from '../auth'
 import { useToast } from '../components/Toast'
 import {
   type Receipt,
   type ReceiptLine,
   type LineEdit,
+  type ReceiptEdit,
+  type MitigationSelection,
+  type MitigationQuantity,
   DEFECT_CATEGORIES,
+  MITIGATION_NO_QTY,
   availableProcesses,
   defaultDefectValues,
   hasAnyDefect,
   buildConditionNotes,
+  uploadDefectPhoto,
+  fetchGRNBlobUrl,
 } from '../lib/receipts'
+import PhotoCapture from '../components/PhotoCapture'
 import '../styles/yard.css'
 
-// ── Yard-compressed defect set ────────────────────────────────────────────────
-// Subset of the canonical DEFECT_CATEGORIES surfaced inside the walkthrough.
-// Keep keys aligned with lib/receipts so buildConditionNotes serialises them
-// the same way the office UI does.
-const YARD_DEFECT_KEYS = [
-  'damaged', 'rust', 'paint', 'oilGreaseDiesel',
-  'weldingFlux', 'weldingSplatter', 'burr',
-  'sharpEdges', 'holesInadequate', 'threadedArticle',
-] as const
-
-type YardDefect = {
-  key: string
-  label: string
-  options: string[]
-  default: string
-}
-
+// All defect items flattened from the canonical category list. The yard surfaces
+// the full set so receivers can flag every mitigatable defect — they're the
+// source of truth for downstream processing.
 const ALL_DEFECT_ITEMS = DEFECT_CATEGORIES.flatMap(c => c.items)
-const YARD_DEFECTS: YardDefect[] = YARD_DEFECT_KEYS
-  .map(k => ALL_DEFECT_ITEMS.find(i => i.key === k))
-  .filter((i): i is NonNullable<typeof i> => !!i)
-  .map(i => ({ key: i.key, label: i.label, options: i.options, default: i.default }))
-
-function hasAnyYardDefect(d: Record<string, string>) {
-  return YARD_DEFECTS.some(def => (d[def.key] ?? def.default) !== def.default)
-}
 
 // ── Icons (minimal inline set so we don't depend on the design's Icon comp) ──
-type IconName = 'truck' | 'flag' | 'check' | 'play' | 'doc' | 'minus' | 'plus' | 'alert' | 'close' | 'chevL' | 'chevR'
+type IconName = 'truck' | 'flag' | 'check' | 'play' | 'doc' | 'minus' | 'plus' | 'alert' | 'close' | 'chevL' | 'chevR' | 'pencil'
 function Icon({ name, size = 18 }: { name: IconName; size?: number }) {
   const s = size
   const common = { width: s, height: s, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const }
@@ -57,6 +42,7 @@ function Icon({ name, size = 18 }: { name: IconName; size?: number }) {
     case 'close':  return <svg {...common}><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
     case 'chevL':  return <svg {...common}><polyline points="15 18 9 12 15 6"/></svg>
     case 'chevR':  return <svg {...common}><polyline points="9 18 15 12 9 6"/></svg>
+    case 'pencil': return <svg {...common}><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
   }
 }
 
@@ -70,10 +56,16 @@ type YardLineState = {
   process?: string
   packaging?: string
   defects?: Record<string, string>
+  mitigations?: MitigationSelection
+  quantities?: MitigationQuantity
   hasDefects?: boolean
   defects_done?: boolean
   notes?: string
   received?: boolean
+  // Defect photo held in memory until the line is confirmed. Strategy B:
+  // upload only after the line PATCH succeeds in markReceived, so a
+  // cleared/abandoned defect doesn't leave an orphaned photo on the server.
+  defectPhoto?: File
 }
 type LineStateMap = Record<string, YardLineState>
 
@@ -82,6 +74,61 @@ type LineStateMap = Record<string, YardLineState>
 function disabledForType(itemType?: string): string[] {
   if (!itemType) return []
   return availableProcesses(itemType).filter(o => o.disabled).map(o => o.value)
+}
+
+// ── Reachability indicator ──────────────────────────────────────────────────
+// "Online" means the API responded to /ready in the last poll. We also flip
+// to offline immediately on browser network events so the receiver sees a
+// fresh signal without waiting for the next poll. Re-checks on focus too,
+// so a tablet coming out of sleep gets an immediate refresh.
+const READY_POLL_MS = 30_000
+function useApiReachable(): boolean {
+  const [online, setOnline] = useState<boolean>(typeof navigator !== 'undefined' ? navigator.onLine : true)
+
+  useEffect(() => {
+    let cancelled = false
+    let timer: number | undefined
+
+    const check = async () => {
+      if (typeof navigator !== 'undefined' && !navigator.onLine) {
+        if (!cancelled) setOnline(false)
+        return
+      }
+      // Bypass apiFetch — /ready is unauthenticated and we don't want a 401
+      // to clear the token while polling.
+      const url = (apiBaseUrl().replace(/\/$/, '')) + '/ready'
+      try {
+        const res = await fetch(url, { headers: { Accept: 'application/json' } })
+        if (!cancelled) setOnline(res.ok)
+      } catch {
+        if (!cancelled) setOnline(false)
+      }
+    }
+    const schedule = () => {
+      window.clearTimeout(timer)
+      timer = window.setTimeout(() => { check(); schedule() }, READY_POLL_MS)
+    }
+
+    check()
+    schedule()
+
+    const onOnline  = () => { setOnline(true);  check() }
+    const onOffline = () => setOnline(false)
+    const onFocus   = () => check()
+    window.addEventListener('online', onOnline)
+    window.addEventListener('offline', onOffline)
+    window.addEventListener('focus', onFocus)
+
+    return () => {
+      cancelled = true
+      window.clearTimeout(timer)
+      window.removeEventListener('online', onOnline)
+      window.removeEventListener('offline', onOffline)
+      window.removeEventListener('focus', onFocus)
+    }
+  }, [])
+
+  return online
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -95,16 +142,9 @@ export default function Yard({ onLogout }: { onLogout?: () => void }) {
   const [activeId, setActiveId] = useState<string | null>(null)
   const [lineState, setLineState] = useState<LineStateMap>({})
   const [savingLineId, setSavingLineId] = useState<string | null>(null)
-  const [online, setOnline] = useState<boolean>(typeof navigator !== 'undefined' ? navigator.onLine : true)
+  const online = useApiReachable()
   const { showToast } = useToast()
-
-  useEffect(() => {
-    const on = () => setOnline(true)
-    const off = () => setOnline(false)
-    window.addEventListener('online', on)
-    window.addEventListener('offline', off)
-    return () => { window.removeEventListener('online', on); window.removeEventListener('offline', off) }
-  }, [])
+  const [outdoor, setOutdoor] = useOutdoorMode()
 
   const fetchReceipts = useCallback(async () => {
     setLoading(true); setError('')
@@ -154,7 +194,12 @@ export default function Yard({ onLogout }: { onLogout?: () => void }) {
     const notes = (st.notes ?? '').trim()
     const hasDefects = !!(st.defects && st.hasDefects)
     if (hasDefects || notes) {
-      edit.condition_notes = buildConditionNotes(st.defects ?? {}, {}, {}, notes)
+      edit.condition_notes = buildConditionNotes(
+        st.defects ?? {},
+        st.mitigations ?? {},
+        st.quantities ?? {},
+        notes,
+      )
     }
     if (hasDefects) edit.discrepancy = 'defects_noted'
 
@@ -172,11 +217,138 @@ export default function Yard({ onLogout }: { onLogout?: () => void }) {
       setReceipts(prev => prev.map(r => r.id === receiptId
         ? { ...r, lines: r.lines.map(l => l.id === updatedLine.id ? updatedLine : l) }
         : r))
+
+      // Strategy B: upload the held-in-memory defect photo only after the
+      // line PATCH succeeds. Failure here is non-fatal — the line is already
+      // saved with its defect flag, and the receiver can re-attach the
+      // photo from the Receipts page. Surface the partial-success via toast.
+      if (hasDefects && st.defectPhoto) {
+        try {
+          await uploadDefectPhoto(receiptId, line.id, st.defectPhoto)
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : 'photo upload failed'
+          showToast(`Line saved, but photo upload failed: ${msg}`, 'error')
+        }
+      }
       return { ok: true }
     } catch (err) {
       return { ok: false, error: (err as Error).message === 'unauthorized' ? 'Session expired — sign in again' : 'Network error — try again' }
     } finally { setSavingLineId(null) }
-  }, [])
+  }, [showToast])
+
+  const [viewingPODFor, setViewingPODFor] = useState<string | null>(null)
+  const [podModal, setPodModal] = useState<{ url: string; receiptId: string } | null>(null)
+  const viewPOD = useCallback(async (receiptId: string) => {
+    setViewingPODFor(receiptId)
+    try {
+      const res = await apiFetch(`/receipts/${receiptId}/pod-link`)
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        if (res.status === 404)      showToast('No POD on file for this load', 'info')
+        else if (res.status === 503) showToast('POD viewer is not configured', 'error')
+        else                         showToast(body.error || `Failed to open POD (${res.status})`, 'error')
+        return
+      }
+      const { url } = await res.json() as { url: string }
+      setPodModal({ url, receiptId })
+    } catch {
+      showToast('Network error — could not open POD', 'error')
+    } finally {
+      setViewingPODFor(null)
+    }
+  }, [showToast])
+
+  const persistReceipt = useCallback(async (receiptId: string, edits: ReceiptEdit): Promise<{ ok: true } | { ok: false; error: string }> => {
+    if (Object.keys(edits).length === 0) return { ok: true }
+    try {
+      const res = await apiFetch(`/receipts/${receiptId}`, {
+        method: 'PATCH',
+        body: JSON.stringify(edits),
+      })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        return { ok: false, error: body.error || `Save failed (${res.status})` }
+      }
+      const body = await res.json() as Receipt & { resynced_lines?: number }
+      setReceipts(prev => prev.map(r => r.id === receiptId ? { ...r, ...body } : r))
+      const n = body.resynced_lines ?? 0
+      if (n > 0) {
+        showToast(`Header updated — ${n} line${n === 1 ? '' : 's'} re-syncing to DocuWare`, 'info')
+      }
+      return { ok: true }
+    } catch (err) {
+      return { ok: false, error: (err as Error).message === 'unauthorized' ? 'Session expired — sign in again' : 'Network error — try again' }
+    }
+  }, [showToast])
+
+  // viewGRN fetches the generated PDF and opens it in a new tab. The
+  // endpoint is auth-required so we materialise the response as a blob URL.
+  //
+  // Two browser-spec gotchas we have to work around:
+  //   - window.open(url, '_blank', 'noopener') returns null by spec, so we
+  //     can't navigate it later — we omit 'noopener' here and sever opener
+  //     ourselves once the popup has navigated.
+  //   - Popup blockers fire if window.open isn't called synchronously from
+  //     a user gesture. We open with a same-origin loader page first so the
+  //     tab stays clean (no flash of about:blank), then navigate to the blob
+  //     URL once it's ready.
+  const viewGRN = useCallback(async (receiptId: string) => {
+    const popup = window.open('about:blank', '_blank')
+    if (popup) {
+      try {
+        popup.document.title = 'Loading GRN…'
+        popup.document.body.style.cssText = 'margin:0;background:#0b1220;color:#cbd5e1;font:14px/1.4 system-ui,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh'
+        popup.document.body.innerHTML = '<div>Loading GRN…</div>'
+      } catch {
+        // Cross-origin or permissions issue — ignore, popup will still navigate.
+      }
+    }
+    try {
+      const url = await fetchGRNBlobUrl(receiptId)
+      if (popup && !popup.closed) {
+        popup.location.replace(url)
+      } else {
+        // Popup blocked or closed — fall back to a temporary anchor click,
+        // which most browsers treat as a continuation of the user gesture.
+        const a = document.createElement('a')
+        a.href = url
+        a.target = '_blank'
+        a.rel = 'noopener noreferrer'
+        document.body.appendChild(a)
+        a.click()
+        a.remove()
+      }
+    } catch (err) {
+      popup?.close()
+      const msg = err instanceof Error ? err.message : 'Failed to load GRN'
+      showToast(msg, 'error')
+    }
+  }, [showToast])
+
+  // Issue GRN: PATCH receipt status to 'matched'. The backend then
+  // generates the GRN PDF and queues the DocuWare push. From the yard
+  // operator's perspective this is the final tap that "issues the GRN".
+  const issueGRN = useCallback(async (receiptId: string) => {
+    try {
+      const res = await apiFetch(`/receipts/${receiptId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status: 'matched' }),
+      })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        showToast(body.error || `Failed to issue GRN (${res.status})`, 'error')
+        return
+      }
+      const body = await res.json() as Receipt & { resynced_lines?: number }
+      setReceipts(prev => prev.map(r => r.id === receiptId ? { ...r, ...body } : r))
+      showToast('GRN issued — uploading to DocuWare', 'success')
+    } catch (err) {
+      const msg = (err as Error).message === 'unauthorized'
+        ? 'Session expired — sign in again'
+        : 'Network error — try again'
+      showToast(msg, 'error')
+    }
+  }, [showToast])
 
   if (view === 'walk' && active) {
     return (
@@ -193,8 +365,8 @@ export default function Yard({ onLogout }: { onLogout?: () => void }) {
   }
 
   return (
-    <div className="yard-shell">
-      <YardTopbar online={online} queueCount={0}/>
+    <div className={'yard-shell' + (outdoor ? ' yard-shell--outdoor' : '')}>
+      <YardTopbar online={online} queueCount={0} outdoor={outdoor} onToggleOutdoor={() => setOutdoor(v => !v)}/>
 
       {loading && (
         <div className="yard-page">
@@ -214,6 +386,8 @@ export default function Yard({ onLogout }: { onLogout?: () => void }) {
           pods={receipts}
           lineState={lineState}
           onOpen={(id) => { setActiveId(id); setView('detail') }}
+          onViewPOD={viewPOD}
+          viewingPODFor={viewingPODFor}
         />
       )}
       {!loading && !error && view === 'detail' && active && (
@@ -222,9 +396,14 @@ export default function Yard({ onLogout }: { onLogout?: () => void }) {
           lineState={lineState}
           onBack={() => setView('list')}
           onWalk={() => setView('walk')}
-          onIssueGRN={() => showToast('GRN issuance is not wired up yet', 'info')}
+          onIssueGRN={() => issueGRN(active.id)}
+          onViewGRN={() => viewGRN(active.id)}
+          onSaveHeader={persistReceipt}
+          onViewPOD={viewPOD}
+          viewingPODFor={viewingPODFor}
         />
       )}
+      {podModal && <YardPODModal url={podModal.url} onClose={() => setPodModal(null)}/>}
     </div>
   )
 }
@@ -232,7 +411,12 @@ export default function Yard({ onLogout }: { onLogout?: () => void }) {
 // ════════════════════════════════════════════════════════════════════════════
 // TOPBAR
 // ════════════════════════════════════════════════════════════════════════════
-function YardTopbar({ online, queueCount }: { online: boolean; queueCount: number }) {
+function YardTopbar({ online, queueCount, outdoor, onToggleOutdoor }: {
+  online: boolean
+  queueCount: number
+  outdoor: boolean
+  onToggleOutdoor: () => void
+}) {
   return (
     <div className="yard-topbar">
       <div className="yard-topbar__brand">
@@ -242,22 +426,62 @@ function YardTopbar({ online, queueCount }: { online: boolean; queueCount: numbe
           <div className="yard-topbar__sub">Transvaal Galvanisers · Nigel</div>
         </div>
       </div>
-      <div className={'yard-conn ' + (online ? 'yard-conn--online' : 'yard-conn--offline')}>
-        <span className="yard-conn__dot"/>
-        {online ? 'Online' : 'Offline'}
-        {queueCount > 0 && <span className="yard-conn__queue">{queueCount} queued</span>}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <button
+          type="button"
+          className={'yard-outdoor-toggle' + (outdoor ? ' is-on' : '')}
+          onClick={onToggleOutdoor}
+          aria-pressed={outdoor}
+          title={outdoor ? 'Outdoor mode: ON — bigger type for direct sun. Tap to switch off.' : 'Tap to enable outdoor mode (bigger type for direct sun).'}
+        >
+          {/* Sun icon */}
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="4"/>
+            <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>
+          </svg>
+          <span>{outdoor ? 'Outdoor' : 'Indoor'}</span>
+        </button>
+        <div
+          className={'yard-conn ' + (online ? 'yard-conn--online' : 'yard-conn--offline')}
+          title={online ? 'API reachable — submissions will save' : "Can't reach the server — submissions will fail until reconnected"}
+        >
+          <span className="yard-conn__dot"/>
+          {online ? 'Online' : 'Offline'}
+          {queueCount > 0 && <span className="yard-conn__queue">{queueCount} queued</span>}
+        </div>
       </div>
     </div>
   )
 }
 
+// useOutdoorMode — persist the receiver's preference. Outdoor stays on across
+// reloads so a receiver who picked it once doesn't have to re-toggle every
+// shift. Stored under a yard-specific key so we don't collide with other prefs.
+const OUTDOOR_KEY = 'yard:outdoor-mode'
+function useOutdoorMode(): [boolean, (updater: (v: boolean) => boolean) => void] {
+  const [on, setOn] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false
+    try { return window.localStorage.getItem(OUTDOOR_KEY) === '1' } catch { return false }
+  })
+  const update = useCallback((updater: (v: boolean) => boolean) => {
+    setOn(prev => {
+      const next = updater(prev)
+      try { window.localStorage.setItem(OUTDOOR_KEY, next ? '1' : '0') } catch {}
+      return next
+    })
+  }, [])
+  return [on, update]
+}
+
 // ════════════════════════════════════════════════════════════════════════════
 // LIST
 // ════════════════════════════════════════════════════════════════════════════
-function YardLoadsList({ pods, lineState, onOpen }: {
+function YardLoadsList({ pods, lineState, onOpen, onViewPOD, viewingPODFor }: {
   pods: Receipt[]
   lineState: LineStateMap
   onOpen: (id: string) => void
+  onViewPOD: (receiptId: string) => void
+  viewingPODFor: string | null
 }) {
   const [filter, setFilter] = useState<'today' | 'all' | 'done'>('today')
 
@@ -275,7 +499,10 @@ function YardLoadsList({ pods, lineState, onOpen }: {
         || (l.quantity_discrepancy && l.quantity_discrepancy !== 'none' && l.quantity_discrepancy !== '')
     }).length
     const allDone = total > 0 && done === total
-    const grnIssued = p.status === 'archived' // best proxy until GRN status lands
+    // Phase 2: 'matched' is when the GRN gets generated + pushed to DocuWare.
+    // 'archived' is a later admin-only state (post-cleanup); treat both as
+    // GRN-issued so the yard reflects either state correctly.
+    const grnIssued = p.status === 'matched' || p.status === 'archived'
     return { ...p, _total: total, _done: done, _flagged: flagged, _allDone: allDone, _grnIssued: grnIssued }
   })
 
@@ -303,36 +530,65 @@ function YardLoadsList({ pods, lineState, onOpen }: {
       </div>
 
       <div className="yard-loads">
-        {visible.map(p => (
-          <button key={p.id} className="yard-load-card" onClick={() => onOpen(p.id)}>
-            <div className="yard-load-card__plate">
-              <Icon name="truck" size={24}/>
-            </div>
-            <div className="yard-load-card__main">
-              <div className="yard-load-card__row">
-                <div className="yard-load-card__num">{p.delivery_note_number || p.receipt_number || '—'}</div>
-                {p._grnIssued && <span className="yard-pill yard-pill--success">GRN issued</span>}
-                {p._allDone && !p._grnIssued && <span className="yard-pill yard-pill--ready">Ready for GRN</span>}
-                {!p._allDone && p._done > 0 && <span className="yard-pill yard-pill--progress">In progress</span>}
+        {visible.map(p => {
+          const podBusy = viewingPODFor === p.id
+          const onCardKey: React.KeyboardEventHandler<HTMLDivElement> = (e) => {
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen(p.id) }
+          }
+          return (
+            <div
+              key={p.id}
+              role="button"
+              tabIndex={0}
+              className="yard-load-card"
+              onClick={() => onOpen(p.id)}
+              onKeyDown={onCardKey}
+            >
+              <div className="yard-load-card__plate">
+                <Icon name="truck" size={24}/>
               </div>
-              <div className="yard-load-card__customer">{p.customer_name || p.supplier_name || '—'}</div>
-              <div className="yard-load-card__meta">
-                <span><Icon name="truck" size={14}/> {p.vehicle_registration || '—'}</span>
-                <span>·</span>
-                <span>{p._total} line{p._total !== 1 ? 's' : ''}</span>
-                {p._flagged > 0 && <><span>·</span><span style={{ color: 'var(--yard-amber)' }}><Icon name="flag" size={14}/> {p._flagged} flagged</span></>}
-              </div>
-            </div>
-            <div className="yard-load-card__right">
-              {p._done > 0 && p._total > 0 && (
-                <div className="yard-progress-ring" style={{ ['--p' as any]: Math.round((p._done/p._total)*100) }}>
-                  <div className="yard-progress-ring__inner">{p._done}/{p._total}</div>
+              <div className="yard-load-card__main">
+                <div className="yard-load-card__row">
+                  <div className="yard-load-card__num">
+                    {p.weighbridge_ticket_number
+                      ? `WB ${p.weighbridge_ticket_number}`
+                      : (p.delivery_note_number || p.receipt_number || '—')}
+                  </div>
+                  {p._grnIssued && <span className="yard-pill yard-pill--success">GRN issued</span>}
+                  {p._allDone && !p._grnIssued && <span className="yard-pill yard-pill--ready">Ready for GRN</span>}
+                  {!p._allDone && p._done > 0 && <span className="yard-pill yard-pill--progress">In progress</span>}
                 </div>
-              )}
-              <Icon name="chevR" size={28}/>
+                <div className="yard-load-card__customer">{p.customer_name || p.supplier_name || '—'}</div>
+                <div className="yard-load-card__meta">
+                  <span><Icon name="truck" size={14}/> {p.vehicle_registration || '—'}</span>
+                  <span>·</span>
+                  <span>{p._total} line{p._total !== 1 ? 's' : ''}</span>
+                  {p._flagged > 0 && <><span>·</span><span style={{ color: 'var(--yard-amber)' }}><Icon name="flag" size={14}/> {p._flagged} flagged</span></>}
+                </div>
+              </div>
+              <div className="yard-load-card__right">
+                {p.source_docuware_document_id && (
+                  <button
+                    type="button"
+                    className="yard-pod-btn yard-pod-btn--compact"
+                    onClick={(e) => { e.stopPropagation(); onViewPOD(p.id) }}
+                    disabled={podBusy}
+                    title="Open POD in DocuWare viewer"
+                    aria-label="View POD"
+                  >
+                    <Icon name="doc" size={16}/> {podBusy ? '…' : 'POD'}
+                  </button>
+                )}
+                {p._done > 0 && p._total > 0 && (
+                  <div className="yard-progress-ring" style={{ ['--p' as any]: Math.round((p._done/p._total)*100) }}>
+                    <div className="yard-progress-ring__inner">{p._done}/{p._total}</div>
+                  </div>
+                )}
+                <Icon name="chevR" size={28}/>
+              </div>
             </div>
-          </button>
-        ))}
+          )
+        })}
         {visible.length === 0 && (
           <div className="yard-empty">
             <div className="yard-empty__title">Nothing in this view</div>
@@ -347,12 +603,16 @@ function YardLoadsList({ pods, lineState, onOpen }: {
 // ════════════════════════════════════════════════════════════════════════════
 // DETAIL
 // ════════════════════════════════════════════════════════════════════════════
-function YardLoadDetail({ pod, lineState, onBack, onWalk, onIssueGRN }: {
+function YardLoadDetail({ pod, lineState, onBack, onWalk, onIssueGRN, onViewGRN, onSaveHeader, onViewPOD, viewingPODFor }: {
   pod: Receipt
   lineState: LineStateMap
   onBack: () => void
   onWalk: () => void
   onIssueGRN: () => void
+  onViewGRN: () => void
+  onSaveHeader: (receiptId: string, edits: ReceiptEdit) => Promise<{ ok: true } | { ok: false; error: string }>
+  onViewPOD: (receiptId: string) => void
+  viewingPODFor: string | null
 }) {
   const lines = pod.lines || []
   const total = lines.length
@@ -364,7 +624,27 @@ function YardLoadDetail({ pod, lineState, onBack, onWalk, onIssueGRN }: {
   }).length
   const allDone = done === total && total > 0
   const firstUndoneIdx = lines.findIndex(l => !(l.receiving_status === 'received' || lineState[l.id]?.received))
-  const grnIssued = pod.status === 'archived'
+  // 'matched' is when the GRN gets issued; 'archived' is the later auto-archive
+  // state. Either means the GRN exists. (Mirrors the list-card precedence above.)
+  const grnIssued = pod.status === 'matched' || pod.status === 'archived'
+
+  const [editing, setEditing] = useState(false)
+  const [edits, setEdits] = useState<ReceiptEdit>({})
+  const [headerSaving, setHeaderSaving] = useState(false)
+  const [headerError, setHeaderError] = useState<string | null>(null)
+
+  const headerVal = (field: keyof ReceiptEdit): string =>
+    (field in edits ? (edits[field] ?? '') : ((pod as any)[field] ?? '')) as string
+  const patch = (field: keyof ReceiptEdit, value: string) =>
+    setEdits(prev => ({ ...prev, [field]: value }))
+  const cancelEdit = () => { setEdits({}); setHeaderError(null); setEditing(false) }
+  const saveEdit = async () => {
+    setHeaderSaving(true); setHeaderError(null)
+    const res = await onSaveHeader(pod.id, edits)
+    setHeaderSaving(false)
+    if (!res.ok) { setHeaderError(res.error); return }
+    setEdits({}); setEditing(false)
+  }
 
   return (
     <div className="yard-page">
@@ -372,12 +652,34 @@ function YardLoadDetail({ pod, lineState, onBack, onWalk, onIssueGRN }: {
         <button className="yard-back" onClick={onBack}>
           <Icon name="chevL" size={28}/> Loads
         </button>
-        <span className="yard-detail__num">{pod.delivery_note_number || pod.receipt_number}</span>
+        <span className="yard-detail__num">
+          {pod.weighbridge_ticket_number
+            ? `WB ${pod.weighbridge_ticket_number}`
+            : (pod.delivery_note_number || pod.receipt_number)}
+        </span>
       </div>
 
       <div className="yard-detail__hero">
         <div>
-          <div className="yard-detail__customer">{pod.customer_name || pod.supplier_name || '—'}</div>
+          <div className="yard-detail__customer-row">
+            <div className="yard-detail__customer">{pod.customer_name || pod.supplier_name || '—'}</div>
+            {pod.source_docuware_document_id && (
+              <button
+                type="button"
+                className="yard-pod-btn"
+                onClick={() => onViewPOD(pod.id)}
+                disabled={viewingPODFor === pod.id}
+                title="Open POD in DocuWare viewer"
+              >
+                <Icon name="doc" size={16}/> {viewingPODFor === pod.id ? 'Opening…' : 'View POD'}
+              </button>
+            )}
+            {!editing && !grnIssued && (
+              <button className="yard-edit-btn" onClick={() => setEditing(true)} aria-label="Edit details">
+                <Icon name="pencil" size={16}/> Edit details
+              </button>
+            )}
+          </div>
           <div className="yard-detail__meta">
             <div><span className="k">PO</span><span className="v mono">{pod.purchase_order_number || '—'}</span></div>
             <div><span className="k">Vehicle</span><span className="v mono">{pod.vehicle_registration || '—'}</span></div>
@@ -396,6 +698,29 @@ function YardLoadDetail({ pod, lineState, onBack, onWalk, onIssueGRN }: {
         </div>
       </div>
 
+      {editing && (
+        <div className="yard-edit-card">
+          <div className="yard-edit-card__title">Edit load details</div>
+          <p className="yard-edit-card__sub">Fix anything the POD got wrong.</p>
+          <div className="yard-edit-grid">
+            <YardField label="Customer"        value={headerVal('customer_name')}             onChange={v => patch('customer_name', v)}/>
+            <YardField label="Fabricator"      value={headerVal('supplier_name')}             onChange={v => patch('supplier_name', v)}/>
+            <YardField label="Delivery Note"   value={headerVal('delivery_note_number')}      onChange={v => patch('delivery_note_number', v)} mono/>
+            <YardField label="Order #"         value={headerVal('purchase_order_number')}     onChange={v => patch('purchase_order_number', v)} mono/>
+            <YardField label="Weighbridge #"   value={headerVal('weighbridge_ticket_number')} onChange={v => patch('weighbridge_ticket_number', v)} mono/>
+            <YardField label="Vehicle Reg"     value={headerVal('vehicle_registration')}      onChange={v => patch('vehicle_registration', v)} mono/>
+            <YardField label="Job Number"      value={headerVal('job_number')}                onChange={v => patch('job_number', v)} mono/>
+          </div>
+          {headerError && <div className="yard-edit-card__error" role="alert"><Icon name="alert" size={16}/> {headerError}</div>}
+          <div className="yard-edit-card__actions">
+            <button className="yard-btn-ghost yard-btn-lg" onClick={cancelEdit} disabled={headerSaving}>Cancel</button>
+            <button className="yard-btn-primary yard-btn-lg yard-btn-flex" onClick={saveEdit} disabled={headerSaving || Object.keys(edits).length === 0}>
+              {headerSaving ? 'Saving…' : 'Save details'}
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="yard-detail__cta">
         {!allDone && !grnIssued && total > 0 && (
           <button className="yard-btn-primary yard-btn-xl" onClick={onWalk}>
@@ -412,7 +737,7 @@ function YardLoadDetail({ pod, lineState, onBack, onWalk, onIssueGRN }: {
           </button>
         )}
         {grnIssued && (
-          <button className="yard-btn-ghost yard-btn-xl" onClick={onIssueGRN}>
+          <button className="yard-btn-ghost yard-btn-xl" onClick={onViewGRN}>
             <Icon name="doc" size={22}/>
             View GRN <span className="mono">{pod.receipt_number}</span>
           </button>
@@ -468,11 +793,113 @@ function YardLineSummary({ line, idx, state }: { line: ReceiptLine; idx: number;
   )
 }
 
+function YardField({ label, value, onChange, mono }: {
+  label: string
+  value: string
+  onChange: (v: string) => void
+  mono?: boolean
+}) {
+  return (
+    <label className="yard-field">
+      <span className="yard-field__label">{label}</span>
+      <input
+        type="text"
+        className={'yard-field__input' + (mono ? ' yard-field__input--mono' : '')}
+        value={value}
+        onChange={e => onChange(e.target.value)}
+      />
+    </label>
+  )
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// POD MODAL — iframes the DocuWare integration URL.
+// DocuWare supports framing on /WebClient/1/Integration; if it ever blocks us
+// (X-Frame-Options or CSP frame-ancestors), the iframe stays blank — we show a
+// fallback banner offering to open in a new tab so the receiver isn't stuck.
+// ════════════════════════════════════════════════════════════════════════════
+function YardPODModal({ url, onClose }: { url: string; onClose: () => void }) {
+  const [loaded, setLoaded] = useState(false)
+  const [showFallback, setShowFallback] = useState(false)
+
+  // Lock background scroll while open
+  useEffect(() => {
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = prev }
+  }, [])
+
+  // Esc to close
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+
+  // Watchdog: if the iframe never loads within 6s, surface a fallback
+  useEffect(() => {
+    if (loaded) return
+    const t = window.setTimeout(() => setShowFallback(true), 6000)
+    return () => window.clearTimeout(t)
+  }, [loaded])
+
+  return (
+    <div className="yard-pod-modal" role="dialog" aria-modal="true" aria-label="POD viewer">
+      <div className="yard-pod-modal__bar">
+        <div className="yard-pod-modal__title"><Icon name="doc" size={18}/> POD</div>
+        <a
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="yard-pod-modal__open"
+        >
+          Open in new tab ↗
+        </a>
+        <button className="yard-pod-modal__close" onClick={onClose} aria-label="Close POD">
+          <Icon name="close" size={22}/>
+        </button>
+      </div>
+      <div className="yard-pod-modal__body">
+        {!loaded && !showFallback && (
+          <div className="yard-pod-modal__loading">Loading POD…</div>
+        )}
+        {showFallback && !loaded && (
+          <div className="yard-pod-modal__fallback">
+            <div className="yard-pod-modal__fallback-title">DocuWare is taking a while.</div>
+            <div className="yard-pod-modal__fallback-sub">
+              If the document doesn't appear, open it in a new tab.
+            </div>
+            <a href={url} target="_blank" rel="noopener noreferrer" className="yard-btn-primary yard-btn-lg">
+              Open in new tab
+            </a>
+          </div>
+        )}
+        <iframe
+          src={url}
+          className={'yard-pod-modal__frame' + (loaded ? ' yard-pod-modal__frame--loaded' : '')}
+          title="DocuWare POD"
+          onLoad={() => setLoaded(true)}
+          // sandbox allowances DocuWare's WebClient needs to render and authenticate.
+          // omit allow-top-navigation so DocuWare can't navigate the parent page.
+          sandbox="allow-scripts allow-forms allow-same-origin allow-popups allow-downloads"
+        />
+      </div>
+    </div>
+  )
+}
+
 // ════════════════════════════════════════════════════════════════════════════
 // WALKTHROUGH
 // ════════════════════════════════════════════════════════════════════════════
-const STEPS = ['qty', 'type', 'process', 'packaging', 'defects', 'review'] as const
+// 'photo' is conditional: shown only when the receiver flagged a defect on
+// the previous step. goNext/goPrev skip it for clean lines so the 90% case
+// stays a one-tap walkthrough.
+const STEPS = ['qty', 'type', 'process', 'packaging', 'defects', 'photo', 'review'] as const
 type Step = typeof STEPS[number]
+
+function shouldSkipStep(step: Step, state: YardLineState): boolean {
+  return step === 'photo' && !state.hasDefects
+}
 
 function YardWalkthrough({ pod, lineState, updateLine, savingLineId, onPersistLine, onExit, onComplete }: {
   pod: Receipt
@@ -516,9 +943,15 @@ function YardWalkthrough({ pod, lineState, updateLine, savingLineId, onPersistLi
   // Clear any prior error when the user navigates or edits
   useEffect(() => { setSaveError(null) }, [idx, step])
 
-  const goNext = () => { if (stepIdx < STEPS.length - 1) setStep(STEPS[stepIdx + 1]) }
+  const goNext = () => {
+    let next = stepIdx + 1
+    while (next < STEPS.length && shouldSkipStep(STEPS[next], state)) next++
+    if (next < STEPS.length) setStep(STEPS[next])
+  }
   const goPrev = () => {
-    if (stepIdx > 0) setStep(STEPS[stepIdx - 1])
+    let prev = stepIdx - 1
+    while (prev >= 0 && shouldSkipStep(STEPS[prev], state)) prev--
+    if (prev >= 0) setStep(STEPS[prev])
     else if (idx > 0) { setIdx(idx - 1); setStep('review') }
     else onExit()
   }
@@ -556,13 +989,20 @@ function YardWalkthrough({ pod, lineState, updateLine, savingLineId, onPersistLi
           <Icon name="close" size={24}/>
         </button>
         <div>
-          <div className="yard-walk__delivery">{pod.delivery_note_number || pod.receipt_number} · {pod.customer_name}</div>
+          <div className="yard-walk__delivery">
+            {(pod.weighbridge_ticket_number ? `WB ${pod.weighbridge_ticket_number}` : (pod.delivery_note_number || pod.receipt_number))} · {pod.customer_name}
+          </div>
           <div className="yard-walk__progress">Line <strong>{idx+1}</strong> of <strong>{total}</strong></div>
         </div>
         <div className="yard-walk__steps">
-          {STEPS.slice(0,5).map((s, i) => (
-            <span key={s} className={'yard-walk__dot ' + (i < stepIdx ? 'done' : i === stepIdx ? 'now' : '')}/>
-          ))}
+          {STEPS.slice(0, STEPS.length - 1)
+            .filter(s => !shouldSkipStep(s, state))
+            .map((s) => {
+              const i = STEPS.indexOf(s)
+              return (
+                <span key={s} className={'yard-walk__dot ' + (i < stepIdx ? 'done' : i === stepIdx ? 'now' : '')}/>
+              )
+            })}
         </div>
       </div>
 
@@ -594,6 +1034,7 @@ function YardWalkthrough({ pod, lineState, updateLine, savingLineId, onPersistLi
         {step === 'process'   && <StepProcess   state={state} set={set}/>}
         {step === 'packaging' && <StepPackaging state={state} set={set}/>}
         {step === 'defects'   && <StepDefects   state={state} set={set}/>}
+        {step === 'photo'     && <StepPhoto     state={state} set={set}/>}
         {step === 'review'    && <StepReview    line={line} state={state} set={set} idx={idx} total={total}/>}
       </div>
 
@@ -649,6 +1090,8 @@ function canAdvance(step: Step, state: YardLineState): boolean {
   if (step === 'process')   return !!state.process
   if (step === 'packaging') return !!state.packaging
   if (step === 'defects')   return state.defects_done === true
+  // Photo is optional — receiver can skip with no file selected.
+  if (step === 'photo')     return true
   return true
 }
 
@@ -797,42 +1240,215 @@ function StepPackaging({ state, set }: { state: YardLineState; set: (p: Partial<
 
 function StepDefects({ state, set }: { state: YardLineState; set: (p: Partial<YardLineState>) => void }) {
   const defects = state.defects || defaultDefectValues()
+  const mitigations = state.mitigations ?? {}
+  const quantities = state.quantities ?? {}
+
   const setDefect = (key: string, val: string) => {
     const newDef = { ...defects, [key]: val }
-    set({ defects: newDef, hasDefects: hasAnyYardDefect(newDef) || hasAnyDefect(newDef), defects_done: true })
+    const item = ALL_DEFECT_ITEMS.find(i => i.key === key)
+    // If the value reverts to default, drop any mitigations + qtys for this item
+    let nextMits = mitigations
+    let nextQtys = quantities
+    if (item && val === item.default) {
+      if (mitigations[key]) {
+        nextMits = { ...mitigations }; delete nextMits[key]
+      }
+      if (quantities[key]) {
+        nextQtys = { ...quantities }; delete nextQtys[key]
+      }
+    }
+    set({
+      defects: newDef,
+      mitigations: nextMits,
+      quantities: nextQtys,
+      hasDefects: hasAnyDefect(newDef),
+      defects_done: true,
+    })
   }
+
+  const toggleMitigation = (itemKey: string, mit: string) => {
+    const current = mitigations[itemKey] ?? []
+    const isOn = current.includes(mit)
+    const nextList = isOn ? current.filter(m => m !== mit) : [...current, mit]
+    const nextMits: MitigationSelection = { ...mitigations }
+    if (nextList.length) nextMits[itemKey] = nextList
+    else delete nextMits[itemKey]
+
+    const nextQtys: MitigationQuantity = { ...quantities }
+    if (isOn) {
+      // removing — drop the qty entry too
+      if (nextQtys[itemKey]) {
+        const cleaned = { ...nextQtys[itemKey] }
+        delete cleaned[mit]
+        if (Object.keys(cleaned).length) nextQtys[itemKey] = cleaned
+        else delete nextQtys[itemKey]
+      }
+    } else if (!MITIGATION_NO_QTY.has(itemKey)) {
+      // adding — seed qty=0 for items that take quantities (matches office UX)
+      nextQtys[itemKey] = { ...(nextQtys[itemKey] ?? {}), [mit]: 0 }
+    }
+    set({ mitigations: nextMits, quantities: nextQtys, defects_done: true })
+  }
+
+  const setMitigationQty = (itemKey: string, mit: string, value: number) => {
+    const clean = Math.max(0, value | 0)
+    const nextQtys: MitigationQuantity = {
+      ...quantities,
+      [itemKey]: { ...(quantities[itemKey] ?? {}), [mit]: clean },
+    }
+    set({ quantities: nextQtys })
+  }
+
   const skipAll = () => {
-    set({ defects: defaultDefectValues(), hasDefects: false, defects_done: true })
+    set({ defects: defaultDefectValues(), mitigations: {}, quantities: {}, hasDefects: false, defects_done: true })
   }
+
   return (
     <div>
       <h2 className="walk-step__title">Any defects?</h2>
-      <p className="walk-step__sub">Tap a row that doesn't match — leave the rest</p>
+      <p className="walk-step__sub">Tap a row that doesn't match — leave the rest. When you flag one, pick the mitigation the workshop will need.</p>
 
       <button className="walk-skip-all" onClick={skipAll}>
         <Icon name="check" size={18}/> All clean — no defects
       </button>
 
-      <div className="defect-list">
-        {YARD_DEFECTS.map(d => {
-          const val = defects[d.key] ?? d.default
-          const flagged = val !== d.default
-          return (
-            <div key={d.key} className={'defect-row ' + (flagged ? 'defect-row--on' : '')}>
-              <div className="defect-row__label">{d.label}</div>
-              <div className="defect-row__opts">
-                {d.options.map(o => (
-                  <button key={o}
-                          className={'defect-pill ' + (val === o ? 'defect-pill--on' : '')}
-                          onClick={() => setDefect(d.key, o)}>
-                    {o}
-                  </button>
-                ))}
-              </div>
+      <div className="defect-categories">
+        {DEFECT_CATEGORIES.map(cat => (
+          <div key={cat.id} className="defect-category">
+            <div className="defect-category__title">{cat.title}</div>
+            <div className="defect-list">
+              {cat.items.map(d => {
+                const val = defects[d.key] ?? d.default
+                const flagged = val !== d.default
+                const availableMits = d.mitigations[val] ?? []
+                const selected = mitigations[d.key] ?? []
+                const noQty = MITIGATION_NO_QTY.has(d.key)
+                return (
+                  <div key={d.key} className={'defect-row ' + (flagged ? 'defect-row--on' : '')}>
+                    <div className="defect-row__label">{d.label}</div>
+                    <div className="defect-row__opts">
+                      {d.options.map(o => (
+                        <button key={o}
+                                className={'defect-pill ' + (val === o ? 'defect-pill--on' : '')}
+                                onClick={() => setDefect(d.key, o)}>
+                          {o}
+                        </button>
+                      ))}
+                    </div>
+                    {flagged && availableMits.length > 0 && (
+                      <div className="defect-row__mits">
+                        <div className="defect-row__mits-label">Mitigation</div>
+                        <div className="defect-row__mits-list">
+                          {availableMits.map(mit => {
+                            const on = selected.includes(mit)
+                            const qty = quantities[d.key]?.[mit] ?? 0
+                            return (
+                              <div key={mit} className={'mit-row ' + (on ? 'mit-row--on' : '')}>
+                                <button
+                                  type="button"
+                                  className="mit-row__toggle"
+                                  onClick={() => toggleMitigation(d.key, mit)}
+                                  aria-pressed={on}
+                                >
+                                  <span className={'mit-row__check' + (on ? ' mit-row__check--on' : '')}>
+                                    {on && <Icon name="check" size={14}/>}
+                                  </span>
+                                  <span className="mit-row__label">{mit}</span>
+                                </button>
+                                {on && !noQty && (
+                                  <div className="mit-qty">
+                                    <button className="mit-qty__btn" onClick={() => setMitigationQty(d.key, mit, qty - 1)} aria-label={`Decrease ${mit}`}>
+                                      <Icon name="minus" size={20}/>
+                                    </button>
+                                    <input
+                                      type="number"
+                                      className="mit-qty__input"
+                                      value={qty}
+                                      onChange={e => setMitigationQty(d.key, mit, parseInt(e.target.value || '0', 10))}
+                                      inputMode="numeric"
+                                      aria-label={`${mit} quantity`}
+                                    />
+                                    <button className="mit-qty__btn" onClick={() => setMitigationQty(d.key, mit, qty + 1)} aria-label={`Increase ${mit}`}>
+                                      <Icon name="plus" size={20}/>
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
             </div>
-          )
-        })}
+          </div>
+        ))}
       </div>
+    </div>
+  )
+}
+
+function ReviewPhotoPreview({ file }: { file: File }) {
+  const [url, setUrl] = useState<string | null>(null)
+  useEffect(() => {
+    const u = URL.createObjectURL(file)
+    setUrl(u)
+    return () => URL.revokeObjectURL(u)
+  }, [file])
+  if (!url) return null
+  return (
+    <div style={{ marginTop: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
+      <img
+        src={url}
+        alt="Defect photo preview"
+        style={{ width: 56, height: 56, objectFit: 'cover', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}
+      />
+      <span style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
+        Photo will upload when you confirm
+      </span>
+    </div>
+  )
+}
+
+function StepPhoto({ state, set }: {
+  state: YardLineState
+  set: (p: Partial<YardLineState>) => void
+}) {
+  // Local blob URL for the in-memory File so receiver sees the thumbnail
+  // immediately. Cleaned up on replace / unmount.
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  useEffect(() => {
+    if (!state.defectPhoto) { setPreviewUrl(null); return }
+    const url = URL.createObjectURL(state.defectPhoto)
+    setPreviewUrl(url)
+    return () => URL.revokeObjectURL(url)
+  }, [state.defectPhoto])
+
+  return (
+    <div>
+      <h2 className="walk-step__title">Defect photo</h2>
+      <p className="walk-step__sub">
+        Optional. The photo is saved to DocuWare with the line so the office has evidence of the defect.
+      </p>
+
+      <div style={{ marginTop: '1rem' }}>
+        <PhotoCapture
+          existingUrl={previewUrl}
+          existingStatus={previewUrl ? 'pending' : undefined}
+          existingFilename={state.defectPhoto?.name}
+          busy={false}
+          onSelect={file => set({ defectPhoto: file })}
+          onRemove={previewUrl ? () => set({ defectPhoto: undefined }) : undefined}
+        />
+      </div>
+
+      {!state.defectPhoto && (
+        <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)', marginTop: '1rem' }}>
+          Skip if you can't take a photo right now — you can attach one later from the Receipts page.
+        </p>
+      )}
     </div>
   )
 }
@@ -845,8 +1461,10 @@ function StepReview({ line, state, set, idx, total }: {
   total: number
 }) {
   const flagged = (state.discrepancy && state.discrepancy !== 'none') || state.hasDefects
-  const flaggedDefects = YARD_DEFECTS.filter(d => state.defects && state.defects[d.key] !== d.default)
+  const flaggedDefects = ALL_DEFECT_ITEMS.filter(d => state.defects && (state.defects[d.key] ?? d.default) !== d.default)
   const processLabel = availableProcesses(state.item_type || '').find(p => p.value === state.process)?.label
+  const mitigations = state.mitigations ?? {}
+  const quantities = state.quantities ?? {}
 
   return (
     <div>
@@ -875,11 +1493,30 @@ function StepReview({ line, state, set, idx, total }: {
             <span className="yard-pill yard-pill--success" style={{ alignSelf: 'flex-start' }}><Icon name="check" size={12}/> None</span>
           ) : (
             <div className="review-defects">
-              {flaggedDefects.map(d => (
-                <span key={d.key} className="yard-pill yard-pill--warn">
-                  {d.label}: {state.defects?.[d.key]}
-                </span>
-              ))}
+              {flaggedDefects.map(d => {
+                const mits = mitigations[d.key] ?? []
+                const noQty = MITIGATION_NO_QTY.has(d.key)
+                return (
+                  <div key={d.key} className="review-defect">
+                    <span className="yard-pill yard-pill--warn">
+                      {d.label}: {state.defects?.[d.key]}
+                    </span>
+                    {mits.length > 0 && (
+                      <div className="review-defect__mits">
+                        {mits.map(m => {
+                          const qty = quantities[d.key]?.[m]
+                          const showQty = !noQty && qty != null
+                          return (
+                            <span key={m} className="review-defect__mit">
+                              <Icon name="check" size={11}/> {m}{showQty ? ` × ${qty}` : ''}
+                            </span>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
             </div>
           )}
         </div>
@@ -896,6 +1533,10 @@ function StepReview({ line, state, set, idx, total }: {
           rows={3}
         />
       </div>
+
+      {state.defectPhoto && (
+        <ReviewPhotoPreview file={state.defectPhoto} />
+      )}
 
       {flagged && (
         <div className="review-warn">

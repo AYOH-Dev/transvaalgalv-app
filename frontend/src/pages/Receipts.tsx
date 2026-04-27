@@ -2,9 +2,11 @@ import React, { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { clearToken, apiFetch } from '../auth'
 import { useToast } from '../components/Toast'
+import { useCurrentUser } from '../components/CurrentUser'
 import {
   type ReceiptLine,
   type Receipt,
+  type ReceiptDocument,
   type LineEdit,
   type ReceiptEdit,
   type MitigationSelection,
@@ -28,7 +30,12 @@ import {
   parseConditionNotes,
   fmtDate,
   qty,
+  uploadDefectPhoto,
+  deleteDefectPhoto,
+  fetchDefectPhotoBlobUrl,
+  fetchGRNBlobUrl,
 } from '../lib/receipts'
+import PhotoCapture, { useObjectUrl, type PhotoSyncStatus } from '../components/PhotoCapture'
 
 // ─── Defect Modal ─────────────────────────────────────────────────────────────
 
@@ -38,17 +45,56 @@ type DefectModalProps = {
   initialMitigations: MitigationSelection
   initialQuantities: MitigationQuantity
   additionalComments: string
+  existingPhoto: ReceiptDocument | null
+  receiptId: string
+  onUploadPhoto: (file: File) => Promise<void>
+  onDeletePhoto: () => Promise<void>
   onConfirm: (defects: Record<string, string>, mitigations: MitigationSelection, quantities: MitigationQuantity, additionalComments: string) => void
   onClose: () => void
 }
 
-function DefectModal({ lineLabel, initial, initialMitigations, initialQuantities, additionalComments: initialComments, onConfirm, onClose }: DefectModalProps) {
+function DefectModal({ lineLabel, initial, initialMitigations, initialQuantities, additionalComments: initialComments, existingPhoto, receiptId, onUploadPhoto, onDeletePhoto, onConfirm, onClose }: DefectModalProps) {
   const [defects, setDefects] = useState<Record<string, string>>(initial)
   const [mitigations, setMitigations] = useState<MitigationSelection>(initialMitigations)
   const [quantities, setQuantities] = useState<MitigationQuantity>(initialQuantities)
   const [comments, setComments] = useState(initialComments)
   const [pickerOpen, setPickerOpen] = useState(false)
   const [pickerSearch, setPickerSearch] = useState('')
+  const [photoBusy, setPhotoBusy] = useState(false)
+  const [photoError, setPhotoError] = useState<string | null>(null)
+
+  // Stable getter so useObjectUrl only re-runs when the photo id changes,
+  // not on every render.
+  const photoId = existingPhoto?.id ?? null
+  const photoGetter = React.useMemo(
+    () => (photoId ? () => fetchDefectPhotoBlobUrl(receiptId, photoId) : null),
+    [photoId, receiptId],
+  )
+  const blobUrl = useObjectUrl(photoGetter)
+
+  async function handlePick(file: File) {
+    setPhotoError(null)
+    setPhotoBusy(true)
+    try {
+      await onUploadPhoto(file)
+    } catch (e) {
+      setPhotoError(e instanceof Error ? e.message : 'Upload failed')
+    } finally {
+      setPhotoBusy(false)
+    }
+  }
+
+  async function handleRemove() {
+    setPhotoError(null)
+    setPhotoBusy(true)
+    try {
+      await onDeletePhoto()
+    } catch (e) {
+      setPhotoError(e instanceof Error ? e.message : 'Delete failed')
+    } finally {
+      setPhotoBusy(false)
+    }
+  }
 
   function setDefect(key: string, value: string) {
     setDefects(prev => ({ ...prev, [key]: value }))
@@ -344,6 +390,26 @@ function DefectModal({ lineLabel, initial, initialMitigations, initialQuantities
             </div>
           )}
 
+          {/* Defect photo (optional, max 1 per line) */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '1rem' }}>
+            <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+              Defect Photo <span style={{ textTransform: 'none', fontWeight: 500, color: 'var(--text-muted)' }}>(optional)</span>
+            </label>
+            <PhotoCapture
+              existingUrl={blobUrl}
+              existingStatus={existingPhoto?.docuware_status as PhotoSyncStatus | undefined}
+              existingFilename={existingPhoto?.filename}
+              busy={photoBusy}
+              onSelect={handlePick}
+              onRemove={existingPhoto ? handleRemove : undefined}
+            />
+            {photoError && (
+              <span role="alert" style={{ fontSize: '0.75rem', color: 'var(--color-danger, #b91c1c)' }}>
+                {photoError}
+              </span>
+            )}
+          </div>
+
           {/* Additional comments */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
             <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Additional Comments</label>
@@ -374,11 +440,15 @@ function DefectModal({ lineLabel, initial, initialMitigations, initialQuantities
 
 export default function Receipts({ onLogout }: { onLogout?: () => void }) {
   const { showToast } = useToast()
+  const { user } = useCurrentUser()
+  const isAdmin = user?.role === 'admin'
   const [receipts, setReceipts]   = useState<Receipt[]>([])
   const [filtered, setFiltered]   = useState<Receipt[]>([])
   const [error, setError]         = useState('')
   const [loading, setLoading]     = useState(false)
   const [search, setSearch]       = useState('')
+  // Admin-only toggle. Defaults off so the active list stays focused.
+  const [showArchived, setShowArchived] = useState(false)
   const [expandedId, setExpanded]       = useState<string | null>(null)
   const [loadingLines, setLoadingLines] = useState<string | null>(null)
   const [saving, setSaving]             = useState<string | null>(null)
@@ -402,7 +472,7 @@ export default function Receipts({ onLogout }: { onLogout?: () => void }) {
     initialComments: string
   } | null>(null)
 
-  useEffect(() => { fetchReceipts() }, [])
+  useEffect(() => { fetchReceipts() }, [showArchived])
 
   useEffect(() => {
     const q = search.toLowerCase()
@@ -425,7 +495,8 @@ export default function Receipts({ onLogout }: { onLogout?: () => void }) {
   async function fetchReceipts(attempt = 1) {
     setError(''); setLoading(true)
     try {
-      const res = await apiFetch('/receipts')
+      const url = showArchived ? '/receipts?include_archived=1' : '/receipts'
+      const res = await apiFetch(url)
       if (res.status === 401) { clearToken(); onLogout?.(); return }
       if (!res.ok) { setError(`Failed to load receipts (${res.status})`); return }
       const data = await res.json()
@@ -453,9 +524,42 @@ export default function Receipts({ onLogout }: { onLogout?: () => void }) {
       const res = await apiFetch(`/receipts/${id}`)
       if (!res.ok) return
       const full: Receipt = await res.json()
-      setReceipts(prev => prev.map(r => r.id === id ? { ...r, lines: full.lines } : r))
+      setReceipts(prev => prev.map(r => r.id === id ? { ...r, lines: full.lines, documents: full.documents ?? [] } : r))
     } catch { /* silently fail, lines will just be empty */ }
     finally { setLoadingLines(null) }
+  }
+
+  // viewGRN opens the generated GRN PDF in a new tab. The endpoint is
+  // auth-required so we materialise it as a blob URL. We open the popup
+  // synchronously inside the click handler to avoid popup blockers, but
+  // omit 'noopener' so we can navigate the tab when the blob is ready
+  // (window.open with 'noopener' returns null by spec).
+  async function viewGRN(receiptId: string) {
+    const popup = window.open('about:blank', '_blank')
+    if (popup) {
+      try {
+        popup.document.title = 'Loading GRN…'
+        popup.document.body.innerHTML = '<p style="font:14px/1.4 system-ui,sans-serif;padding:1rem">Loading GRN…</p>'
+      } catch { /* ignore */ }
+    }
+    try {
+      const url = await fetchGRNBlobUrl(receiptId)
+      if (popup && !popup.closed) {
+        popup.location.replace(url)
+      } else {
+        const a = document.createElement('a')
+        a.href = url
+        a.target = '_blank'
+        a.rel = 'noopener noreferrer'
+        document.body.appendChild(a)
+        a.click()
+        a.remove()
+      }
+    } catch (err) {
+      popup?.close()
+      const msg = err instanceof Error ? err.message : 'Failed to load GRN'
+      showToast(msg, 'error')
+    }
   }
 
   async function updateStatus(receipt: Receipt, newStatus: string) {
@@ -537,10 +641,11 @@ export default function Receipts({ onLogout }: { onLogout?: () => void }) {
         showToast(body.error || 'Failed to save receipt', 'error')
         return
       }
-      const updated: Receipt = await res.json()
+      const updated = await res.json() as Receipt & { resynced_lines?: number }
       setReceipts(prev => prev.map(r => r.id === receiptId ? { ...r, ...updated } : r))
       setReceiptEdits(prev => { const n = { ...prev }; delete n[receiptId]; return n })
-      showToast('Receipt saved', 'success')
+      const n = updated.resynced_lines ?? 0
+      showToast(n > 0 ? `Receipt saved — ${n} line${n === 1 ? '' : 's'} re-syncing to DocuWare` : 'Receipt saved', 'success')
     } catch { showToast('Network error', 'error') }
     finally { setSavingReceipt(null) }
   }
@@ -556,6 +661,33 @@ export default function Receipts({ onLogout }: { onLogout?: () => void }) {
       initialQuantities: quantities,
       initialComments: comments,
     })
+  }
+
+  function findDefectPhoto(receiptId: string, lineId: string): ReceiptDocument | null {
+    const r = receipts.find(r => r.id === receiptId)
+    if (!r || !r.documents) return null
+    return r.documents.find(d => d.category === 'defect_photo' && d.receipt_line_id === lineId) ?? null
+  }
+
+  async function handleUploadDefectPhoto(receiptId: string, lineId: string, file: File) {
+    const doc = await uploadDefectPhoto(receiptId, lineId, file)
+    setReceipts(prev => prev.map(r => {
+      if (r.id !== receiptId) return r
+      const docs = r.documents ?? []
+      // Replace any existing defect photo for this line, else append.
+      const next = docs.filter(d => !(d.category === 'defect_photo' && d.receipt_line_id === lineId))
+      return { ...r, documents: [...next, doc] }
+    }))
+    showToast('Photo uploaded', 'success')
+  }
+
+  async function handleDeleteDefectPhoto(receiptId: string, photoId: string) {
+    await deleteDefectPhoto(receiptId, photoId)
+    setReceipts(prev => prev.map(r => {
+      if (r.id !== receiptId) return r
+      return { ...r, documents: (r.documents ?? []).filter(d => d.id !== photoId) }
+    }))
+    showToast('Photo removed', 'success')
   }
 
   function handleDefectConfirm(
@@ -585,6 +717,7 @@ export default function Receipts({ onLogout }: { onLogout?: () => void }) {
         const label = liveLine
           ? `${liveLine.description || liveLine.material_description || liveLine.item_code || 'Line'} (Line ${liveLine.line_number})`
           : 'Line'
+        const existingPhoto = findDefectPhoto(defectModal.receiptId, defectModal.lineId)
         return (
           <DefectModal
             lineLabel={label}
@@ -592,6 +725,12 @@ export default function Receipts({ onLogout }: { onLogout?: () => void }) {
             initialMitigations={defectModal.initialMitigations}
             initialQuantities={defectModal.initialQuantities}
             additionalComments={defectModal.initialComments}
+            existingPhoto={existingPhoto}
+            receiptId={defectModal.receiptId}
+            onUploadPhoto={file => handleUploadDefectPhoto(defectModal.receiptId, defectModal.lineId, file)}
+            onDeletePhoto={async () => {
+              if (existingPhoto) await handleDeleteDefectPhoto(defectModal.receiptId, existingPhoto.id)
+            }}
             onConfirm={handleDefectConfirm}
             onClose={() => setDefectModal(null)}
           />
@@ -604,6 +743,19 @@ export default function Receipts({ onLogout }: { onLogout?: () => void }) {
           {!loading && <p className="page-subtitle">{filtered.length} receipt{filtered.length !== 1 ? 's' : ''}</p>}
         </div>
         <div className="header-actions">
+          {isAdmin && (
+            <button
+              type="button"
+              className={`btn btn-sm ${showArchived ? 'btn-primary' : 'btn-ghost'}`}
+              onClick={() => setShowArchived(s => !s)}
+              disabled={loading}
+              title="Include archived receipts"
+              aria-pressed={showArchived}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ marginRight: 4 }}><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
+              {showArchived ? 'Hide archived' : 'Show archived'}
+            </button>
+          )}
           <button className="btn btn-ghost btn-sm" onClick={fetchReceipts} disabled={loading}>
             <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={loading ? 'spin' : ''} aria-hidden="true"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
             Refresh
@@ -967,6 +1119,7 @@ export default function Receipts({ onLogout }: { onLogout?: () => void }) {
                                           {condNotes}
                                         </div>
                                       )}
+                                      <DefectPhotoSummary receiptId={r.id} photo={findDefectPhoto(r.id, line.id)} />
                                     </div>
                                   </AccordionSection>
 
@@ -1028,8 +1181,8 @@ export default function Receipts({ onLogout }: { onLogout?: () => void }) {
                       <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>No line items on this receipt.</p>
                     )}
 
-                    {/* Status transitions */}
-                    {nextStatuses.length > 0 && (
+                    {/* Status transitions + View GRN */}
+                    {(nextStatuses.length > 0 || r.grn_document_id) && (
                       <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', paddingTop: '0.5rem', borderTop: '1px solid var(--border)' }}>
                         {nextStatuses.map(ns => (
                           <button
@@ -1041,6 +1194,16 @@ export default function Receipts({ onLogout }: { onLogout?: () => void }) {
                             {saving === r.id ? '…' : `Mark ${STATUS_LABELS[ns] ?? ns}`}
                           </button>
                         ))}
+                        {r.grn_document_id && (
+                          <button
+                            className="btn btn-ghost btn-sm"
+                            onClick={() => viewGRN(r.id)}
+                            style={{ marginLeft: 'auto' }}
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '0.3rem' }}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                            View GRN
+                          </button>
+                        )}
                       </div>
                     )}
                   </div>
@@ -1088,6 +1251,48 @@ function LineField({ label, children, style }: { label: string; children: React.
       <div style={labelStyle}>{label}</div>
       {children}
     </div>
+  )
+}
+
+function DefectPhotoSummary({ receiptId, photo }: { receiptId: string; photo: ReceiptDocument | null }) {
+  const photoId = photo?.id ?? null
+  const getter = React.useMemo(
+    () => (photoId ? () => fetchDefectPhotoBlobUrl(receiptId, photoId) : null),
+    [receiptId, photoId],
+  )
+  const url = useObjectUrl(getter)
+  if (!photo) return null
+  return (
+    <div style={{ display: 'flex', gap: '0.625rem', alignItems: 'center', flexWrap: 'wrap' }}>
+      {url ? (
+        <img
+          src={url}
+          alt={photo.filename || 'Defect photo'}
+          style={{ width: 56, height: 56, objectFit: 'cover', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}
+        />
+      ) : (
+        <div style={{ width: 56, height: 56, background: 'var(--surface-2)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }} />
+      )}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+        <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Defect photo</span>
+        <DefectPhotoSyncBadge status={photo.docuware_status} />
+      </div>
+    </div>
+  )
+}
+
+function DefectPhotoSyncBadge({ status }: { status: string }) {
+  const cfg: Record<string, { label: string; bg: string; fg: string }> = {
+    pending: { label: 'Queued', bg: 'rgba(245,158,11,0.12)', fg: 'var(--amber, #b45309)' },
+    in_progress: { label: 'Uploading…', bg: 'rgba(59,130,246,0.12)', fg: 'var(--blue, #1d4ed8)' },
+    synced: { label: 'Synced', bg: 'rgba(34,197,94,0.12)', fg: 'var(--green, #166534)' },
+    failed: { label: 'Failed — will retry', bg: 'rgba(239,68,68,0.12)', fg: 'var(--color-danger, #b91c1c)' },
+  }
+  const c = cfg[status] || cfg.pending
+  return (
+    <span style={{ fontSize: '0.6875rem', fontWeight: 600, padding: '0.125rem 0.5rem', borderRadius: '999px', background: c.bg, color: c.fg, alignSelf: 'flex-start' }}>
+      {c.label}
+    </span>
   )
 }
 

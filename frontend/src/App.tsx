@@ -8,6 +8,7 @@ import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import Receipts from './pages/Receipts'
 import Yard from './pages/Yard'
+import NewGRN from './pages/NewGRN'
 import Admin from './pages/Admin'
 import Settings from './pages/Settings'
 
@@ -48,6 +49,7 @@ export default function App() {
             <Routes>
               <Route path="/"         element={<RootRedirect />} />
               <Route path="/yard"     element={<RequireRole allow={['receiver', 'admin']}><Yard onLogout={() => setToken(null)} /></RequireRole>} />
+              <Route path="/grns/new" element={<RequireRole allow={['receiver', 'admin']}><NewGRN /></RequireRole>} />
               <Route path="/receipts" element={<Receipts onLogout={() => setToken(null)} />} />
               <Route path="/admin"    element={<Admin />} />
               <Route path="/settings" element={<Settings />} />

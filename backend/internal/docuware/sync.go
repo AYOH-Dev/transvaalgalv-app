@@ -32,6 +32,7 @@ type SyncableReceiptLine struct {
 	MaterialThickness            string
 	MaterialLength               string
 	Weight                       string
+	ReceivedByName               string // display_name of the user who confirmed this line
 }
 
 type SyncableReceipt struct {
@@ -44,18 +45,30 @@ type SyncableReceipt struct {
 	JobNumber               string
 }
 
-// newStringField creates a FieldUpdate for a string field with proper defaults
+// newStringField creates a FieldUpdate for a string field with proper defaults.
+//
+// DocuWare's REST payload uses an XML-choice-style discriminator
+// (ItemElementName) that must be empty when the value is null — otherwise
+// the platform deserializer rejects the request with
+// "Error converting value \"\" to type 'DocuWare.Platform.Model.ItemChoiceType'".
+// Sending ItemElementName="string" with an empty Item is therefore a hard
+// error, not a no-op.
 func newStringField(name, value string) FieldUpdate {
-	return FieldUpdate{
-		FieldName:        name,
-		Item:             value,
-		ItemElementName:  "string",
-		ReadOnly:         false,
-		SystemField:      false,
+	field := FieldUpdate{
+		FieldName:         name,
+		Item:              value,
+		ItemElementName:   "string",
+		ReadOnly:          false,
+		SystemField:       false,
 		PointAndShootInfo: nil,
-		IsAutoNumber:     false,
-		IsNull:           value == "",
+		IsAutoNumber:      false,
+		IsNull:            false,
 	}
+	if value == "" {
+		field.ItemElementName = ""
+		field.IsNull = true
+	}
+	return field
 }
 
 // BuildFieldUpdates constructs DocuWare field updates from receipt line data.
@@ -72,6 +85,7 @@ func BuildFieldUpdates(line SyncableReceiptLine, receipt SyncableReceipt) []Fiel
 		newStringField("WEIGHBRIDGE_TICKET_NUMBER", receipt.WeighbridgeTicketNumber),
 		newStringField("VEHICLE_REGISTRATION", receipt.VehicleRegistration),
 		newStringField("JOB_NUMBER", receipt.JobNumber),
+		newStringField("RECEIVED_BY", line.ReceivedByName),
 	)
 
 	// Line outcome fields

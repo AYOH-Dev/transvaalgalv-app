@@ -38,6 +38,11 @@ const NAV: NavItem[] = [
     icon: <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>,
   },
   {
+    to: '/grns/new', label: 'New GRN',
+    roles: ['receiver', 'admin'],
+    icon: <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>,
+  },
+  {
     to: '/receipts', label: 'Receipts',
     icon: <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>,
   },
@@ -66,19 +71,12 @@ export default function Layout({ children, onLogout }: { children: React.ReactNo
   const visibleNav = NAV.filter(n => !n.roles || (user && n.roles.includes(user.role)))
   const currentLabel = visibleNav.find(n => n.exact ? location.pathname === n.to : location.pathname.startsWith(n.to))?.label ?? 'Transvaal Galv'
 
-  // Yard view goes full-bleed and hides the sidebar — receivers on tablets need every pixel
+  // Yard route gets full-bleed page-wrap (via .app-shell--yard in yard.css)
+  // but keeps the sidebar mounted so users can navigate out.
   const isYard = location.pathname.startsWith('/yard')
 
-  if (isYard) {
-    return (
-      <div className="app-shell app-shell--yard">
-        <main className="page-wrap" id="main-content">{children}</main>
-      </div>
-    )
-  }
-
   return (
-    <div className="app-shell">
+    <div className={'app-shell' + (isYard ? ' app-shell--yard' : '')}>
 
       {/* Mobile overlay */}
       {mobileOpen && <div className="sidebar-overlay" onClick={() => setMobileOpen(false)} aria-hidden="true" />}

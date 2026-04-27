@@ -2,7 +2,14 @@ import React, { createContext, useContext, useState, useCallback, useRef } from 
 
 type ToastType = 'success' | 'error' | 'warning' | 'info'
 interface ToastItem { id: number; message: string; type: ToastType }
-interface ToastCtx { success(m: string): void; error(m: string): void; warning(m: string): void; info(m: string): void }
+interface ToastCtx {
+  success(m: string): void
+  error(m: string): void
+  warning(m: string): void
+  info(m: string): void
+  // Convenience: callers that prefer (message, type) over the typed methods.
+  showToast(m: string, type?: ToastType): void
+}
 
 const Ctx = createContext<ToastCtx | null>(null)
 let nextId = 0
@@ -27,6 +34,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     error:   (m) => add(m, 'error'),
     warning: (m) => add(m, 'warning'),
     info:    (m) => add(m, 'info'),
+    showToast: (m, type = 'info') => add(m, type),
   }
 
   const icons: Record<ToastType, React.ReactNode> = {

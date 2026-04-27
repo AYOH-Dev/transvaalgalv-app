@@ -36,13 +36,21 @@ func main() {
 	userService := users.NewService(userRepository, tokenManager, cfg.BootstrapAdminToken)
 	receivingRepository := receiving.NewRepository(dbPool)
 	receivingService := receiving.NewService(receivingRepository)
+	photoService := receiving.NewPhotoService(receivingRepository, cfg.PhotoStorageDir, cfg.PhotoMaxBytes)
+	grnService := receiving.NewGRNService(receivingRepository, cfg.PhotoStorageDir, receiving.TransvaalCompany)
 
 	// Initialize DocuWare sync worker if credentials are present
 	var syncWorker *docuware.Worker
+	var photoEnqueuer httpapi.PhotoEnqueuer
 	if cfg.DocuWareBaseURL != "" && cfg.DocuWareFileCabinetID != "" && cfg.DocuWareUsername != "" && cfg.DocuWarePassword != "" {
 		docuwareClient := docuware.NewClient(cfg.DocuWareBaseURL, cfg.DocuWareFileCabinetID, cfg.DocuWareUsername, cfg.DocuWarePassword)
 		syncWorker = docuware.NewWorker(dbPool, docuwareClient, *log.Default(), cfg.DocuWareSyncInterval, cfg.DocuWareSyncMaxWorkers)
+		syncWorker.SetPhotoStorageDir(cfg.PhotoStorageDir)
+		syncWorker.SetDocumentsCabinet(cfg.DocuWarePODCabinetID)
 		receivingService.SetSyncEnqueuer(syncWorker)
+		receivingService.SetGRNService(grnService, func(_ string) { syncWorker.NotifyPendingGRN("") })
+		receivingService.SetPODStatusEnqueuer(syncWorker)
+		photoEnqueuer = syncWorker
 
 		// Start sync worker in background
 		syncCtx, syncCancel := context.WithCancel(context.Background())
@@ -52,9 +60,19 @@ func main() {
 		log.Printf("docuware sync worker initialized (base_url=%s, cabinet=%s)", cfg.DocuWareBaseURL, cfg.DocuWareFileCabinetID)
 	} else {
 		log.Printf("docuware sync worker disabled (missing credentials)")
+		// Still wire GRN generation so the PDF is produced and stored locally,
+		// even if the DocuWare push is offline.
+		receivingService.SetGRNService(grnService, nil)
 	}
 
-	server := httpapi.NewServer(cfg, userService, receivingService, tokenManager)
+	// Auto-archive: promote 'matched' receipts older than ARCHIVE_AFTER_DAYS
+	// into 'archived'. Runs hourly in the background; archived receipts stay
+	// in the DB but are hidden from default list views.
+	archiveCtx, archiveCancel := context.WithCancel(context.Background())
+	go receivingService.RunArchiveLoop(archiveCtx, cfg.ArchiveAfter, time.Hour)
+	defer archiveCancel()
+
+	server := httpapi.NewServer(cfg, userService, receivingService, photoService, photoEnqueuer, tokenManager)
 	log.Printf("starting %s on :%s", cfg.AppName, cfg.Port)
 
 	if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {

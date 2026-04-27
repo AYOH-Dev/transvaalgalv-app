@@ -41,6 +41,18 @@ func (s *stubRepository) ImportDocuWareReceipts(_ context.Context, receipts []im
 	return s.importResult, s.importErr
 }
 
+func (s *stubRepository) CreateReceipt(_ context.Context, _ importedReceipt) (Receipt, error) {
+	return Receipt{}, nil
+}
+
+func (s *stubRepository) UpdateReceipt(_ context.Context, _ string, _ UpdateReceiptInput) (Receipt, error) {
+	return Receipt{}, nil
+}
+
+func (s *stubRepository) UpdateReceiptLine(_ context.Context, _ string, _ string, _ UpdateReceiptLineInput) (ReceiptLine, error) {
+	return ReceiptLine{}, nil
+}
+
 func TestImportDocuWareRowsGroupsRowsIntoOneReceipt(t *testing.T) {
 	repo := &stubRepository{
 		importResult: []Receipt{{ID: "receipt-1", ReceiptNumber: "imported"}},

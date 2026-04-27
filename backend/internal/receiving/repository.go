@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -24,8 +25,15 @@ func NewRepository(pool *pgxpool.Pool) *PostgresRepository {
 	return &PostgresRepository{pool: pool}
 }
 
-func (r *PostgresRepository) ListReceipts(ctx context.Context) ([]Receipt, error) {
-	rows, err := r.pool.Query(ctx, `
+// ListReceipts returns receipts in display order. Archived receipts are
+// excluded by default; pass includeArchived=true (admin-only at the HTTP
+// layer) to include them.
+func (r *PostgresRepository) ListReceipts(ctx context.Context, includeArchived bool) ([]Receipt, error) {
+	whereClause := "WHERE status != 'archived'"
+	if includeArchived {
+		whereClause = ""
+	}
+	query := `
 		SELECT id::text,
 		       receipt_number,
 		       supplier_name,
@@ -45,13 +53,19 @@ func (r *PostgresRepository) ListReceipts(ctx context.Context) ([]Receipt, error
 		       status::text,
 		       sync_status,
 		       notes,
+		       COALESCE(grn_document_id::text, ''),
+		       grn_docuware_doc_id,
+		       grn_generated_at,
+		       docuware_pod_status,
+		       docuware_pod_status_synced_at,
 		       imported_at,
 		       last_synced_at,
 		       created_at,
 		       updated_at
-		FROM receipts
+		FROM receipts ` + whereClause + `
 		ORDER BY received_at DESC, created_at DESC
-	`)
+	`
+	rows, err := r.pool.Query(ctx, query)
 	if err != nil {
 		return nil, fmt.Errorf("list receipts: %w", err)
 	}
@@ -67,6 +81,24 @@ func (r *PostgresRepository) ListReceipts(ctx context.Context) ([]Receipt, error
 	}
 
 	return receipts, rows.Err()
+}
+
+// ArchiveStaleMatched bulk-transitions matched receipts older than the
+// supplied threshold into the 'archived' status. Returns the count
+// archived. Idempotent — re-running with the same threshold is a no-op
+// for receipts already archived. Backed by idx_receipts_matched_for_archive.
+func (r *PostgresRepository) ArchiveStaleMatched(ctx context.Context, olderThan time.Duration) (int64, error) {
+	tag, err := r.pool.Exec(ctx, `
+		UPDATE receipts
+		SET status = 'archived',
+		    updated_at = NOW()
+		WHERE status = 'matched'
+		  AND updated_at < NOW() - $1::interval
+	`, olderThan.String())
+	if err != nil {
+		return 0, fmt.Errorf("archive stale matched: %w", err)
+	}
+	return tag.RowsAffected(), nil
 }
 
 func (r *PostgresRepository) GetReceipt(ctx context.Context, id string) (Receipt, error) {
@@ -90,6 +122,11 @@ func (r *PostgresRepository) GetReceipt(ctx context.Context, id string) (Receipt
 		       status::text,
 		       sync_status,
 		       notes,
+		       COALESCE(grn_document_id::text, ''),
+		       grn_docuware_doc_id,
+		       grn_generated_at,
+		       docuware_pod_status,
+		       docuware_pod_status_synced_at,
 		       imported_at,
 		       last_synced_at,
 		       created_at,
@@ -165,6 +202,120 @@ func (r *PostgresRepository) ImportDocuWareReceipts(ctx context.Context, imports
 	}
 
 	return receipts, nil
+}
+
+// CreateReceipt inserts a fresh receipt + lines for a manually-captured POD.
+// Unlike ImportDocuWareReceipts, this performs no upsert — every call must
+// produce a new receipt_number (caller's responsibility, see
+// buildManualReceiptNumber). DocuWare-only fields are left empty.
+func (r *PostgresRepository) CreateReceipt(ctx context.Context, imported importedReceipt) (Receipt, error) {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return Receipt{}, fmt.Errorf("begin create receipt transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	payloadJSON, err := json.Marshal(imported.SourcePayload)
+	if err != nil {
+		return Receipt{}, fmt.Errorf("marshal receipt payload: %w", err)
+	}
+
+	var receivedBy any
+	if imported.ReceivedByUserID != "" {
+		receivedBy = imported.ReceivedByUserID
+	}
+
+	row := tx.QueryRow(ctx, `
+		INSERT INTO receipts (
+			receipt_number,
+			supplier_name,
+			customer_name,
+			supplier_reference,
+			purchase_order_number,
+			delivery_note_number,
+			weighbridge_ticket_number,
+			vehicle_registration,
+			job_number,
+			received_at,
+			received_by,
+			received_by_name,
+			status,
+			notes,
+			sync_status,
+			docuware_source_payload
+		)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::uuid, $12, $13::receipt_status, $14, $15, $16::jsonb)
+		RETURNING id::text
+	`,
+		imported.ReceiptNumber,
+		imported.SupplierName,
+		imported.CustomerName,
+		imported.SupplierReference,
+		imported.PurchaseOrderNumber,
+		imported.DeliveryNoteNumber,
+		imported.WeighbridgeTicketNumber,
+		imported.VehicleRegistration,
+		imported.JobNumber,
+		imported.ReceivedAt,
+		receivedBy,
+		imported.ReceivedByName,
+		string(imported.Status),
+		imported.Notes,
+		imported.SyncStatus,
+		payloadJSON,
+	)
+
+	var receiptID string
+	if err := row.Scan(&receiptID); err != nil {
+		return Receipt{}, fmt.Errorf("insert receipt: %w", err)
+	}
+
+	for _, line := range imported.Lines {
+		linePayloadJSON, err := json.Marshal(line.SourcePayload)
+		if err != nil {
+			return Receipt{}, fmt.Errorf("marshal receipt line payload: %w", err)
+		}
+
+		_, err = tx.Exec(ctx, `
+			INSERT INTO receipt_lines (
+				receipt_id,
+				line_number,
+				item_code,
+				description,
+				material_size,
+				material_markings,
+				material_length,
+				weight,
+				expected_quantity,
+				received_quantity,
+				receiving_status,
+				docuware_source_payload
+			)
+			VALUES ($1::uuid, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12::jsonb)
+		`,
+			receiptID,
+			line.LineNumber,
+			line.ItemCode,
+			line.Description,
+			line.MaterialSize,
+			line.MaterialMarkings,
+			line.MaterialLength,
+			line.Weight,
+			line.ExpectedQuantity,
+			line.ReceivedQuantity,
+			line.ReceivingStatus,
+			linePayloadJSON,
+		)
+		if err != nil {
+			return Receipt{}, fmt.Errorf("insert receipt line: %w", err)
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return Receipt{}, fmt.Errorf("commit create receipt: %w", err)
+	}
+
+	return r.GetReceipt(ctx, receiptID)
 }
 
 func (r *PostgresRepository) upsertImportedReceipt(ctx context.Context, tx pgx.Tx, imported importedReceipt) (string, error) {
@@ -449,13 +600,18 @@ func (r *PostgresRepository) listReceiptLines(ctx context.Context, receiptID str
 func (r *PostgresRepository) listReceiptDocuments(ctx context.Context, receiptID string) ([]ReceiptDocument, error) {
 	rows, err := r.pool.Query(ctx, `
 		SELECT id::text,
+		       COALESCE(receipt_line_id::text, ''),
+		       category,
 		       document_type,
 		       filename,
 		       content_type,
 		       storage_key,
+		       file_size,
 		       source::text,
 		       docuware_document_id,
 		       docuware_status,
+		       docuware_error,
+		       COALESCE(uploaded_by::text, ''),
 		       created_at
 		FROM receipt_documents
 		WHERE receipt_id = $1::uuid
@@ -468,24 +624,242 @@ func (r *PostgresRepository) listReceiptDocuments(ctx context.Context, receiptID
 
 	documents := []ReceiptDocument{}
 	for rows.Next() {
-		var document ReceiptDocument
-		if err := rows.Scan(
-			&document.ID,
-			&document.DocumentType,
-			&document.Filename,
-			&document.ContentType,
-			&document.StorageKey,
-			&document.Source,
-			&document.DocuWareDocumentID,
-			&document.DocuWareStatus,
-			&document.CreatedAt,
-		); err != nil {
+		document, err := scanReceiptDocument(rows)
+		if err != nil {
 			return nil, fmt.Errorf("scan receipt document: %w", err)
 		}
 		documents = append(documents, document)
 	}
 
 	return documents, rows.Err()
+}
+
+func scanReceiptDocument(row rowScanner) (ReceiptDocument, error) {
+	var doc ReceiptDocument
+	if err := row.Scan(
+		&doc.ID,
+		&doc.ReceiptLineID,
+		&doc.Category,
+		&doc.DocumentType,
+		&doc.Filename,
+		&doc.ContentType,
+		&doc.StorageKey,
+		&doc.FileSize,
+		&doc.Source,
+		&doc.DocuWareDocumentID,
+		&doc.DocuWareStatus,
+		&doc.DocuWareError,
+		&doc.UploadedByID,
+		&doc.CreatedAt,
+	); err != nil {
+		return ReceiptDocument{}, err
+	}
+	return doc, nil
+}
+
+const receiptDocumentSelectColumns = `
+    id::text,
+    COALESCE(receipt_line_id::text, ''),
+    category,
+    document_type,
+    filename,
+    content_type,
+    storage_key,
+    file_size,
+    source::text,
+    docuware_document_id,
+    docuware_status,
+    docuware_error,
+    COALESCE(uploaded_by::text, ''),
+    created_at
+`
+
+// GetReceiptLine fetches a single line scoped by receipt id, returning
+// ErrNotFound if either id is wrong or they don't match.
+func (r *PostgresRepository) GetReceiptLine(ctx context.Context, receiptID, lineID string) (ReceiptLine, error) {
+	row := r.pool.QueryRow(ctx, `
+		SELECT id::text,
+		       line_number,
+		       item_code,
+		       description,
+		       material_code,
+		       material_description,
+		       material_size,
+		       material_markings,
+		       material_thickness,
+		       material_length,
+		       weight,
+		       internal_description,
+		       item_type,
+		       packaging_method,
+		       accessories,
+		       comments,
+		       required_galv_thickness,
+		       process,
+		       stored_in,
+		       bay,
+		       expected_quantity,
+		       received_quantity,
+		       unit_of_measure,
+		       receiving_status,
+		       discrepancy,
+		       quantity_discrepancy,
+		       condition_notes,
+		       docuware_record_line_id,
+		       docuware_unique_number,
+		       docuware_primary_key,
+		       docuware_doc_id,
+		       last_synced_at
+		FROM receipt_lines
+		WHERE id = $1::uuid AND receipt_id = $2::uuid
+	`, lineID, receiptID)
+
+	line, err := scanReceiptLine(row)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return ReceiptLine{}, ErrNotFound
+		}
+		return ReceiptLine{}, fmt.Errorf("get receipt line: %w", err)
+	}
+	return line, nil
+}
+
+// InsertPhotoDocument creates a receipt_documents row tied to a receipt line.
+// The DB-level partial unique index enforces "one defect photo per line".
+func (r *PostgresRepository) InsertPhotoDocument(ctx context.Context, input InsertPhotoDocumentInput) (ReceiptDocument, error) {
+	var uploadedBy any
+	if strings.TrimSpace(input.UploadedByID) != "" {
+		uploadedBy = input.UploadedByID
+	}
+
+	row := r.pool.QueryRow(ctx, `
+		INSERT INTO receipt_documents (
+		    receipt_id, receipt_line_id, category, document_type,
+		    filename, content_type, storage_key, file_size,
+		    source, docuware_status, uploaded_by
+		) VALUES (
+		    $1::uuid, $2::uuid, $3, $4,
+		    $5, $6, $7, $8,
+		    'capture', 'pending', $9
+		)
+		RETURNING `+receiptDocumentSelectColumns,
+		input.ReceiptID,
+		input.ReceiptLineID,
+		string(input.Category),
+		string(input.Category),
+		input.Filename,
+		input.ContentType,
+		input.StorageKey,
+		input.FileSize,
+		uploadedBy,
+	)
+
+	doc, err := scanReceiptDocument(row)
+	if err != nil {
+		// Unique-violation surfaces here (one defect photo per line).
+		if isUniqueViolation(err) {
+			return ReceiptDocument{}, fmt.Errorf("%w: a defect photo already exists for this line", ErrConflict)
+		}
+		return ReceiptDocument{}, fmt.Errorf("insert photo document: %w", err)
+	}
+	return doc, nil
+}
+
+// GetPhotoDocument returns the document and its storage_key. Caller resolves
+// the storage_key to a filesystem path via PhotoService (which keeps the
+// storage root encapsulated and prevents traversal).
+func (r *PostgresRepository) GetPhotoDocument(ctx context.Context, photoID string) (ReceiptDocument, string, error) {
+	row := r.pool.QueryRow(ctx, `
+		SELECT `+receiptDocumentSelectColumns+`
+		FROM receipt_documents
+		WHERE id = $1::uuid
+	`, photoID)
+
+	doc, err := scanReceiptDocument(row)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return ReceiptDocument{}, "", ErrNotFound
+		}
+		return ReceiptDocument{}, "", fmt.Errorf("get photo document: %w", err)
+	}
+	return doc, doc.StorageKey, nil
+}
+
+// DeletePhotoDocument removes a still-pending photo row, returning the
+// storage_key so the caller can unlink the file. Synced photos cannot be
+// deleted via this path.
+func (r *PostgresRepository) DeletePhotoDocument(ctx context.Context, photoID string) (string, error) {
+	var storageKey string
+	err := r.pool.QueryRow(ctx, `
+		DELETE FROM receipt_documents
+		WHERE id = $1::uuid
+		  AND docuware_status = 'pending'
+		RETURNING storage_key
+	`, photoID).Scan(&storageKey)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return "", ErrConflict
+		}
+		return "", fmt.Errorf("delete photo document: %w", err)
+	}
+	return storageKey, nil
+}
+
+// InsertGRNDocument creates a receipt_documents row representing the
+// generated GRN PDF, scoped to the receipt (no receipt_line_id) and
+// categorised so the worker's GRN push step picks it up.
+func (r *PostgresRepository) InsertGRNDocument(ctx context.Context, input InsertGRNDocumentInput) (ReceiptDocument, error) {
+	row := r.pool.QueryRow(ctx, `
+		INSERT INTO receipt_documents (
+		    receipt_id, category, document_type,
+		    filename, content_type, storage_key, file_size,
+		    source, docuware_status
+		) VALUES (
+		    $1::uuid, $2, $3,
+		    $4, $5, $6, $7,
+		    'capture', 'pending'
+		)
+		RETURNING `+receiptDocumentSelectColumns,
+		input.ReceiptID,
+		string(PhotoCategoryGRN),
+		"GRN",
+		input.Filename,
+		input.ContentType,
+		input.StorageKey,
+		input.FileSize,
+	)
+	doc, err := scanReceiptDocument(row)
+	if err != nil {
+		return ReceiptDocument{}, fmt.Errorf("insert grn document: %w", err)
+	}
+	return doc, nil
+}
+
+// SetReceiptGRNDocument records the back-pointer from the receipt to the
+// generated GRN row, so subsequent calls to MaybeGenerate are idempotent
+// even before the PDF is loaded with the receipt.
+func (r *PostgresRepository) SetReceiptGRNDocument(ctx context.Context, receiptID, documentID string) error {
+	_, err := r.pool.Exec(ctx, `
+		UPDATE receipts
+		SET grn_document_id = $2::uuid,
+		    grn_generated_at = NOW(),
+		    updated_at = NOW()
+		WHERE id = $1::uuid
+	`, receiptID, documentID)
+	if err != nil {
+		return fmt.Errorf("set receipt grn document: %w", err)
+	}
+	return nil
+}
+
+func isUniqueViolation(err error) bool {
+	if err == nil {
+		return false
+	}
+	// pgx wraps the underlying *pgconn.PgError; sniff the message rather than
+	// adding a new dependency. Callers map this to ErrConflict.
+	msg := err.Error()
+	return strings.Contains(msg, "duplicate key value") || strings.Contains(msg, "23505")
 }
 
 func (r *PostgresRepository) listReceiptExceptions(ctx context.Context, receiptID string) ([]ReceiptException, error) {
@@ -691,6 +1065,22 @@ func (r *PostgresRepository) UpdateReceiptLine(ctx context.Context, receiptID, l
 		argIdx++
 	}
 
+	// Stamp the confirmer when (and only when) the line transitions to
+	// receiving_status='received'. Use COALESCE on the existing column so
+	// the first confirmer wins — a later edit by someone else doesn't
+	// retroactively rewrite who signed for the line.
+	if input.ReceivingStatus != nil && *input.ReceivingStatus == "received" && input.ReceivedByUserID != "" {
+		setClauses = append(setClauses,
+			fmt.Sprintf("received_by = COALESCE(received_by, $%d::uuid)", argIdx))
+		args = append(args, input.ReceivedByUserID)
+		argIdx++
+
+		setClauses = append(setClauses,
+			fmt.Sprintf("received_by_name = CASE WHEN COALESCE(received_by_name, '') = '' THEN $%d ELSE received_by_name END", argIdx))
+		args = append(args, input.ReceivedByName)
+		argIdx++
+	}
+
 	query := fmt.Sprintf(
 		"UPDATE receipt_lines SET %s WHERE id = $1::uuid AND receipt_id = $2::uuid",
 		strings.Join(setClauses, ", "),
@@ -747,8 +1137,7 @@ func (r *PostgresRepository) UpdateReceiptLine(ctx context.Context, receiptID, l
 func scanReceipt(row rowScanner) (Receipt, error) {
 	var receipt Receipt
 	var status string
-	var importedAt sql.NullTime
-	var lastSyncedAt sql.NullTime
+	var importedAt, lastSyncedAt, grnGeneratedAt, podStatusSyncedAt sql.NullTime
 
 	err := row.Scan(
 		&receipt.ID,
@@ -770,6 +1159,11 @@ func scanReceipt(row rowScanner) (Receipt, error) {
 		&status,
 		&receipt.SyncStatus,
 		&receipt.Notes,
+		&receipt.GRNDocumentID,
+		&receipt.GRNDocuWareDocID,
+		&grnGeneratedAt,
+		&receipt.DocuWarePODStatus,
+		&podStatusSyncedAt,
 		&importedAt,
 		&lastSyncedAt,
 		&receipt.CreatedAt,
@@ -790,6 +1184,14 @@ func scanReceipt(row rowScanner) (Receipt, error) {
 	if lastSyncedAt.Valid {
 		value := lastSyncedAt.Time
 		receipt.LastSyncedAt = &value
+	}
+	if grnGeneratedAt.Valid {
+		value := grnGeneratedAt.Time
+		receipt.GRNGeneratedAt = &value
+	}
+	if podStatusSyncedAt.Valid {
+		value := podStatusSyncedAt.Time
+		receipt.DocuWarePODStatusSyncedAt = &value
 	}
 
 	return receipt, nil

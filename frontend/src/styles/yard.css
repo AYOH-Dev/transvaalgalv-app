@@ -1,11 +1,11 @@
 /* Yard receiving — outdoor tablet-first, glove-friendly hit targets.
-   Targets ≥ 64px, body ≥ 16px, primary CTAs ≥ 56px. Light-default by design;
-   the receiver memory says outdoor tablets need high contrast, so we don't
-   inherit the app's dark theme here. */
+   Targets ≥ 64px, body ≥ 16px, primary CTAs ≥ 56px.
+   Honours the app's dark theme via [data-theme="dark"] overrides below. */
 
 :root {
   --yard-bg:        #f4f6f8;
   --yard-surface:   #ffffff;
+  --yard-surface-2: #f8fafc;
   --yard-ink:       #0b1220;
   --yard-ink-2:     #475569;
   --yard-ink-3:     #94a3b8;
@@ -14,18 +14,139 @@
 
   --yard-brand:     #0a3d62;
   --yard-brand-2:   #1e6091;
+  --yard-brand-tint: rgba(10, 61, 98, 0.04);
+  --yard-brand-tint-strong: rgba(10, 61, 98, 0.10);
   --yard-accent:    #ffb703;
   --yard-accent-2:  #fb8500;
   --yard-green:     #15803d;
   --yard-green-2:   #16a34a;
+  --yard-green-tint: rgba(22, 163, 74, 0.06);
+  --yard-green-tint-strong: rgba(22, 163, 74, 0.12);
   --yard-red:       #b91c1c;
   --yard-amber:     #b45309;
   --yard-amber-bg:  #fef3c7;
+  --yard-amber-tint: rgba(245, 158, 11, 0.04);
+
+  /* Pills (status chips) */
+  --yard-pill-neutral-bg:  #f1f5f9;
+  --yard-pill-neutral-fg:  #475569;
+  --yard-pill-success-bg:  #dcfce7;
+  --yard-pill-success-fg:  #166534;
+  --yard-pill-ready-bg:    #dbeafe;
+  --yard-pill-ready-fg:    #1e40af;
+  --yard-pill-warn-bg:     #fef3c7;
+  --yard-pill-warn-fg:     #92400e;
+  --yard-pill-danger-bg:   #fee2e2;
+  --yard-pill-danger-fg:   #991b1b;
+  --yard-pill-progress-bg: #e0e7ff;
+  --yard-pill-progress-fg: #3730a3;
+
+  /* Save-error banner */
+  --yard-error-bg:     #fee2e2;
+  --yard-error-fg:     #991b1b;
+  --yard-error-border: #fca5a5;
+  --yard-error-btn-bg: #991b1b;
+  --yard-error-btn-fg: #ffffff;
+
+  --yard-chip-tint: rgba(0,0,0,.08);
+  --yard-chip-tint-strong: rgba(0,0,0,.10);
 
   --yard-radius:    14px;
   --yard-radius-lg: 20px;
   --yard-shadow:    0 1px 2px rgba(15,23,42,.04), 0 4px 12px rgba(15,23,42,.04);
   --yard-shadow-lg: 0 8px 32px rgba(15,23,42,.10);
+
+  /* Type scale — single source of truth for the yard. Each tier maps to a
+     normal/outdoor pair; .yard-shell--outdoor overrides these to the bigger
+     values for direct-sunlight tablet use. Never hard-code px in a font-size
+     rule below — always reference one of these. */
+  --yard-fs-xs:    11px;  /* uppercase labels, badge captions */
+  --yard-fs-sm:    13px;  /* secondary metadata, sub-text */
+  --yard-fs-md:    15px;  /* button/chip text, body */
+  --yard-fs-base:  16px;  /* default body / qty-pad */
+  --yard-fs-mdlg:  17px;  /* topbar title, walk progress */
+  --yard-fs-lg:    18px;  /* prominent headings, big-radio labels */
+  --yard-fs-xl:    22px;  /* big numerals on cards */
+  --yard-fs-2xl:   28px;  /* page h1 / expected-quantity */
+  --yard-fs-3xl:   30px;  /* big-ring numeral */
+  --yard-fs-giant: 64px;  /* qty-pad display */
+}
+
+[data-theme="dark"] {
+  --yard-bg:        #0b1220;
+  --yard-surface:   #111827;
+  --yard-surface-2: #1f2937;
+  --yard-ink:       #f1f5f9;
+  --yard-ink-2:     #cbd5e1;
+  --yard-ink-3:     #94a3b8;
+  --yard-line:      #1f2937;
+  --yard-line-2:    #374151;
+
+  --yard-brand:     #38bdf8;
+  --yard-brand-2:   #7dd3fc;
+  --yard-brand-tint: rgba(56, 189, 248, 0.10);
+  --yard-brand-tint-strong: rgba(56, 189, 248, 0.18);
+  --yard-green:     #34d399;
+  --yard-green-2:   #10b981;
+  --yard-green-tint: rgba(52, 211, 153, 0.12);
+  --yard-green-tint-strong: rgba(52, 211, 153, 0.20);
+  --yard-red:       #f87171;
+  --yard-amber:     #fbbf24;
+  --yard-amber-bg:  rgba(251, 191, 36, 0.16);
+  --yard-amber-tint: rgba(251, 191, 36, 0.10);
+
+  --yard-pill-neutral-bg:  #1f2937;
+  --yard-pill-neutral-fg:  #cbd5e1;
+  --yard-pill-success-bg:  rgba(52, 211, 153, 0.16);
+  --yard-pill-success-fg:  #6ee7b7;
+  --yard-pill-ready-bg:    rgba(56, 189, 248, 0.16);
+  --yard-pill-ready-fg:    #7dd3fc;
+  --yard-pill-warn-bg:     rgba(251, 191, 36, 0.16);
+  --yard-pill-warn-fg:     #fcd34d;
+  --yard-pill-danger-bg:   rgba(248, 113, 113, 0.16);
+  --yard-pill-danger-fg:   #fca5a5;
+  --yard-pill-progress-bg: rgba(167, 139, 250, 0.16);
+  --yard-pill-progress-fg: #c4b5fd;
+
+  --yard-error-bg:     rgba(248, 113, 113, 0.12);
+  --yard-error-fg:     #fca5a5;
+  --yard-error-border: rgba(248, 113, 113, 0.40);
+  --yard-error-btn-bg: #b91c1c;
+  --yard-error-btn-fg: #ffffff;
+
+  --yard-chip-tint: rgba(255,255,255,.10);
+  --yard-chip-tint-strong: rgba(255,255,255,.14);
+
+  --yard-shadow:    0 1px 2px rgba(0,0,0,.30), 0 4px 12px rgba(0,0,0,.30);
+  --yard-shadow-lg: 0 8px 32px rgba(0,0,0,.45);
+}
+
+/* Outdoor mode — bigger type for direct-sunlight tablet use. Toggled via the
+   topbar button and persisted in localStorage (see Yard.tsx). Only the type
+   scale changes; layout stays identical so receivers can flip mid-shift
+   without losing their place. */
+.yard-shell--outdoor {
+  --yard-fs-xs:    13px;
+  --yard-fs-sm:    15px;
+  --yard-fs-md:    18px;
+  --yard-fs-base:  20px;
+  --yard-fs-mdlg:  21px;
+  --yard-fs-lg:    22px;
+  --yard-fs-xl:    26px;
+  --yard-fs-2xl:   34px;
+  --yard-fs-3xl:   38px;
+  --yard-fs-giant: 76px;
+
+  /* Push contrast a touch higher in outdoor mode — the muted greys vanish
+     under direct sun. Only the soft-grey tiers move; brand/state colours
+     keep their meaning. */
+  --yard-ink-2: #1f2937;
+  --yard-ink-3: #475569;
+}
+
+[data-theme="dark"] .yard-shell--outdoor {
+  --yard-ink-2: #f1f5f9;
+  --yard-ink-3: #e2e8f0;
 }
 
 /* When Layout marks the shell as yard, kill the page-wrap padding so the
@@ -37,7 +158,7 @@
   min-height: 100vh;
   display: flex; flex-direction: column;
   color: var(--yard-ink);
-  font-size: 16px;
+  font-size: var(--yard-fs-base);
 }
 
 /* ─── Topbar ──────────────────────────────────────────────────────────────── */
@@ -52,16 +173,16 @@
 .yard-topbar__logo {
   width: 40px; height: 40px; border-radius: 10px;
   background: var(--yard-brand); color: #fff;
-  font-weight: 800; font-size: 14px; letter-spacing: 0.04em;
+  font-weight: 800; font-size: var(--yard-fs-md); letter-spacing: 0.04em;
   display: grid; place-items: center;
 }
-.yard-topbar__title { font-size: 17px; font-weight: 700; letter-spacing: -0.01em; }
-.yard-topbar__sub   { font-size: 12px; color: var(--yard-ink-3); margin-top: 1px; }
+.yard-topbar__title { font-size: var(--yard-fs-mdlg); font-weight: 700; letter-spacing: -0.01em; }
+.yard-topbar__sub   { font-size: var(--yard-fs-sm); color: var(--yard-ink-3); margin-top: 1px; }
 
 .yard-conn {
   display: inline-flex; align-items: center; gap: 8px;
   padding: 8px 14px; border-radius: 999px;
-  font-size: 14px; font-weight: 600;
+  font-size: var(--yard-fs-md); font-weight: 600;
   background: var(--yard-surface);
   border: 1px solid var(--yard-line-2);
 }
@@ -70,9 +191,26 @@
 .yard-conn--offline { color: var(--yard-amber); background: var(--yard-amber-bg); border-color: transparent; }
 .yard-conn__queue {
   margin-left: 6px; padding: 2px 8px;
-  background: rgba(0,0,0,.08); border-radius: 999px;
-  font-size: 12px; color: inherit;
+  background: var(--yard-chip-tint); border-radius: 999px;
+  font-size: var(--yard-fs-sm); color: inherit;
 }
+
+/* Outdoor-mode toggle — sits next to the connectivity pill in the topbar. */
+.yard-outdoor-toggle {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 8px 14px; border-radius: 999px;
+  font: inherit; font-size: var(--yard-fs-md); font-weight: 600;
+  background: var(--yard-surface);
+  color: var(--yard-ink-2);
+  border: 1px solid var(--yard-line-2);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.yard-outdoor-toggle:hover { border-color: var(--yard-brand); color: var(--yard-brand); }
+.yard-outdoor-toggle.is-on {
+  background: var(--yard-accent); color: #1f2937; border-color: var(--yard-accent);
+}
+.yard-outdoor-toggle.is-on:hover { background: var(--yard-accent-2); border-color: var(--yard-accent-2); color: #fff; }
 
 /* ─── Page wrapper ────────────────────────────────────────────────────────── */
 .yard-page {
@@ -82,8 +220,8 @@
   margin: 0 auto;
 }
 .yard-page__header { margin-bottom: 18px; }
-.yard-h1 { font-size: 28px; font-weight: 800; letter-spacing: -0.025em; margin: 0; }
-.yard-sub { color: var(--yard-ink-2); margin: 4px 0 0; font-size: 15px; }
+.yard-h1 { font-size: var(--yard-fs-2xl); font-weight: 800; letter-spacing: -0.025em; margin: 0; }
+.yard-sub { color: var(--yard-ink-2); margin: 4px 0 0; font-size: var(--yard-fs-md); }
 
 /* ─── Tabs ────────────────────────────────────────────────────────────────── */
 .yard-tabs {
@@ -97,15 +235,15 @@
 .yard-tab {
   padding: 10px 18px; border-radius: 10px;
   background: transparent; border: 0; cursor: pointer;
-  font-family: inherit; font-size: 15px; font-weight: 600;
+  font-family: inherit; font-size: var(--yard-fs-md); font-weight: 600;
   color: var(--yard-ink-2);
   display: inline-flex; align-items: center; gap: 8px;
   min-height: 40px;
 }
 .yard-tab--active { background: var(--yard-brand); color: #fff; }
 .yard-tab__count {
-  background: rgba(0,0,0,.10); padding: 2px 8px; border-radius: 999px;
-  font-size: 12px; font-weight: 700;
+  background: var(--yard-chip-tint-strong); padding: 2px 8px; border-radius: 999px;
+  font-size: var(--yard-fs-sm); font-weight: 700;
 }
 .yard-tab--active .yard-tab__count { background: rgba(255,255,255,.18); }
 
@@ -136,16 +274,16 @@
 .yard-load-card__row { display: flex; align-items: center; gap: 10px; margin-bottom: 2px; }
 .yard-load-card__num {
   font-family: 'JetBrains Mono', ui-monospace, monospace;
-  font-size: 18px; font-weight: 700; letter-spacing: -0.01em;
+  font-size: var(--yard-fs-lg); font-weight: 700; letter-spacing: -0.01em;
 }
 .yard-load-card__customer {
-  font-size: 15px; color: var(--yard-ink); font-weight: 500;
+  font-size: var(--yard-fs-md); color: var(--yard-ink); font-weight: 500;
   margin-bottom: 4px;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .yard-load-card__meta {
   display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
-  font-size: 13px; color: var(--yard-ink-2);
+  font-size: var(--yard-fs-sm); color: var(--yard-ink-2);
 }
 .yard-load-card__meta span { display: inline-flex; align-items: center; gap: 4px; }
 
@@ -158,15 +296,15 @@
 .yard-pill {
   display: inline-flex; align-items: center; gap: 4px;
   padding: 4px 10px; border-radius: 999px;
-  font-size: 12px; font-weight: 600;
+  font-size: var(--yard-fs-sm); font-weight: 600;
   white-space: nowrap;
 }
-.yard-pill--neutral  { background: #f1f5f9; color: #475569; }
-.yard-pill--success  { background: #dcfce7; color: #166534; }
-.yard-pill--ready    { background: #dbeafe; color: #1e40af; }
-.yard-pill--warn     { background: #fef3c7; color: #92400e; }
-.yard-pill--danger   { background: #fee2e2; color: #991b1b; }
-.yard-pill--progress { background: #e0e7ff; color: #3730a3; }
+.yard-pill--neutral  { background: var(--yard-pill-neutral-bg);  color: var(--yard-pill-neutral-fg); }
+.yard-pill--success  { background: var(--yard-pill-success-bg);  color: var(--yard-pill-success-fg); }
+.yard-pill--ready    { background: var(--yard-pill-ready-bg);    color: var(--yard-pill-ready-fg); }
+.yard-pill--warn     { background: var(--yard-pill-warn-bg);     color: var(--yard-pill-warn-fg); }
+.yard-pill--danger   { background: var(--yard-pill-danger-bg);   color: var(--yard-pill-danger-fg); }
+.yard-pill--progress { background: var(--yard-pill-progress-bg); color: var(--yard-pill-progress-fg); }
 
 /* Progress ring */
 .yard-progress-ring {
@@ -182,7 +320,7 @@
   border-radius: 50%;
   background: var(--yard-surface);
   display: grid; place-items: center;
-  font-size: 13px; font-weight: 700; font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: var(--yard-fs-sm); font-weight: 700; font-family: 'JetBrains Mono', ui-monospace, monospace;
   color: var(--yard-ink);
 }
 
@@ -194,8 +332,8 @@
   border: 1px dashed var(--yard-line-2);
   border-radius: var(--yard-radius);
 }
-.yard-empty__title { font-size: 17px; font-weight: 600; margin-bottom: 4px; }
-.yard-empty__sub   { font-size: 14px; color: var(--yard-ink-3); }
+.yard-empty__title { font-size: var(--yard-fs-mdlg); font-weight: 600; margin-bottom: 4px; }
+.yard-empty__sub   { font-size: var(--yard-fs-md); color: var(--yard-ink-3); }
 
 /* ─── Load detail ─────────────────────────────────────────────────────────── */
 .yard-detail__topbar {
@@ -207,14 +345,14 @@
   padding: 10px 14px 10px 8px;
   border-radius: 10px;
   background: transparent; border: 0; cursor: pointer;
-  font-family: inherit; font-size: 16px; font-weight: 600;
+  font-family: inherit; font-size: var(--yard-fs-base); font-weight: 600;
   color: var(--yard-ink-2);
   min-height: 48px;
 }
 .yard-back:hover { background: var(--yard-surface); color: var(--yard-ink); }
 .yard-detail__num {
   font-family: 'JetBrains Mono', ui-monospace, monospace; font-weight: 700;
-  font-size: 14px; color: var(--yard-ink-3);
+  font-size: var(--yard-fs-md); color: var(--yard-ink-3);
   letter-spacing: 0.02em;
 }
 
@@ -227,17 +365,175 @@
   padding: 24px;
   margin-bottom: 16px;
 }
-.yard-detail__customer {
-  font-size: 22px; font-weight: 700; letter-spacing: -0.02em;
+.yard-detail__customer-row {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
   margin-bottom: 14px;
 }
+.yard-detail__customer {
+  font-size: var(--yard-fs-xl); font-weight: 700; letter-spacing: -0.02em;
+  margin: 0;
+}
+.yard-edit-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: var(--yard-surface);
+  border: 1px solid var(--yard-line-2);
+  color: var(--yard-ink-2);
+  font: inherit; font-size: var(--yard-fs-sm); font-weight: 600;
+  cursor: pointer;
+  min-height: 36px;
+}
+.yard-edit-btn:hover { color: var(--yard-ink); border-color: var(--yard-brand); }
+
+/* "View POD" — tablet-friendly link to the source DocuWare document */
+.yard-pod-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: var(--yard-brand-tint);
+  border: 1px solid var(--yard-brand);
+  color: var(--yard-brand);
+  font: inherit; font-size: var(--yard-fs-sm); font-weight: 700;
+  cursor: pointer;
+  min-height: 36px;
+}
+.yard-pod-btn:hover:not(:disabled) { background: var(--yard-brand-tint-strong); }
+.yard-pod-btn:disabled { opacity: 0.5; cursor: progress; }
+.yard-pod-btn--compact {
+  padding: 6px 10px;
+  font-size: var(--yard-fs-sm);
+  min-height: 32px;
+}
+
+/* ─── POD modal (iframe wrapper) ──────────────────────────────────────────── */
+.yard-pod-modal {
+  position: fixed; inset: 0;
+  z-index: 200;
+  background: var(--yard-bg);
+  display: flex; flex-direction: column;
+}
+.yard-pod-modal__bar {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 16px;
+  background: var(--yard-surface);
+  border-bottom: 1px solid var(--yard-line);
+  min-height: 56px;
+}
+.yard-pod-modal__title {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-size: var(--yard-fs-base); font-weight: 700; color: var(--yard-ink);
+}
+.yard-pod-modal__open {
+  margin-left: auto;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: var(--yard-brand-tint);
+  border: 1px solid var(--yard-brand);
+  color: var(--yard-brand);
+  font: inherit; font-size: var(--yard-fs-sm); font-weight: 600;
+  text-decoration: none;
+  min-height: 36px;
+  display: inline-flex; align-items: center;
+}
+.yard-pod-modal__open:hover { background: var(--yard-brand-tint-strong); }
+.yard-pod-modal__close {
+  width: 44px; height: 44px;
+  display: grid; place-items: center;
+  background: var(--yard-bg);
+  border: 0; border-radius: 10px;
+  color: var(--yard-ink);
+  cursor: pointer;
+}
+.yard-pod-modal__close:hover { background: var(--yard-line); }
+
+.yard-pod-modal__body {
+  position: relative;
+  flex: 1; min-height: 0;
+}
+.yard-pod-modal__frame {
+  width: 100%; height: 100%;
+  border: 0;
+  background: var(--yard-bg);
+  opacity: 0;
+  transition: opacity .15s;
+}
+.yard-pod-modal__frame--loaded { opacity: 1; }
+
+.yard-pod-modal__loading {
+  position: absolute; inset: 0;
+  display: grid; place-items: center;
+  font-size: var(--yard-fs-md); color: var(--yard-ink-2);
+}
+
+.yard-pod-modal__fallback {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 14px; padding: 32px;
+  text-align: center;
+}
+.yard-pod-modal__fallback-title { font-size: var(--yard-fs-lg); font-weight: 700; color: var(--yard-ink); }
+.yard-pod-modal__fallback-sub   { font-size: var(--yard-fs-md); color: var(--yard-ink-2); max-width: 360px; }
+.yard-pod-modal__fallback .yard-btn-primary { text-decoration: none; padding: 14px 24px; }
+
+/* Header edit card */
+.yard-edit-card {
+  background: var(--yard-surface);
+  border: 1px solid var(--yard-line);
+  border-radius: var(--yard-radius-lg);
+  padding: 22px 24px;
+  margin-bottom: 16px;
+}
+.yard-edit-card__title {
+  font-size: var(--yard-fs-lg); font-weight: 700; letter-spacing: -0.01em;
+  color: var(--yard-ink);
+}
+.yard-edit-card__sub {
+  font-size: var(--yard-fs-sm); color: var(--yard-ink-3);
+  margin: 2px 0 16px;
+}
+.yard-edit-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px 18px;
+}
+.yard-edit-card__error {
+  display: flex; align-items: center; gap: 8px;
+  margin-top: 14px;
+  padding: 10px 14px;
+  background: var(--yard-error-bg); color: var(--yard-error-fg);
+  border-radius: 10px;
+  font-size: var(--yard-fs-md); font-weight: 600;
+}
+.yard-edit-card__actions {
+  display: flex; gap: 12px;
+  margin-top: 16px;
+}
+
+/* Yard text field — tablet-sized */
+.yard-field { display: flex; flex-direction: column; gap: 6px; }
+.yard-field__label {
+  font-size: var(--yard-fs-xs); text-transform: uppercase; letter-spacing: 0.07em;
+  color: var(--yard-ink-3); font-weight: 600;
+}
+.yard-field__input {
+  padding: 12px 14px;
+  background: var(--yard-bg);
+  border: 1px solid var(--yard-line-2);
+  border-radius: 10px;
+  font: inherit; font-size: var(--yard-fs-base); font-weight: 600;
+  color: var(--yard-ink);
+  min-height: 48px;
+}
+.yard-field__input--mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+.yard-field__input:focus { outline: 2px solid var(--yard-brand-2); outline-offset: 1px; border-color: transparent; }
 .yard-detail__meta {
   display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   gap: 14px 24px;
 }
 .yard-detail__meta > div { display: flex; flex-direction: column; gap: 2px; }
-.yard-detail__meta .k { font-size: 11px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--yard-ink-3); font-weight: 600; }
-.yard-detail__meta .v { font-size: 15px; font-weight: 600; color: var(--yard-ink); }
+.yard-detail__meta .k { font-size: var(--yard-fs-xs); text-transform: uppercase; letter-spacing: 0.07em; color: var(--yard-ink-3); font-weight: 600; }
+.yard-detail__meta .v { font-size: var(--yard-fs-md); font-weight: 600; color: var(--yard-ink); }
 .yard-detail__meta .v.mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
 
 .yard-detail__hero-right { display: flex; flex-direction: column; align-items: center; gap: 8px; }
@@ -257,20 +553,20 @@
   text-align: center;
 }
 .yard-bigring__num {
-  font-size: 30px; font-weight: 800;
+  font-size: var(--yard-fs-3xl); font-weight: 800;
   font-family: 'JetBrains Mono', ui-monospace, monospace;
   letter-spacing: -0.04em; line-height: 1;
 }
-.yard-bigring__num span { font-size: 18px; font-weight: 600; color: var(--yard-ink-3); }
+.yard-bigring__num span { font-size: var(--yard-fs-lg); font-weight: 600; color: var(--yard-ink-3); }
 .yard-bigring__lbl {
   margin-top: 4px;
-  font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em;
+  font-size: var(--yard-fs-xs); text-transform: uppercase; letter-spacing: 0.08em;
   color: var(--yard-ink-3); font-weight: 600;
 }
 
 .yard-detail__flagged {
   display: inline-flex; align-items: center; gap: 6px;
-  font-size: 13px; font-weight: 600;
+  font-size: var(--yard-fs-sm); font-weight: 600;
   color: var(--yard-amber);
   padding: 4px 10px;
   background: var(--yard-amber-bg);
@@ -285,7 +581,7 @@
   gap: 12px; flex-wrap: wrap;
   padding: 18px 24px;
   border-radius: 14px;
-  font-family: inherit; font-size: 18px; font-weight: 700;
+  font-family: inherit; font-size: var(--yard-fs-lg); font-weight: 700;
   cursor: pointer; border: 0;
   min-height: 72px;
   transition: filter .12s, transform .12s;
@@ -294,7 +590,7 @@
 .yard-btn-xl:active { transform: scale(0.99); }
 .yard-btn-xl__sub {
   flex-basis: 100%; text-align: center;
-  font-size: 13px; font-weight: 500; opacity: 0.85;
+  font-size: var(--yard-fs-sm); font-weight: 500; opacity: 0.85;
   margin-top: -4px;
 }
 
@@ -309,13 +605,13 @@
 .yard-detail__list-header {
   display: flex; justify-content: space-between; align-items: center;
   margin-bottom: 10px;
-  font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em;
+  font-size: var(--yard-fs-sm); text-transform: uppercase; letter-spacing: 0.08em;
   color: var(--yard-ink-3); font-weight: 600;
 }
 .yard-link {
   background: 0; border: 0; cursor: pointer;
   color: var(--yard-brand-2); font-family: inherit;
-  font-size: 13px; font-weight: 600;
+  font-size: var(--yard-fs-sm); font-weight: 600;
   text-transform: none; letter-spacing: 0;
 }
 
@@ -337,18 +633,21 @@
   background: var(--yard-bg);
   display: grid; place-items: center;
   font-family: 'JetBrains Mono', ui-monospace, monospace; font-weight: 700;
-  font-size: 12px; color: var(--yard-ink-2);
+  font-size: var(--yard-fs-sm); color: var(--yard-ink-2);
   flex-shrink: 0;
 }
 .yard-line__main { flex: 1; min-width: 0; }
-.yard-line__desc { font-size: 15px; font-weight: 600; }
-.yard-line__sub  { font-size: 13px; color: var(--yard-ink-3); margin-top: 2px; }
+.yard-line__desc { font-size: var(--yard-fs-md); font-weight: 600; }
+.yard-line__sub  { font-size: var(--yard-fs-sm); color: var(--yard-ink-3); margin-top: 2px; }
 .yard-line__sub .mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
 .yard-line__status { flex-shrink: 0; }
 
 /* ─── Walkthrough overlay ─────────────────────────────────────────────────── */
+/* Sticky-fills the .app-main region so the sidebar stays reachable. */
 .yard-walk {
-  position: fixed; inset: 0; z-index: 200;
+  position: sticky; top: 0;
+  height: 100vh;
+  z-index: 50;
   background: var(--yard-bg);
   display: flex; flex-direction: column;
   color: var(--yard-ink);
@@ -369,8 +668,8 @@
   color: var(--yard-ink);
 }
 .yard-walk__close:hover { background: var(--yard-line); }
-.yard-walk__delivery { font-size: 13px; font-weight: 600; color: var(--yard-ink-2); }
-.yard-walk__progress { font-size: 17px; font-weight: 700; margin-top: 2px; }
+.yard-walk__delivery { font-size: var(--yard-fs-sm); font-weight: 600; color: var(--yard-ink-2); }
+.yard-walk__progress { font-size: var(--yard-fs-mdlg); font-weight: 700; margin-top: 2px; }
 .yard-walk__steps { display: flex; gap: 6px; }
 .yard-walk__dot { width: 28px; height: 6px; border-radius: 3px; background: var(--yard-line); }
 .yard-walk__dot.now  { background: var(--yard-brand); }
@@ -389,11 +688,11 @@
   background: var(--yard-brand); color: #fff;
   display: grid; place-items: center;
   font-family: 'JetBrains Mono', ui-monospace, monospace; font-weight: 800;
-  font-size: 20px;
+  font-size: var(--yard-fs-lg);
 }
 .yard-walk__line-info { min-width: 0; }
-.yard-walk__line-desc { font-size: 18px; font-weight: 700; letter-spacing: -0.01em; margin-bottom: 4px; }
-.yard-walk__line-meta { font-size: 13px; color: var(--yard-ink-2); }
+.yard-walk__line-desc { font-size: var(--yard-fs-lg); font-weight: 700; letter-spacing: -0.01em; margin-bottom: 4px; }
+.yard-walk__line-meta { font-size: var(--yard-fs-sm); color: var(--yard-ink-2); }
 .yard-walk__line-meta .mono { font-family: 'JetBrains Mono', ui-monospace, monospace; font-weight: 600; color: var(--yard-ink); }
 
 .yard-walk__line-expected {
@@ -403,15 +702,15 @@
   border-radius: 12px;
 }
 .yard-walk__line-expected .k {
-  font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em;
+  font-size: var(--yard-fs-xs); text-transform: uppercase; letter-spacing: 0.08em;
   color: var(--yard-ink-3); font-weight: 700;
 }
 .yard-walk__line-expected .v {
-  font-size: 28px; font-weight: 800;
+  font-size: var(--yard-fs-2xl); font-weight: 800;
   font-family: 'JetBrains Mono', ui-monospace, monospace;
   line-height: 1; margin: 2px 0;
 }
-.yard-walk__line-expected .u { font-size: 12px; color: var(--yard-ink-3); font-weight: 600; }
+.yard-walk__line-expected .u { font-size: var(--yard-fs-sm); color: var(--yard-ink-3); font-weight: 600; }
 
 .yard-walk__body {
   flex: 1;
@@ -422,11 +721,11 @@
 }
 
 .walk-step__title {
-  font-size: 26px; font-weight: 800;
+  font-size: var(--yard-fs-2xl); font-weight: 800;
   letter-spacing: -0.025em;
   margin: 0 0 6px;
 }
-.walk-step__sub { font-size: 15px; color: var(--yard-ink-2); margin: 0 0 24px; }
+.walk-step__sub { font-size: var(--yard-fs-md); color: var(--yard-ink-2); margin: 0 0 24px; }
 
 /* Quantity step */
 .big-counter {
@@ -460,7 +759,7 @@
 }
 .big-counter__display input {
   font: inherit; font-family: 'JetBrains Mono', ui-monospace, monospace;
-  font-size: 64px; font-weight: 800;
+  font-size: var(--yard-fs-giant); font-weight: 800;
   letter-spacing: -0.04em;
   color: var(--yard-ink);
   background: transparent; border: 0; outline: 0;
@@ -470,7 +769,7 @@
 .big-counter__display input::-webkit-outer-spin-button,
 .big-counter__display input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 .big-counter__unit {
-  font-size: 14px; font-weight: 600;
+  font-size: var(--yard-fs-md); font-weight: 600;
   color: var(--yard-ink-3);
   text-transform: uppercase; letter-spacing: 0.08em;
 }
@@ -484,7 +783,7 @@
   padding: 12px 22px; border-radius: 12px;
   background: var(--yard-surface);
   border: 1px solid var(--yard-line-2);
-  font-family: inherit; font-size: 15px; font-weight: 600;
+  font-family: inherit; font-size: var(--yard-fs-md); font-weight: 600;
   color: var(--yard-ink); cursor: pointer;
   min-height: 48px;
 }
@@ -496,11 +795,11 @@
   max-width: 600px; margin: 0 auto;
   padding: 14px 20px;
   border-radius: 14px;
-  font-size: 16px; font-weight: 600;
+  font-size: var(--yard-fs-base); font-weight: 600;
 }
-.discrepancy-banner[data-disc="none"]  { background: #dcfce7; color: #166534; }
-.discrepancy-banner[data-disc="short"] { background: #fee2e2; color: #991b1b; }
-.discrepancy-banner[data-disc="over"]  { background: #fef3c7; color: #92400e; }
+.discrepancy-banner[data-disc="none"]  { background: var(--yard-pill-success-bg); color: var(--yard-pill-success-fg); }
+.discrepancy-banner[data-disc="short"] { background: var(--yard-pill-danger-bg);  color: var(--yard-pill-danger-fg); }
+.discrepancy-banner[data-disc="over"]  { background: var(--yard-pill-warn-bg);    color: var(--yard-pill-warn-fg); }
 
 /* Big radio (item type) */
 .big-radio { display: flex; flex-direction: column; gap: 12px; max-width: 700px; }
@@ -517,7 +816,7 @@
 }
 .big-radio__opt--on {
   border-color: var(--yard-brand);
-  background: rgba(10, 61, 98, 0.04);
+  background: var(--yard-brand-tint);
 }
 .big-radio__check {
   width: 32px; height: 32px; border-radius: 50%;
@@ -530,8 +829,8 @@
   background: var(--yard-brand);
   border-color: var(--yard-brand);
 }
-.big-radio__label { font-size: 18px; font-weight: 700; letter-spacing: -0.01em; margin-bottom: 2px; }
-.big-radio__desc  { font-size: 14px; color: var(--yard-ink-2); }
+.big-radio__label { font-size: var(--yard-fs-lg); font-weight: 700; letter-spacing: -0.01em; margin-bottom: 2px; }
+.big-radio__desc  { font-size: var(--yard-fs-md); color: var(--yard-ink-2); }
 
 /* Process chips */
 .proc-grid {
@@ -544,7 +843,7 @@
   background: var(--yard-surface);
   border: 2px solid var(--yard-line);
   border-radius: 14px;
-  font-family: inherit; font-size: 15px; font-weight: 600;
+  font-family: inherit; font-size: var(--yard-fs-md); font-weight: 600;
   color: var(--yard-ink); cursor: pointer;
   text-align: center;
   min-height: 64px;
@@ -570,7 +869,7 @@
   background: var(--yard-surface);
   border: 2px solid var(--yard-line);
   border-radius: 14px;
-  font-family: inherit; font-size: 18px; font-weight: 700;
+  font-family: inherit; font-size: var(--yard-fs-lg); font-weight: 700;
   color: var(--yard-ink); cursor: pointer;
   min-height: 96px;
   display: grid; place-items: center;
@@ -589,16 +888,16 @@
   display: inline-flex; align-items: center; justify-content: center;
   gap: 10px;
   padding: 16px;
-  background: rgba(22, 163, 74, 0.06);
+  background: var(--yard-green-tint);
   border: 2px dashed var(--yard-green-2);
   border-radius: 14px;
-  font-family: inherit; font-size: 16px; font-weight: 700;
+  font-family: inherit; font-size: var(--yard-fs-base); font-weight: 700;
   color: var(--yard-green);
   cursor: pointer;
   margin-bottom: 16px;
   min-height: 60px;
 }
-.walk-skip-all:hover { background: rgba(22, 163, 74, 0.10); }
+.walk-skip-all:hover { background: var(--yard-green-tint-strong); }
 
 .defect-list { display: flex; flex-direction: column; gap: 10px; }
 .defect-row {
@@ -611,14 +910,14 @@
   border-radius: 14px;
   border-left-width: 4px; border-left-color: var(--yard-line);
 }
-.defect-row--on { border-left-color: var(--yard-amber); background: rgba(245, 158, 11, 0.04); }
-.defect-row__label { font-size: 15px; font-weight: 700; }
+.defect-row--on { border-left-color: var(--yard-amber); background: var(--yard-amber-tint); }
+.defect-row__label { font-size: var(--yard-fs-md); font-weight: 700; }
 .defect-row__opts { display: flex; flex-wrap: wrap; gap: 8px; }
 .defect-pill {
   padding: 10px 16px; border-radius: 999px;
   background: var(--yard-bg);
   border: 1px solid var(--yard-line-2);
-  font-family: inherit; font-size: 13px; font-weight: 600;
+  font-family: inherit; font-size: var(--yard-fs-sm); font-weight: 600;
   color: var(--yard-ink-2); cursor: pointer;
   min-height: 40px;
 }
@@ -626,6 +925,89 @@
 .defect-pill--on    { background: var(--yard-amber); color: #fff; border-color: var(--yard-amber); }
 .defect-row:not(.defect-row--on) .defect-pill--on {
   background: var(--yard-brand); color: #fff; border-color: var(--yard-brand);
+}
+
+/* Defect categories — each section gets a quiet header */
+.defect-categories { display: flex; flex-direction: column; gap: 22px; }
+.defect-category__title {
+  font-size: var(--yard-fs-sm); text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--yard-ink-3); font-weight: 700;
+  margin: 0 0 10px;
+}
+
+/* Mitigations expand inline below the defect row when value !== default */
+.defect-row__mits {
+  grid-column: 1 / -1;
+  margin-top: 12px; padding-top: 12px;
+  border-top: 1px dashed var(--yard-line-2);
+  display: flex; flex-direction: column; gap: 8px;
+}
+.defect-row__mits-label {
+  font-size: var(--yard-fs-xs); text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--yard-amber); font-weight: 700;
+}
+.defect-row__mits-list { display: flex; flex-direction: column; gap: 8px; }
+
+.mit-row {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding: 10px 12px;
+  background: var(--yard-bg);
+  border: 1px solid var(--yard-line);
+  border-radius: 12px;
+  min-height: 56px;
+}
+.mit-row--on { border-color: var(--yard-amber); background: var(--yard-amber-tint); }
+.mit-row__toggle {
+  display: inline-flex; align-items: center; gap: 10px; flex: 1;
+  background: transparent; border: 0; cursor: pointer;
+  font: inherit; color: var(--yard-ink); text-align: left;
+  padding: 4px 0;
+}
+.mit-row__check {
+  width: 24px; height: 24px; border-radius: 6px;
+  border: 2px solid var(--yard-line-2);
+  display: grid; place-items: center;
+  flex-shrink: 0;
+}
+.mit-row__check--on { background: var(--yard-amber); border-color: var(--yard-amber); color: #fff; }
+.mit-row__label { font-size: var(--yard-fs-md); font-weight: 600; }
+
+.mit-qty {
+  display: inline-flex; align-items: center; gap: 4px;
+  background: var(--yard-surface);
+  border: 1px solid var(--yard-line-2);
+  border-radius: 10px;
+  padding: 2px;
+}
+.mit-qty__btn {
+  width: 40px; height: 40px;
+  border: 0; border-radius: 8px;
+  background: transparent; cursor: pointer;
+  display: grid; place-items: center;
+  color: var(--yard-ink-2);
+}
+.mit-qty__btn:hover { background: var(--yard-bg); color: var(--yard-ink); }
+.mit-qty__input {
+  width: 56px; padding: 6px 0;
+  text-align: center;
+  font: inherit; font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: var(--yard-fs-base); font-weight: 700;
+  color: var(--yard-ink);
+  background: transparent; border: 0; outline: 0;
+  -moz-appearance: textfield;
+}
+.mit-qty__input::-webkit-outer-spin-button,
+.mit-qty__input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+
+/* Review-step rendering of flagged defects + their mitigations */
+.review-defect { display: flex; flex-direction: column; gap: 4px; }
+.review-defect__mits {
+  display: flex; flex-wrap: wrap; gap: 4px 8px;
+  padding-left: 4px;
+}
+.review-defect__mit {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: var(--yard-fs-sm); color: var(--yard-ink-2);
 }
 
 /* Review step */
@@ -645,10 +1027,10 @@
 }
 .review-row:last-child { border-bottom: 0; }
 .review-row .k {
-  font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em;
+  font-size: var(--yard-fs-sm); text-transform: uppercase; letter-spacing: 0.08em;
   color: var(--yard-ink-3); font-weight: 600;
 }
-.review-row .v { font-size: 16px; font-weight: 600; }
+.review-row .v { font-size: var(--yard-fs-base); font-weight: 600; }
 .review-row .v.mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
 .review-row--col { grid-template-columns: 140px 1fr; align-items: flex-start; }
 .review-defects { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -658,7 +1040,7 @@
   padding: 12px 18px;
   background: var(--yard-amber-bg);
   border-radius: 12px;
-  font-size: 14px; font-weight: 600;
+  font-size: var(--yard-fs-md); font-weight: 600;
   color: var(--yard-amber);
 }
 
@@ -666,21 +1048,21 @@
 .yard-carry {
   display: inline-flex; align-items: center; gap: 8px;
   padding: 10px 16px; margin: 0 0 18px;
-  background: rgba(10, 61, 98, 0.06);
+  background: var(--yard-brand-tint);
   border: 1px dashed var(--yard-brand);
   border-radius: 999px;
-  font-family: inherit; font-size: 14px; font-weight: 600;
+  font-family: inherit; font-size: var(--yard-fs-md); font-weight: 600;
   color: var(--yard-brand);
   cursor: pointer;
   min-height: 44px;
 }
-.yard-carry:hover { background: rgba(10, 61, 98, 0.10); }
+.yard-carry:hover { background: var(--yard-brand-tint-strong); }
 
 /* Notes textarea on review */
 .review-notes { margin-top: 16px; max-width: 720px; }
 .review-notes__label {
   display: block;
-  font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em;
+  font-size: var(--yard-fs-sm); text-transform: uppercase; letter-spacing: 0.08em;
   color: var(--yard-ink-3); font-weight: 600;
   margin-bottom: 6px;
 }
@@ -690,7 +1072,7 @@
   background: var(--yard-surface);
   border: 1px solid var(--yard-line-2);
   border-radius: 12px;
-  font: inherit; font-size: 15px;
+  font: inherit; font-size: var(--yard-fs-md);
   color: var(--yard-ink);
   resize: vertical;
   min-height: 72px;
@@ -701,16 +1083,16 @@
 .yard-walk__error {
   display: flex; align-items: center; gap: 12px;
   padding: 14px 20px;
-  background: #fee2e2; color: #991b1b;
-  border-top: 1px solid #fca5a5;
-  font-size: 15px; font-weight: 600;
+  background: var(--yard-error-bg); color: var(--yard-error-fg);
+  border-top: 1px solid var(--yard-error-border);
+  font-size: var(--yard-fs-md); font-weight: 600;
 }
 .yard-walk__error .yard-link {
   margin-left: auto;
   padding: 8px 14px;
-  background: #991b1b; color: #fff;
+  background: var(--yard-error-btn-bg); color: var(--yard-error-btn-fg);
   border-radius: 8px;
-  font-size: 14px; font-weight: 700;
+  font-size: var(--yard-fs-md); font-weight: 700;
   min-height: 36px;
 }
 .yard-walk__error .yard-link:disabled { opacity: 0.5; cursor: not-allowed; }
@@ -728,7 +1110,7 @@
   gap: 8px;
   padding: 16px 28px;
   border-radius: 14px;
-  font-family: inherit; font-size: 17px; font-weight: 700;
+  font-family: inherit; font-size: var(--yard-fs-mdlg); font-weight: 700;
   cursor: pointer; border: 0;
   min-height: 64px;
   transition: filter .1s, transform .1s;
@@ -743,7 +1125,7 @@
   .yard-detail__hero-right { grid-row: 1; align-self: flex-start; }
   .yard-walk__topbar { grid-template-columns: 48px 1fr; }
   .yard-walk__steps { grid-column: 1 / -1; }
-  .yard-walk__line-expected .v { font-size: 22px; }
+  .yard-walk__line-expected .v { font-size: var(--yard-fs-xl); }
   .defect-row { grid-template-columns: 1fr; gap: 8px; }
   .review-row, .review-row--col { grid-template-columns: 1fr; gap: 4px; }
 }

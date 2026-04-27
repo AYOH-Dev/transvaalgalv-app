@@ -20,8 +20,19 @@ export async function apiFetch(path: string, opts: RequestInit = {}) {
   const url = apiBaseUrl().replace(/\/$/, '') + path
   const headers = new Headers(opts.headers || {})
   headers.set('Accept', 'application/json')
-  if (opts.method && opts.method.toUpperCase() !== 'GET' && !headers.has('Content-Type')) {
+  // Only auto-set Content-Type for JSON-shaped bodies. FormData/Blob/etc
+  // need the browser to set the correct multipart boundary itself.
+  const isForm = typeof FormData !== 'undefined' && opts.body instanceof FormData
+  if (
+    opts.method &&
+    opts.method.toUpperCase() !== 'GET' &&
+    !headers.has('Content-Type') &&
+    !isForm
+  ) {
     headers.set('Content-Type', 'application/json')
+  }
+  if (isForm && headers.has('Content-Type')) {
+    headers.delete('Content-Type')
   }
   const token = getToken()
   if (token) {

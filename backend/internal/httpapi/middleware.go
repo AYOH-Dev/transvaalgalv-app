@@ -45,6 +45,22 @@ func (a *App) requireAdmin(next http.Handler) http.Handler {
 	}))
 }
 
+func (a *App) requireReceiverOrAdmin(next http.Handler) http.Handler {
+	return a.requireAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		subject, ok := currentSubject(r.Context())
+		if !ok {
+			writeError(w, http.StatusForbidden, "receiver or admin access required")
+			return
+		}
+		role := users.Role(subject.Role)
+		if role != users.RoleAdmin && role != users.RoleReceiver {
+			writeError(w, http.StatusForbidden, "receiver or admin access required")
+			return
+		}
+		next.ServeHTTP(w, r)
+	}))
+}
+
 func (a *App) requireDocuWareImportAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !a.hasDocuWarePushBasicAuth() {

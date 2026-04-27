@@ -45,6 +45,11 @@ type Receipt struct {
 	Lines                   []ReceiptLine      `json:"lines"`
 	Documents               []ReceiptDocument  `json:"documents"`
 	Exceptions              []ReceiptException `json:"exceptions"`
+	GRNDocumentID           string             `json:"grn_document_id,omitempty"`
+	GRNDocuWareDocID        string             `json:"grn_docuware_doc_id,omitempty"`
+	GRNGeneratedAt          *time.Time         `json:"grn_generated_at,omitempty"`
+	DocuWarePODStatus       string             `json:"docuware_pod_status,omitempty"`
+	DocuWarePODStatusSyncedAt *time.Time       `json:"docuware_pod_status_synced_at,omitempty"`
 	ImportedAt              *time.Time         `json:"imported_at,omitempty"`
 	LastSyncedAt            *time.Time         `json:"last_synced_at,omitempty"`
 	CreatedAt               time.Time          `json:"created_at"`
@@ -88,13 +93,18 @@ type ReceiptLine struct {
 
 type ReceiptDocument struct {
 	ID                 string    `json:"id"`
+	ReceiptLineID      string    `json:"receipt_line_id,omitempty"`
+	Category           string    `json:"category,omitempty"`
 	DocumentType       string    `json:"document_type"`
 	Filename           string    `json:"filename"`
 	ContentType        string    `json:"content_type"`
 	StorageKey         string    `json:"storage_key"`
+	FileSize           int64     `json:"file_size,omitempty"`
 	Source             string    `json:"source"`
 	DocuWareDocumentID string    `json:"docuware_document_id"`
 	DocuWareStatus     string    `json:"docuware_status"`
+	DocuWareError      string    `json:"docuware_error,omitempty"`
+	UploadedByID       string    `json:"uploaded_by,omitempty"`
 	CreatedAt          time.Time `json:"created_at"`
 }
 
@@ -135,6 +145,50 @@ type UpdateReceiptLineInput struct {
 	ReceivingStatus       *string  `json:"receiving_status"`
 	Discrepancy           *string  `json:"discrepancy"`
 	ConditionNotes        *string  `json:"condition_notes"`
+
+	// ReceivedByUserID and ReceivedByName are set server-side from the
+	// authenticated session and are never accepted from the request body.
+	// They are written to the line only on the transition to receiving_status
+	// = "received", so the field captures who confirmed the line, not who
+	// last edited it.
+	ReceivedByUserID string `json:"-"`
+	ReceivedByName   string `json:"-"`
+}
+
+type CreateGRNInput struct {
+	DeliveryNoteNumber      string             `json:"delivery_note_number"`
+	OrderNumber             string             `json:"order_number"`
+	VehicleRegistration     string             `json:"vehicle_registration"`
+	DeliveryDate            string             `json:"delivery_date"`
+	WeighbridgeTicketNumber string             `json:"weighbridge_ticket_number"`
+	Company                 string             `json:"company"`
+	Fabricator              string             `json:"fabricator"`
+	JobComments             string             `json:"job_comments"`
+	StoredBy                string             `json:"stored_by"`
+	CompletionDate          string             `json:"completion_date"`
+	ProductName             string             `json:"product_name"`
+	ProcessingStatus        string             `json:"processing_status"`
+	Lines                   []CreateGRNLineInput `json:"lines"`
+
+	// ReceivedByUserID and ReceivedByName are set server-side from the
+	// authenticated session and are never accepted from the request body.
+	// The name is snapshotted onto the receipt at create time so a later
+	// profile rename cannot retroactively rewrite who signed for a load.
+	ReceivedByUserID string `json:"-"`
+	ReceivedByName   string `json:"-"`
+}
+
+type CreateGRNLineInput struct {
+	DeliveryNote     string `json:"delivery_note"`
+	ItemCode         string `json:"item_code"`
+	ItemDescription  string `json:"item_description"`
+	ItemSize         string `json:"item_size"`
+	ItemQuantity     string `json:"item_quantity"`
+	Weight           string `json:"weight"`
+	MaterialMarkings string `json:"material_markings"`
+	MaterialLength   string `json:"material_length"`
+	JobNumber        string `json:"job_number"`
+	Other            string `json:"other"`
 }
 
 type DocuWareImportInput struct {

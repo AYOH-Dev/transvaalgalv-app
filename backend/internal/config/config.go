@@ -26,6 +26,25 @@ type Config struct {
 	DocuWarePassword      string
 	DocuWareSyncInterval  time.Duration
 	DocuWareSyncMaxWorkers int
+
+	// DocuWare integration-URL parameters for receiver-facing POD viewing.
+	// Mirrors the parameters of the official DocuWare Integration URL builder:
+	// AES-256-CBC encrypted blob containing login + cabinet + result-dialog + query.
+	DocuWareIntegrationPassphraseB64 string
+	DocuWareIntegrationUser          string
+	DocuWareIntegrationPassword      string
+	DocuWarePODCabinetID             string
+	DocuWarePODResultDialogID        string
+
+	// Filesystem location for captured photos (defect photos, future arrival/per-line).
+	// Files live here until the DocuWare worker pushes them as Sections.
+	PhotoStorageDir    string
+	PhotoMaxBytes      int64
+
+	// How many days a 'matched' receipt remains in the active list before
+	// being auto-archived. Archived receipts are still queryable via
+	// admin-only ?include_archived=1, just hidden from the default views.
+	ArchiveAfter time.Duration
 }
 
 func Load() (Config, error) {
@@ -66,6 +85,16 @@ func Load() (Config, error) {
 		DocuWarePassword:      os.Getenv("DOCUWARE_PASSWORD"),
 		DocuWareSyncInterval:  syncInterval,
 		DocuWareSyncMaxWorkers: maxWorkers,
+
+		DocuWareIntegrationPassphraseB64: strings.TrimSpace(os.Getenv("DOCUWARE_INTEGRATION_PASSPHRASE_B64")),
+		DocuWareIntegrationUser:          strings.TrimSpace(os.Getenv("DOCUWARE_INTEGRATION_USER")),
+		DocuWareIntegrationPassword:      strings.TrimSpace(os.Getenv("DOCUWARE_INTEGRATION_PASSWORD")),
+		DocuWarePODCabinetID:             strings.TrimSpace(os.Getenv("DOCUWARE_POD_CABINET_ID")),
+		DocuWarePODResultDialogID:        strings.TrimSpace(os.Getenv("DOCUWARE_POD_RESULT_DIALOG_ID")),
+
+		PhotoStorageDir: getenv("PHOTO_STORAGE_DIR", "/var/lib/transvaalgalv/photos"),
+		PhotoMaxBytes:   parseBytes(getenv("PHOTO_MAX_BYTES", "10485760")), // 10 MiB default
+		ArchiveAfter:    parseDays(getenv("ARCHIVE_AFTER_DAYS", "14")),
 	}
 
 	if err := validateDatabaseURL(cfg.DatabaseURL); err != nil {
@@ -93,6 +122,24 @@ func getenv(key, fallback string) string {
 		return fallback
 	}
 	return value
+}
+
+func parseBytes(raw string) int64 {
+	value, err := strconv.ParseInt(strings.TrimSpace(raw), 10, 64)
+	if err != nil || value <= 0 {
+		return 10 * 1024 * 1024
+	}
+	return value
+}
+
+// parseDays returns a duration in days from an integer-like string.
+// Falls back to 14 days on parse error or non-positive values.
+func parseDays(raw string) time.Duration {
+	days, err := strconv.Atoi(strings.TrimSpace(raw))
+	if err != nil || days <= 0 {
+		days = 14
+	}
+	return time.Duration(days) * 24 * time.Hour
 }
 
 func validateDatabaseURL(raw string) error {

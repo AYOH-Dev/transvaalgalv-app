@@ -57,6 +57,7 @@ type QueuedSync struct {
 	WeighbridgeTicketNumber string
 	VehicleRegistration     string
 	JobNumber               string
+	ReceivedByDisplayName   string
 }
 
 type Worker struct {
@@ -65,6 +66,10 @@ type Worker struct {
 	logger    log.Logger
 	pollInterval time.Duration
 	maxWorkers   int
+
+	photoStorageDir   string
+	documentsCabinet  string
+	wake              chan struct{}
 }
 
 func NewWorker(pool *pgxpool.Pool, client *Client, logger log.Logger, pollInterval time.Duration, maxWorkers int) *Worker {
@@ -74,6 +79,28 @@ func NewWorker(pool *pgxpool.Pool, client *Client, logger log.Logger, pollInterv
 		logger:       logger,
 		pollInterval: pollInterval,
 		maxWorkers:   maxWorkers,
+		wake:         make(chan struct{}, 1),
+	}
+}
+
+// SetPhotoStorageDir tells the worker where to find captured photo files.
+// Empty disables photo pushes.
+func (w *Worker) SetPhotoStorageDir(dir string) { w.photoStorageDir = dir }
+
+// SetDocumentsCabinet configures the cabinet id used when creating new
+// GRN documents (the upstream Documents cabinet, not the operational
+// Receiving Data cabinet). Empty disables GRN pushes.
+func (w *Worker) SetDocumentsCabinet(cabinetID string) { w.documentsCabinet = cabinetID }
+
+// NotifyPendingGRN wakes the worker so a freshly generated GRN gets
+// pushed without waiting for the next tick.
+func (w *Worker) NotifyPendingGRN(_ string) {
+	if w == nil || w.wake == nil {
+		return
+	}
+	select {
+	case w.wake <- struct{}{}:
+	default:
 	}
 }
 
@@ -92,6 +119,13 @@ func (w *Worker) Start(ctx context.Context) {
 			return
 		case <-ticker.C:
 			w.processPendingQueue(ctx)
+			w.processPendingGRNs(ctx)
+			w.processPendingPhotos(ctx)
+			w.processPendingPODStatuses(ctx)
+		case <-w.wake:
+			w.processPendingGRNs(ctx)
+			w.processPendingPhotos(ctx)
+			w.processPendingPODStatuses(ctx)
 		}
 	}
 }
@@ -162,6 +196,7 @@ func (w *Worker) fetchPendingItems(ctx context.Context, limit int) ([]QueuedSync
 			l.material_thickness,
 			l.material_length,
 			l.weight,
+			l.received_by_name,
 			r.customer_name,
 			r.supplier_name,
 			r.delivery_note_number,
@@ -219,6 +254,7 @@ func (w *Worker) fetchPendingItems(ctx context.Context, limit int) ([]QueuedSync
 			&item.MaterialThickness,
 			&item.MaterialLength,
 			&item.Weight,
+			&item.ReceivedByDisplayName,
 			&item.CustomerName,
 			&item.SupplierName,
 			&item.DeliveryNoteNumber,
@@ -287,6 +323,7 @@ func (w *Worker) syncItem(ctx context.Context, item QueuedSync) SyncResult {
 		MaterialThickness:     item.MaterialThickness,
 		MaterialLength:        item.MaterialLength,
 		Weight:                item.Weight,
+		ReceivedByName:        item.ReceivedByDisplayName,
 	}
 
 	receipt := SyncableReceipt{
@@ -491,6 +528,7 @@ func (w *Worker) SyncLineNow(ctx context.Context, receiptID, lineID string) erro
 			l.material_thickness,
 			l.material_length,
 			l.weight,
+			l.received_by_name,
 			r.customer_name,
 			r.supplier_name,
 			r.delivery_note_number,
@@ -547,6 +585,7 @@ func (w *Worker) SyncLineNow(ctx context.Context, receiptID, lineID string) erro
 		&item.MaterialThickness,
 		&item.MaterialLength,
 		&item.Weight,
+		&item.ReceivedByDisplayName,
 		&item.CustomerName,
 		&item.SupplierName,
 		&item.DeliveryNoteNumber,

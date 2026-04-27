@@ -10,11 +10,60 @@ import (
 	"strings"
 	"time"
 
+	"github.com/AYOH-Dev/transvaalgalv-app/backend/internal/docuware"
 	"github.com/AYOH-Dev/transvaalgalv-app/backend/internal/receiving"
+	"github.com/AYOH-Dev/transvaalgalv-app/backend/internal/users"
 )
 
+func (a *App) handleCreateGRN(w http.ResponseWriter, r *http.Request) {
+	var input receiving.CreateGRNInput
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	// received_by is the accountability anchor for the receipt and is always
+	// taken from the authenticated session — never from the request body.
+	// stored_by is a separate, editable field (who physically put the goods
+	// into the bay) and may differ from the receiver.
+	subject, ok := currentSubject(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "authentication required")
+		return
+	}
+	input.ReceivedByUserID = subject.UserID
+	if user, err := a.users.CurrentUser(r.Context(), subject.UserID); err == nil {
+		input.ReceivedByName = user.DisplayName
+	} else {
+		// Fall back to the email — better than blank, and the UUID still
+		// anchors accountability via the FK.
+		input.ReceivedByName = subject.Email
+	}
+	if strings.TrimSpace(input.StoredBy) == "" {
+		input.StoredBy = subject.Email
+	}
+
+	receipt, err := a.receiving.CreateGRN(r.Context(), input)
+	if err != nil {
+		mapReceivingError(w, err)
+		return
+	}
+
+	writeJSON(w, http.StatusCreated, receipt)
+}
+
 func (a *App) handleListReceipts(w http.ResponseWriter, r *http.Request) {
-	result, err := a.receiving.ListReceipts(r.Context())
+	// include_archived is admin-only. Non-admins (or missing flag) get the
+	// default active-only list. We silently ignore the flag for non-admins
+	// rather than 403'ing — the result is the same as not asking.
+	includeArchived := false
+	if r.URL.Query().Get("include_archived") == "1" {
+		if subject, ok := currentSubject(r.Context()); ok && users.Role(subject.Role) == users.RoleAdmin {
+			includeArchived = true
+		}
+	}
+
+	result, err := a.receiving.ListReceipts(r.Context(), includeArchived)
 	if err != nil {
 		mapReceivingError(w, err)
 		return
@@ -36,6 +85,57 @@ func (a *App) handleGetReceipt(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, receipt)
 }
 
+// handleGetReceiptPODLink returns a one-shot DocuWare WebClient Integration URL
+// that opens the POD document for this receipt in the DocuWare viewer. The
+// URL embeds an AES-encrypted login + query, so we generate it server-side and
+// hand the receiver only the final URL (never the credentials or passphrase).
+func (a *App) handleGetReceiptPODLink(w http.ResponseWriter, r *http.Request) {
+	receipt, err := a.receiving.GetReceipt(r.Context(), r.PathValue("id"))
+	if err != nil {
+		mapReceivingError(w, err)
+		return
+	}
+
+	docID := strings.TrimSpace(receipt.SourceDocuWareDocument)
+	if docID == "" {
+		writeError(w, http.StatusNotFound, "no POD reference on this receipt")
+		return
+	}
+
+	cfg := docuware.IntegrationConfig{
+		ServerURL:        a.cfg.DocuWareBaseURL,
+		PassphraseBase64: a.cfg.DocuWareIntegrationPassphraseB64,
+		Username:         a.cfg.DocuWareIntegrationUser,
+		Password:         a.cfg.DocuWareIntegrationPassword,
+		CabinetID:        a.cfg.DocuWarePODCabinetID,
+		ResultDialogID:   a.cfg.DocuWarePODResultDialogID,
+	}
+	if !cfg.Configured() {
+		writeError(w, http.StatusServiceUnavailable, "POD viewer is not configured")
+		return
+	}
+
+	// DocuWare condition syntax — match by the document's own DWDOCID.
+	query := fmt.Sprintf(`[DWDOCID] = "%s"`, escapeDocuWareLiteral(docID))
+	url, err := docuware.BuildIntegrationURL(cfg, docuware.ModeViewer, query)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to build POD link")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{"url": url})
+}
+
+// escapeDocuWareLiteral hardens against an attacker-controlled DNDocID landing
+// in the query string. DocuWare condition literals are quoted with " — escape
+// any embedded quotes and strip newlines.
+func escapeDocuWareLiteral(s string) string {
+	s = strings.ReplaceAll(s, `"`, `""`)
+	s = strings.ReplaceAll(s, "\n", "")
+	s = strings.ReplaceAll(s, "\r", "")
+	return s
+}
+
 func (a *App) handleUpdateReceipt(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 
@@ -45,13 +145,22 @@ func (a *App) handleUpdateReceipt(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	receipt, err := a.receiving.UpdateReceipt(r.Context(), id, input)
+	result, err := a.receiving.UpdateReceipt(r.Context(), id, input)
 	if err != nil {
 		mapReceivingError(w, err)
 		return
 	}
 
-	writeJSON(w, http.StatusOK, receipt)
+	// Embed the Receipt and add resynced_lines as a sibling key without touching
+	// the Receipt type — Go marshals the embedded struct's fields inline.
+	type updateReceiptResponse struct {
+		receiving.Receipt
+		ResyncedLines int `json:"resynced_lines"`
+	}
+	writeJSON(w, http.StatusOK, updateReceiptResponse{
+		Receipt:       result.Receipt,
+		ResyncedLines: result.ResyncedLines,
+	})
 }
 
 func (a *App) handleUpdateReceiptLine(w http.ResponseWriter, r *http.Request) {
@@ -62,6 +171,22 @@ func (a *App) handleUpdateReceiptLine(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request body")
 		return
+	}
+
+	// Stamp the confirmer from the authenticated session. The repository
+	// only writes received_by_* on the transition to "received", so it's
+	// safe (and correct) to attach this on every PATCH — even non-confirm
+	// edits — without overwriting an existing confirmer.
+	subject, ok := currentSubject(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "authentication required")
+		return
+	}
+	input.ReceivedByUserID = subject.UserID
+	if user, err := a.users.CurrentUser(r.Context(), subject.UserID); err == nil {
+		input.ReceivedByName = user.DisplayName
+	} else {
+		input.ReceivedByName = subject.Email
 	}
 
 	line, err := a.receiving.UpdateReceiptLine(r.Context(), receiptID, lineID, input)
