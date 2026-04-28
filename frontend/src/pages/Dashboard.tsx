@@ -260,7 +260,7 @@ export default function Dashboard() {
           <div>
             <div className="phase-card__title">Dispatching</div>
             <div className="phase-card__desc">Track outbound goods from the floor to delivery. Assign jobs, generate dispatch notes, and confirm delivery.</div>
-            <span className="badge badge-default" style={{ marginTop: '0.75rem', display: 'inline-block' }}>Phase 2 — Coming soon</span>
+            <span className="badge badge-amber" style={{ marginTop: '0.75rem', padding: '0.125rem 0.5rem', fontSize: '0.6875rem' }}>Phase 2 — Coming soon</span>
           </div>
         </div>
 
@@ -273,7 +273,7 @@ export default function Dashboard() {
           <div>
             <div className="phase-card__title">Processing</div>
             <div className="phase-card__desc">Manage the galvanising process: dip schedules, kettle assignments, batch tracking, and quality sign-off.</div>
-            <span className="badge badge-default" style={{ marginTop: '0.75rem', display: 'inline-block' }}>Phase 3 — Coming soon</span>
+            <span className="badge badge-amber" style={{ marginTop: '0.75rem', padding: '0.125rem 0.5rem', fontSize: '0.6875rem' }}>Phase 3 — Coming soon</span>
           </div>
         </div>
       </div>

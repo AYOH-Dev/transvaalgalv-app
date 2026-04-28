@@ -119,6 +119,29 @@ A consolidated list of candidate enhancements to take the receiving app to best-
 
 51. Post-galv bundle scan-back (received → processed → dispatched count reconciliation)
 
+## Dashboard rework — receiving-first operations console
+
+The current Dashboard ([frontend/src/pages/Dashboard.tsx](../frontend/src/pages/Dashboard.tsx)) is a status summary, not an operations console. ~40% of the viewport is consumed by a pipeline-phase banner and two "Coming soon" cards (Dispatching, Processing) — content that belongs in onboarding/release notes, not on every load. The five status counts are equal-weighted and all link to the unfiltered `/receipts`, so a receiver opening the app can't tell what needs them, what's stuck, or what failed to sync.
+
+Per [receiving-workflow.md](receiving-workflow.md), the receiver's actual questions on open are: *what needs me right now, what's stuck, did anything fail to sync, can I start/resume a GRN fast.* None of those are answered today.
+
+52. **Deep-link status tiles to filtered Receipts views** (cheap win) — `/receipts?status=quality_hold`, etc. Receipts page already supports filtering; Dashboard should use it.
+53. **Collapse / relocate "Coming soon" cards** (cheap win) — hide behind a Settings/About link, or shrink to a single footer strip. Reclaim the real estate for action.
+54. **"Needs attention" lane** — three urgency-coded tiles, only render when count > 0:
+    - Quality holds (amber) with oldest-age
+    - Sync failures (red) with oldest-age — drives off `docuware_upload_jobs` retry queue
+    - Stale drafts >24h (gray-amber)
+55. **DocuWare sync-failure visibility** — surface `docuware_upload_jobs` failed/retrying counts. Currently silent; if overnight syncs fail, no one knows from the dashboard.
+56. **Personal queue** — "My drafts" / "Receipts I started today" filtered by authenticated user (JWT subject). Receivers want to resume their own work, not browse the org queue.
+57. **Inbound import indicator** — count of new `Receiving Data` records imported but not yet started, with inline "Start receipting" action.
+58. **Primary CTAs on Dashboard** — "Start new GRN" + "Resume last draft" (when one exists). Removes the navigation tax on the most common action.
+59. **Today's pulse strip** — receipts completed today, lines received today, exceptions logged today. Single line, supervisor-oriented.
+60. **Backend `/dashboard/summary` endpoint** — server computes `{ holds, sync_failed, stale_drafts, inbound, my_drafts, completed_today, ... }` so Dashboard stops recomputing client-side from the full `/receipts` list (which doesn't scale and doesn't expose sync state).
+61. **Richer "recent" rows** — line counts, defect counts, accurate relative time. A 3-day-old draft and a 10-min-old draft should not look the same.
+62. **Mobile-first density pass** — receivers on the floor are on phones/tablets; pipeline banner + dual phase cards push actionable content below the fold on small screens.
+
+Suggested first slice: #52 + #53 (one afternoon), then #60 + #54 + #55 as a single backend-plus-frontend piece (the highest-value chunk — "what needs me, what's broken").
+
 ---
 
 ## Suggested first slice

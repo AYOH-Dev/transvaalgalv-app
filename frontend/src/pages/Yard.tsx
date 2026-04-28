@@ -140,6 +140,7 @@ export default function Yard({ onLogout }: { onLogout?: () => void }) {
   const [error, setError] = useState('')
   const [view, setView] = useState<'list' | 'detail' | 'walk'>('list')
   const [activeId, setActiveId] = useState<string | null>(null)
+  const [walkStartLineId, setWalkStartLineId] = useState<string | null>(null)
   const [lineState, setLineState] = useState<LineStateMap>({})
   const [savingLineId, setSavingLineId] = useState<string | null>(null)
   const online = useApiReachable()
@@ -354,12 +355,13 @@ export default function Yard({ onLogout }: { onLogout?: () => void }) {
     return (
       <YardWalkthrough
         pod={active}
+        startLineId={walkStartLineId}
         lineState={lineState}
         updateLine={updateLine}
         savingLineId={savingLineId}
         onPersistLine={persistLine}
-        onExit={() => setView('detail')}
-        onComplete={() => setView('detail')}
+        onExit={() => { setWalkStartLineId(null); setView('detail') }}
+        onComplete={() => { setWalkStartLineId(null); setView('detail') }}
       />
     )
   }
@@ -394,8 +396,18 @@ export default function Yard({ onLogout }: { onLogout?: () => void }) {
         <YardLoadDetail
           pod={active}
           lineState={lineState}
+          savingLineId={savingLineId}
           onBack={() => setView('list')}
-          onWalk={() => setView('walk')}
+          onWalk={(lineId) => { setWalkStartLineId(lineId ?? null); setView('walk') }}
+          onConfirmAsExpected={async (line) => {
+            const res = await persistLine(active.id, line, lineState[line.id] || {})
+            if (res.ok) {
+              updateLine(line.id, { received: true })
+              showToast('Line confirmed', 'success')
+            } else {
+              showToast(res.error, 'error')
+            }
+          }}
           onIssueGRN={() => issueGRN(active.id)}
           onViewGRN={() => viewGRN(active.id)}
           onSaveHeader={persistReceipt}
@@ -603,11 +615,13 @@ function YardLoadsList({ pods, lineState, onOpen, onViewPOD, viewingPODFor }: {
 // ════════════════════════════════════════════════════════════════════════════
 // DETAIL
 // ════════════════════════════════════════════════════════════════════════════
-function YardLoadDetail({ pod, lineState, onBack, onWalk, onIssueGRN, onViewGRN, onSaveHeader, onViewPOD, viewingPODFor }: {
+function YardLoadDetail({ pod, lineState, savingLineId, onBack, onWalk, onConfirmAsExpected, onIssueGRN, onViewGRN, onSaveHeader, onViewPOD, viewingPODFor }: {
   pod: Receipt
   lineState: LineStateMap
+  savingLineId: string | null
   onBack: () => void
-  onWalk: () => void
+  onWalk: (lineId?: string) => void
+  onConfirmAsExpected: (line: ReceiptLine) => Promise<void> | void
   onIssueGRN: () => void
   onViewGRN: () => void
   onSaveHeader: (receiptId: string, edits: ReceiptEdit) => Promise<{ ok: true } | { ok: false; error: string }>
@@ -632,6 +646,28 @@ function YardLoadDetail({ pod, lineState, onBack, onWalk, onIssueGRN, onViewGRN,
   const [edits, setEdits] = useState<ReceiptEdit>({})
   const [headerSaving, setHeaderSaving] = useState(false)
   const [headerError, setHeaderError] = useState<string | null>(null)
+
+  // Line-list search + status filter. Worth the cost on loads with many
+  // lines (we've seen 68+); kept simple — substring match on item code,
+  // description, line number, material size/markings.
+  const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'received' | 'flagged'>('all')
+
+  const filteredLines = lines.filter((l) => {
+    const st = lineState[l.id] || {}
+    const isReceived = st.received || l.receiving_status === 'received'
+    const isFlagged = (st.discrepancy && st.discrepancy !== 'none') || st.hasDefects || l.discrepancy === 'defects_noted'
+    if (statusFilter === 'pending'  && isReceived) return false
+    if (statusFilter === 'received' && !isReceived) return false
+    if (statusFilter === 'flagged'  && !isFlagged)  return false
+    const q = search.trim().toLowerCase()
+    if (!q) return true
+    const hay = [
+      l.item_code, l.description, l.material_description, l.material_size,
+      l.material_markings, String(l.line_number),
+    ].filter(Boolean).join(' ').toLowerCase()
+    return hay.includes(q)
+  })
 
   const headerVal = (field: keyof ReceiptEdit): string =>
     (field in edits ? (edits[field] ?? '') : ((pod as any)[field] ?? '')) as string
@@ -723,10 +759,10 @@ function YardLoadDetail({ pod, lineState, onBack, onWalk, onIssueGRN, onViewGRN,
 
       <div className="yard-detail__cta">
         {!allDone && !grnIssued && total > 0 && (
-          <button className="yard-btn-primary yard-btn-xl" onClick={onWalk}>
+          <button className="yard-btn-primary yard-btn-xl" onClick={() => onWalk()}>
             <Icon name="play" size={22}/>
             {firstUndoneIdx > 0 ? 'Resume walkthrough' : 'Start walkthrough'}
-            <span className="yard-btn-xl__sub">{total - done} line{total-done !== 1 ? 's' : ''} to check</span>
+            <span className="yard-btn-xl__sub">{total - done} line{total-done !== 1 ? 's' : ''} to check · or tap any line below</span>
           </button>
         )}
         {allDone && !grnIssued && (
@@ -746,17 +782,64 @@ function YardLoadDetail({ pod, lineState, onBack, onWalk, onIssueGRN, onViewGRN,
 
       <div className="yard-detail__list-header">
         <span>Line items</span>
-        <button className="yard-link" onClick={onWalk}>Open in walkthrough →</button>
+        <button className="yard-link" onClick={() => onWalk()}>Open in walkthrough →</button>
       </div>
+
+      {lines.length > 0 && (
+        <div className="yard-line-toolbar">
+          <input
+            type="search"
+            className="yard-line-search"
+            placeholder="Search item code, description, size…"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            aria-label="Search lines"
+          />
+          <div className="yard-line-chips" role="tablist" aria-label="Filter lines by status">
+            {(['all','pending','received','flagged'] as const).map(key => {
+              const count = key === 'all' ? total
+                : key === 'pending'  ? total - done
+                : key === 'received' ? done
+                : flagged
+              const label = key === 'all' ? 'All' : key[0].toUpperCase() + key.slice(1)
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  role="tab"
+                  aria-selected={statusFilter === key}
+                  className={'yard-line-chip' + (statusFilter === key ? ' is-active' : '')}
+                  onClick={() => setStatusFilter(key)}
+                >
+                  {label} <span className="yard-line-chip__count">{count}</span>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
       <div className="yard-detail__lines">
-        {lines.map((l, idx) => (
+        {filteredLines.map((l) => (
           <YardLineSummary
             key={l.id}
             line={l}
-            idx={idx}
+            idx={lines.indexOf(l)}
             state={lineState[l.id] || {}}
+            saving={savingLineId === l.id}
+            disabled={grnIssued}
+            onConfirm={() => onConfirmAsExpected(l)}
+            onWalk={() => onWalk(l.id)}
           />
         ))}
+        {lines.length > 0 && filteredLines.length === 0 && (
+          <div className="yard-empty">
+            <div className="yard-empty__title">No lines match</div>
+            <div className="yard-empty__sub">
+              <button className="yard-link" onClick={() => { setSearch(''); setStatusFilter('all') }}>Clear filters</button>
+            </div>
+          </div>
+        )}
         {lines.length === 0 && (
           <div className="yard-empty">
             <div className="yard-empty__title">No lines on this load yet</div>
@@ -768,7 +851,15 @@ function YardLoadDetail({ pod, lineState, onBack, onWalk, onIssueGRN, onViewGRN,
   )
 }
 
-function YardLineSummary({ line, idx, state }: { line: ReceiptLine; idx: number; state: YardLineState }) {
+function YardLineSummary({ line, idx, state, saving, disabled, onConfirm, onWalk }: {
+  line: ReceiptLine
+  idx: number
+  state: YardLineState
+  saving: boolean
+  disabled: boolean
+  onConfirm: () => void
+  onWalk: () => void
+}) {
   const received = state.received || line.receiving_status === 'received'
   const flagged = (state.discrepancy && state.discrepancy !== 'none')
     || state.hasDefects
@@ -789,6 +880,30 @@ function YardLineSummary({ line, idx, state }: { line: ReceiptLine; idx: number;
         {received && !flagged && <span className="yard-pill yard-pill--success"><Icon name="check" size={12}/> Received</span>}
         {received &&  flagged && <span className="yard-pill yard-pill--warn"><Icon name="flag" size={12}/> Flagged</span>}
       </div>
+      {!received && !disabled && (
+        <div className="yard-line__actions">
+          <button
+            type="button"
+            className="yard-btn-success yard-btn-md"
+            onClick={onConfirm}
+            disabled={saving}
+            aria-label={`Confirm line ${idx+1} as expected`}
+            title="Mark this line received with the expected quantity. Use 'Has issues' if anything's off."
+          >
+            <Icon name="check" size={16}/> {saving ? 'Saving…' : 'Confirm'}
+          </button>
+          <button
+            type="button"
+            className="yard-btn-ghost yard-btn-md"
+            onClick={onWalk}
+            disabled={saving}
+            aria-label={`Open line ${idx+1} in walkthrough`}
+            title="Open the walkthrough for this line if there's a discrepancy or defect."
+          >
+            <Icon name="flag" size={16}/> Has issues
+          </button>
+        </div>
+      )}
     </div>
   )
 }
@@ -901,8 +1016,9 @@ function shouldSkipStep(step: Step, state: YardLineState): boolean {
   return step === 'photo' && !state.hasDefects
 }
 
-function YardWalkthrough({ pod, lineState, updateLine, savingLineId, onPersistLine, onExit, onComplete }: {
+function YardWalkthrough({ pod, startLineId, lineState, updateLine, savingLineId, onPersistLine, onExit, onComplete }: {
   pod: Receipt
+  startLineId: string | null
   lineState: LineStateMap
   updateLine: (lineId: string, patch: Partial<YardLineState>) => void
   savingLineId: string | null
@@ -911,8 +1027,10 @@ function YardWalkthrough({ pod, lineState, updateLine, savingLineId, onPersistLi
   onComplete: () => void
 }) {
   const lines = pod.lines || []
+  const explicitIdx = startLineId ? lines.findIndex(l => l.id === startLineId) : -1
   const firstUndone = lines.findIndex(l => !(l.receiving_status === 'received' || lineState[l.id]?.received))
-  const [idx, setIdx] = useState(firstUndone === -1 ? 0 : firstUndone)
+  const initialIdx = explicitIdx >= 0 ? explicitIdx : (firstUndone === -1 ? 0 : firstUndone)
+  const [idx, setIdx] = useState(initialIdx)
   const [step, setStep] = useState<Step>('qty')
   const [saveError, setSaveError] = useState<string | null>(null)
 

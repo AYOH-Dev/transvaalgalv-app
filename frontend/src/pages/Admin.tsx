@@ -14,6 +14,7 @@ export default function Admin() {
   const [roles, setRoles]     = useState<string[]>(['user', 'admin'])
   const [loading, setLoading] = useState(false)
   const [search, setSearch]   = useState('')
+  const [showInactive, setShowInactive] = useState(false)
 
   // Create form
   const [showCreate, setShowCreate] = useState(false)
@@ -121,9 +122,10 @@ export default function Admin() {
     finally { setConfirmUser(null) }
   }
 
+  const visible = showInactive ? users : users.filter(u => u.is_active !== false)
   const filtered = search
-    ? users.filter(u => u.email.toLowerCase().includes(search.toLowerCase()) || (u.display_name || '').toLowerCase().includes(search.toLowerCase()))
-    : users
+    ? visible.filter(u => u.email.toLowerCase().includes(search.toLowerCase()) || (u.display_name || '').toLowerCase().includes(search.toLowerCase()))
+    : visible
 
   return (
     <div>
@@ -134,6 +136,17 @@ export default function Admin() {
         </div>
         <div className="header-actions">
           <input type="search" className="search-input" placeholder="Search users…" value={search} onChange={e => setSearch(e.target.value)} aria-label="Search users" />
+          <button
+            type="button"
+            className={`btn btn-sm ${showInactive ? 'btn-primary' : 'btn-ghost'}`}
+            onClick={() => setShowInactive(s => !s)}
+            disabled={loading}
+            title="Include deactivated users"
+            aria-pressed={showInactive}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ marginRight: 4 }}><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="17" y1="8" x2="23" y2="14"/><line x1="23" y1="8" x2="17" y2="14"/></svg>
+            {showInactive ? 'Hide deactivated' : 'Show deactivated'}
+          </button>
           <button className="btn btn-ghost btn-sm" onClick={fetchUsers} disabled={loading}>
             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={loading ? 'spin' : ''} aria-hidden="true"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
             Refresh

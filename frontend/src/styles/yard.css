@@ -615,6 +615,48 @@
   text-transform: none; letter-spacing: 0;
 }
 
+.yard-line-toolbar {
+  display: flex; flex-wrap: wrap; gap: 10px;
+  margin-bottom: 12px;
+}
+.yard-line-search {
+  flex: 1 1 220px;
+  min-height: 44px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--yard-line-2);
+  background: var(--yard-surface); color: var(--yard-ink);
+  font-family: inherit; font-size: var(--yard-fs-md);
+}
+.yard-line-search:focus {
+  outline: none; border-color: var(--yard-brand);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--yard-brand) 30%, transparent);
+}
+.yard-line-chips {
+  display: flex; gap: 6px; flex-wrap: wrap;
+}
+.yard-line-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 14px; min-height: 44px;
+  border-radius: 999px;
+  background: var(--yard-surface);
+  border: 1px solid var(--yard-line-2);
+  color: var(--yard-ink-2);
+  font-family: inherit; font-size: var(--yard-fs-sm); font-weight: 600;
+  cursor: pointer;
+}
+.yard-line-chip:hover { background: var(--yard-bg); }
+.yard-line-chip.is-active {
+  background: var(--yard-brand);
+  border-color: var(--yard-brand);
+  color: #fff;
+}
+.yard-line-chip__count {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: var(--yard-fs-xs, 0.75rem);
+  opacity: 0.85;
+}
+
 .yard-detail__lines { display: flex; flex-direction: column; gap: 8px; }
 .yard-line {
   display: flex; align-items: center; gap: 14px;
@@ -641,6 +683,32 @@
 .yard-line__sub  { font-size: var(--yard-fs-sm); color: var(--yard-ink-3); margin-top: 2px; }
 .yard-line__sub .mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
 .yard-line__status { flex-shrink: 0; }
+.yard-line__actions {
+  display: flex; gap: 8px; flex-shrink: 0;
+  margin-left: 8px;
+}
+
+/* Mid-size button used in line rows. Sized for thumb-tap on a tablet but
+ * compact enough that two fit alongside the line summary without wrapping. */
+.yard-btn-md {
+  display: inline-flex; align-items: center; justify-content: center;
+  gap: 6px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-family: inherit; font-size: var(--yard-fs-sm); font-weight: 700;
+  cursor: pointer; border: 0;
+  min-height: 44px;
+  transition: filter .12s, transform .12s;
+}
+.yard-btn-md:hover:not(:disabled)  { filter: brightness(1.05); }
+.yard-btn-md:active:not(:disabled) { transform: scale(0.98); }
+.yard-btn-md:disabled { opacity: 0.55; cursor: not-allowed; }
+
+@media (max-width: 600px) {
+  .yard-line { flex-wrap: wrap; }
+  .yard-line__actions { margin-left: 0; width: 100%; }
+  .yard-line__actions .yard-btn-md { flex: 1; }
+}
 
 /* ─── Walkthrough overlay ─────────────────────────────────────────────────── */
 /* Sticky-fills the .app-main region so the sidebar stays reachable. */
