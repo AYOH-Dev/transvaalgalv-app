@@ -3,12 +3,13 @@ package receiving
 import (
 	"context"
 	"testing"
+	"time"
 )
 
 func TestListReceiptsWithNilRepository(t *testing.T) {
 	service := NewService(nil)
 
-	receipts, err := service.ListReceipts(context.Background())
+	receipts, err := service.ListReceipts(context.Background(), false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -28,8 +29,12 @@ type stubRepository struct {
 	importErr     error
 }
 
-func (s *stubRepository) ListReceipts(context.Context) ([]Receipt, error) {
+func (s *stubRepository) ListReceipts(_ context.Context, _ bool) ([]Receipt, error) {
 	return s.listResult, s.listErr
+}
+
+func (s *stubRepository) ArchiveStaleMatched(_ context.Context, _ time.Duration) (int64, error) {
+	return 0, nil
 }
 
 func (s *stubRepository) GetReceipt(context.Context, string) (Receipt, error) {
