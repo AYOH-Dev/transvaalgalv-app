@@ -14,12 +14,12 @@ import (
 // build the DocuWare index fields without round-tripping through the
 // receiving service.
 type queuedGRN struct {
-	DocID         string
-	ReceiptID     string
-	Filename      string
-	ContentType   string
-	StorageKey    string
-	AttemptCount  int
+	DocID        string
+	ReceiptID    string
+	Filename     string
+	ContentType  string
+	StorageKey   string
+	AttemptCount int
 
 	ReceiptNumber           string
 	DeliveryNoteNumber      string

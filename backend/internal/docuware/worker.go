@@ -14,40 +14,40 @@ import (
 
 // QueuedSync represents a pending sync item from the queue table.
 type QueuedSync struct {
-	ID               string
-	ReceiptID        string
-	ReceiptLineID    string
-	AttemptCount     int
-	MaxAttempts      int
-	LastError        string
-	NextRetryAt      *time.Time
-	CreatedAt        time.Time
+	ID            string
+	ReceiptID     string
+	ReceiptLineID string
+	AttemptCount  int
+	MaxAttempts   int
+	LastError     string
+	NextRetryAt   *time.Time
+	CreatedAt     time.Time
 
 	// Line data for sync
-	LineID                  string
-	DocuWareRecordLineID    string
-	DocuWareDocID           string
-	ItemType                string
-	Process                 string
-	PackagingMethod         string
-	InternalDescription     string
-	RequiredGalvThickness   string
-	ReceivedQuantity        float64
-	QuantityDiscrepancy     string
-	Discrepancy             string
-	ReceivingStatus         string
-	StoredIn                string
-	Bay                     string
-	Accessories             string
-	Comments                string
-	ConditionNotes          string
-	MaterialCode            string
-	MaterialDescription     string
-	MaterialSize            string
-	MaterialMarkings        string
-	MaterialThickness       string
-	MaterialLength          string
-	Weight                  string
+	LineID                string
+	DocuWareRecordLineID  string
+	DocuWareDocID         string
+	ItemType              string
+	Process               string
+	PackagingMethod       string
+	InternalDescription   string
+	RequiredGalvThickness string
+	ReceivedQuantity      float64
+	QuantityDiscrepancy   string
+	Discrepancy           string
+	ReceivingStatus       string
+	StoredIn              string
+	Bay                   string
+	Accessories           string
+	Comments              string
+	ConditionNotes        string
+	MaterialCode          string
+	MaterialDescription   string
+	MaterialSize          string
+	MaterialMarkings      string
+	MaterialThickness     string
+	MaterialLength        string
+	Weight                string
 
 	// Receipt header data for sync
 	CustomerName            string
@@ -61,15 +61,15 @@ type QueuedSync struct {
 }
 
 type Worker struct {
-	pool      *pgxpool.Pool
-	client    *Client
-	logger    log.Logger
+	pool         *pgxpool.Pool
+	client       *Client
+	logger       log.Logger
 	pollInterval time.Duration
 	maxWorkers   int
 
-	photoStorageDir   string
-	documentsCabinet  string
-	wake              chan struct{}
+	photoStorageDir  string
+	documentsCabinet string
+	wake             chan struct{}
 }
 
 func NewWorker(pool *pgxpool.Pool, client *Client, logger log.Logger, pollInterval time.Duration, maxWorkers int) *Worker {

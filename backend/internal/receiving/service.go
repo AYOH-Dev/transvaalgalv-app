@@ -300,17 +300,17 @@ func (s *Service) CreateGRN(ctx context.Context, input CreateGRNInput) (Receipt,
 			ExpectedQuantity: quantity,
 			ReceivingStatus:  "draft",
 			SourcePayload: map[string]any{
-				"source":          "manual_pod",
-				"delivery_note":   lineDeliveryNote,
-				"item_code":       itemCode,
-				"item_description": description,
-				"item_size":       strings.TrimSpace(raw.ItemSize),
-				"item_quantity":   strings.TrimSpace(raw.ItemQuantity),
-				"weight":          strings.TrimSpace(raw.Weight),
+				"source":            "manual_pod",
+				"delivery_note":     lineDeliveryNote,
+				"item_code":         itemCode,
+				"item_description":  description,
+				"item_size":         strings.TrimSpace(raw.ItemSize),
+				"item_quantity":     strings.TrimSpace(raw.ItemQuantity),
+				"weight":            strings.TrimSpace(raw.Weight),
 				"material_markings": strings.TrimSpace(raw.MaterialMarkings),
 				"material_length":   strings.TrimSpace(raw.MaterialLength),
-				"job_number":      strings.TrimSpace(raw.JobNumber),
-				"other":           strings.TrimSpace(raw.Other),
+				"job_number":        strings.TrimSpace(raw.JobNumber),
+				"other":             strings.TrimSpace(raw.Other),
 			},
 		})
 	}
@@ -1044,24 +1044,24 @@ func buildConditionNotesJSON(payload map[string]any) string {
 
 	// Map DocuWare defect flags to wizard format
 	defectFlags := map[string]string{
-		"PAINT":                      "paint",
-		"DAMAGED":                    "damaged",
-		"RUST":                       "rust",
-		"DELAMINATION":               "delamination",
-		"NON_CONFORMING_PRE_GALV":    "nonConformingPreGalv",
-		"ENCLOSED_CAVITY":            "enclosedCavity",
-		"THREADED_ARTICLE":           "threadedArticle",
-		"BURR":                       "burr",
-		"PIN_HOLES":                  "pinHoles",
-		"WELD_SPLATTER":              "weldSplatter",
-		"WELDING_FLUX":               "weldingFlux",
-		"CONTINUOUS_WELD":            "continuousWeld",
-		"ARTICLE_OVERLAPPED":         "articleOverlapped",
-		"POSSIBLE_DISTORTION":        "possibleDistortion",
-		"OIL_GREASE_DIESEL":          "oilGreaseDiesel",
-		"SHARP_EDGES":                "sharpEdges",
-		"HOLES_INADEQUATE":           "holesInadequate",
-		"NO_HANGING_METHOD":          "noHangingMethod",
+		"PAINT":                   "paint",
+		"DAMAGED":                 "damaged",
+		"RUST":                    "rust",
+		"DELAMINATION":            "delamination",
+		"NON_CONFORMING_PRE_GALV": "nonConformingPreGalv",
+		"ENCLOSED_CAVITY":         "enclosedCavity",
+		"THREADED_ARTICLE":        "threadedArticle",
+		"BURR":                    "burr",
+		"PIN_HOLES":               "pinHoles",
+		"WELD_SPLATTER":           "weldSplatter",
+		"WELDING_FLUX":            "weldingFlux",
+		"CONTINUOUS_WELD":         "continuousWeld",
+		"ARTICLE_OVERLAPPED":      "articleOverlapped",
+		"POSSIBLE_DISTORTION":     "possibleDistortion",
+		"OIL_GREASE_DIESEL":       "oilGreaseDiesel",
+		"SHARP_EDGES":             "sharpEdges",
+		"HOLES_INADEQUATE":        "holesInadequate",
+		"NO_HANGING_METHOD":       "noHangingMethod",
 	}
 
 	for dwField, wizardKey := range defectFlags {
@@ -1072,13 +1072,13 @@ func buildConditionNotesJSON(payload map[string]any) string {
 
 	// Map mitigation fields
 	mitigationFields := map[string]string{
-		"PAINT_MITIGATION":                   "paintMitigation",
-		"DAMAGE_MITIGATION":                  "damagedMitigation",
-		"RUST_MITIGATION":                    "rustMitigation",
-		"DELAMINATION_MITIGATION":            "delaminationMitigation",
-		"NON_CONFORMING_PRE_GALV_MITIG":      "nonConformingPreGalvMitigation",
-		"THREADED_ARTICLE_MITIGATION":        "threadedArticleMitigation",
-		"ENCLOSED_CAVITY_HOLES_REQUIRE":      "enclosedCavityMitigation",
+		"PAINT_MITIGATION":              "paintMitigation",
+		"DAMAGE_MITIGATION":             "damagedMitigation",
+		"RUST_MITIGATION":               "rustMitigation",
+		"DELAMINATION_MITIGATION":       "delaminationMitigation",
+		"NON_CONFORMING_PRE_GALV_MITIG": "nonConformingPreGalvMitigation",
+		"THREADED_ARTICLE_MITIGATION":   "threadedArticleMitigation",
+		"ENCLOSED_CAVITY_HOLES_REQUIRE": "enclosedCavityMitigation",
 	}
 
 	for dwField, wizardKey := range mitigationFields {
@@ -1098,10 +1098,10 @@ func buildConditionNotesJSON(payload map[string]any) string {
 
 	// Map hole quantity fields
 	holeQtyFields := map[string]string{
-		"DRAIN_HOLES":          "drainHolesQty",
-		"VENT_HOLES":           "ventHolesQty",
-		"JIG_HOLES":            "jigHolesQty",
-		"CAVITY_VENT_HOLES":    "cavityVentHolesQty",
+		"DRAIN_HOLES":       "drainHolesQty",
+		"VENT_HOLES":        "ventHolesQty",
+		"JIG_HOLES":         "jigHolesQty",
+		"CAVITY_VENT_HOLES": "cavityVentHolesQty",
 	}
 
 	for dwField, wizardKey := range holeQtyFields {

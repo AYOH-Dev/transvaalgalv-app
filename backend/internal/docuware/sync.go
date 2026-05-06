@@ -9,30 +9,30 @@ import (
 )
 
 type SyncableReceiptLine struct {
-	ID                           string
-	DocuWareRecordLineID         string
-	ItemType                     string
-	Process                      string
-	PackagingMethod              string
-	InternalDescription          string
-	RequiredGalvThickness        string
-	ReceivedQuantity             float64
-	QuantityDiscrepancy          string
-	Discrepancy                  string
-	ReceivingStatus              string
-	StoredIn                     string
-	Bay                          string
-	Accessories                  string
-	Comments                     string
-	ConditionNotes               string // JSON payload from defect wizard
-	MaterialCode                 string
-	MaterialDescription          string
-	MaterialSize                 string
-	MaterialMarkings             string
-	MaterialThickness            string
-	MaterialLength               string
-	Weight                       string
-	ReceivedByName               string // display_name of the user who confirmed this line
+	ID                    string
+	DocuWareRecordLineID  string
+	ItemType              string
+	Process               string
+	PackagingMethod       string
+	InternalDescription   string
+	RequiredGalvThickness string
+	ReceivedQuantity      float64
+	QuantityDiscrepancy   string
+	Discrepancy           string
+	ReceivingStatus       string
+	StoredIn              string
+	Bay                   string
+	Accessories           string
+	Comments              string
+	ConditionNotes        string // JSON payload from defect wizard
+	MaterialCode          string
+	MaterialDescription   string
+	MaterialSize          string
+	MaterialMarkings      string
+	MaterialThickness     string
+	MaterialLength        string
+	Weight                string
+	ReceivedByName        string // display_name of the user who confirmed this line
 }
 
 type SyncableReceipt struct {
@@ -140,12 +140,12 @@ func formatQuantity(qty float64) string {
 // DocuWare BI may expect title-cased versions.
 func humanizeReceivingStatus(status string) string {
 	m := map[string]string{
-		"draft":         "Draft",
-		"received":      "Received",
-		"quality_hold":  "Quality Hold",
-		"matched":       "Matched",
-		"archived":      "Archived",
-		"sent_to_app":   "Sent to App",
+		"draft":        "Draft",
+		"received":     "Received",
+		"quality_hold": "Quality Hold",
+		"matched":      "Matched",
+		"archived":     "Archived",
+		"sent_to_app":  "Sent to App",
 	}
 	if v, ok := m[strings.ToLower(status)]; ok {
 		return v
@@ -161,12 +161,12 @@ type SyncError struct {
 
 // SyncResult tracks the outcome of a sync attempt.
 type SyncResult struct {
-	LineID              string
-	Success             bool
-	LastSyncedAt        time.Time
-	Error               *SyncError
-	FieldCount          int
-	Retryable           bool
+	LineID       string
+	Success      bool
+	LastSyncedAt time.Time
+	Error        *SyncError
+	FieldCount   int
+	Retryable    bool
 }
 
 // extractDefectFields parses condition_notes JSON and returns defect flag + mitigation field updates.
@@ -187,42 +187,42 @@ func extractDefectFields(conditionNotesJSON string) []FieldUpdate {
 		field        string
 		defaultValue string
 	}{
-		"paint":              {field: "PAINT", defaultValue: "none"},
-		"damaged":            {field: "DAMAGED", defaultValue: "none"},
-		"rust":               {field: "RUST", defaultValue: "normal"},
-		"delamination":       {field: "DELAMINATION", defaultValue: "no"},
+		"paint":                {field: "PAINT", defaultValue: "none"},
+		"damaged":              {field: "DAMAGED", defaultValue: "none"},
+		"rust":                 {field: "RUST", defaultValue: "normal"},
+		"delamination":         {field: "DELAMINATION", defaultValue: "no"},
 		"nonConformingPreGalv": {field: "NON_CONFORMING_PRE_GALV", defaultValue: "no"},
-		"enclosedCavity":     {field: "ENCLOSED_CAVITY", defaultValue: "no"},
-		"threadedArticle":    {field: "THREADED_ARTICLE", defaultValue: "no"},
-		"burr":               {field: "BURR", defaultValue: "none"},
-		"pinHoles":           {field: "PIN_HOLES", defaultValue: "none"},
-		"weldingSplatter":    {field: "WELD_SPLATTER", defaultValue: "no"},
-		"weldingFlux":        {field: "WELDING_FLUX", defaultValue: "no"},
-		"continuousWeld":     {field: "CONTINUOUS_WELD", defaultValue: "no"},
-		"articleOverlap":     {field: "ARTICLE_OVERLAPPED", defaultValue: "no"},
-		"possibleDistortion": {field: "POSSIBLE_DISTORTION", defaultValue: "no"},
-		"oilGreaseDiesel":    {field: "OIL_GREASE_DIESEL", defaultValue: "none"},
-		"sharpEdges":         {field: "SHARP_EDGES", defaultValue: "no"},
-		"holesInadequate":    {field: "HOLES_INADEQUATE", defaultValue: "no"},
-		"noHanging":          {field: "NO_HANGING_METHOD", defaultValue: "no"},
+		"enclosedCavity":       {field: "ENCLOSED_CAVITY", defaultValue: "no"},
+		"threadedArticle":      {field: "THREADED_ARTICLE", defaultValue: "no"},
+		"burr":                 {field: "BURR", defaultValue: "none"},
+		"pinHoles":             {field: "PIN_HOLES", defaultValue: "none"},
+		"weldingSplatter":      {field: "WELD_SPLATTER", defaultValue: "no"},
+		"weldingFlux":          {field: "WELDING_FLUX", defaultValue: "no"},
+		"continuousWeld":       {field: "CONTINUOUS_WELD", defaultValue: "no"},
+		"articleOverlap":       {field: "ARTICLE_OVERLAPPED", defaultValue: "no"},
+		"possibleDistortion":   {field: "POSSIBLE_DISTORTION", defaultValue: "no"},
+		"oilGreaseDiesel":      {field: "OIL_GREASE_DIESEL", defaultValue: "none"},
+		"sharpEdges":           {field: "SHARP_EDGES", defaultValue: "no"},
+		"holesInadequate":      {field: "HOLES_INADEQUATE", defaultValue: "no"},
+		"noHanging":            {field: "NO_HANGING_METHOD", defaultValue: "no"},
 	}
 
 	// Map of mitigation keys → DocuWare field names
 	mitigationFields := map[string]string{
-		"paintMitigation":                   "PAINT_MITIGATION",
-		"damagedMitigation":                 "DAMAGE_MITIGATION",
-		"rustMitigation":                    "RUST_MITIGATION",
-		"delaminationMitigation":            "DELAMINATION_MITIGATION",
-		"nonConformingPreGalvMitigation":    "NON_CONFORMING_PRE_GALV_MITIG",
-		"threadedArticleMitigation":         "THREADED_ARTICLE_MITIGATION",
-		"enclosedCavityMitigation":          "ENCLOSED_CAVITY_HOLES_REQUIRE",
+		"paintMitigation":                "PAINT_MITIGATION",
+		"damagedMitigation":              "DAMAGE_MITIGATION",
+		"rustMitigation":                 "RUST_MITIGATION",
+		"delaminationMitigation":         "DELAMINATION_MITIGATION",
+		"nonConformingPreGalvMitigation": "NON_CONFORMING_PRE_GALV_MITIG",
+		"threadedArticleMitigation":      "THREADED_ARTICLE_MITIGATION",
+		"enclosedCavityMitigation":       "ENCLOSED_CAVITY_HOLES_REQUIRE",
 	}
 
 	// Map of mitigation quantity keys → DocuWare field names
 	mitigationQtyFields := map[string]string{
-		"noHangingLiftingLugNutQty":  "NO_HANGING_LIFTING_LUG_NUT_R1",
-		"noHangingHangNotchQty":      "NO_HANGING_HANG_NOTCH_REQUIR1",
-		"enclosedCavityHolesQty":     "ENCLOSED_CAVITY_HOLES_QUANTIT",
+		"noHangingLiftingLugNutQty": "NO_HANGING_LIFTING_LUG_NUT_R1",
+		"noHangingHangNotchQty":     "NO_HANGING_HANG_NOTCH_REQUIR1",
+		"enclosedCavityHolesQty":    "ENCLOSED_CAVITY_HOLES_QUANTIT",
 	}
 
 	// Hole quantity fields (from holesInadequate defect)

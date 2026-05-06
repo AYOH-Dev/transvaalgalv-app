@@ -17,12 +17,12 @@ const podStatusDialogID = "0e8d599f-e745-44dd-bc92-207f8522fe39"
 // queuedPODStatus is a pending POD-status update, joined with the receipt's
 // source POD doc id (the upstream Documents-cabinet record).
 type queuedPODStatus struct {
-	QueueID        string
-	ReceiptID      string
-	DesiredStatus  string
-	AttemptCount   int
-	MaxAttempts    int
-	PODDocID       string
+	QueueID       string
+	ReceiptID     string
+	DesiredStatus string
+	AttemptCount  int
+	MaxAttempts   int
+	PODDocID      string
 }
 
 // EnqueuePODStatusUpdate inserts (or upserts) a pending row in

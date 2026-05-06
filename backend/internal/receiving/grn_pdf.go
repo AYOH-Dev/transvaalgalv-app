@@ -80,7 +80,7 @@ type GRNRenderLine struct {
 	LineNumber       int
 	ItemCode         string
 	Description      string
-	ConditionSummary string  // populated when a defect was flagged
+	ConditionSummary string // populated when a defect was flagged
 	ExpectedQty      float64
 	ReceivedQty      float64
 	UnitOfMeasure    string
@@ -567,7 +567,6 @@ func drawSignatureBlock(ctx renderCtx) {
 	ctx.cell(w, 4, "Name, date, signature", "", 0, "L", false, 0, "")
 }
 
-
 // ── helpers ─────────────────────────────────────────────────────────────────
 
 type rgbColor struct{ r, g, b int }
@@ -738,20 +737,20 @@ func prettifyKey(k string) string {
 // than auto-camelCase-split would produce. It's a soft override — adding
 // to it is cheap, and missing entries still get a reasonable fallback.
 var conditionKeyAliases = map[string]string{
-	"oilGreaseDiesel":         "Oil/Grease/Diesel",
-	"holesInadequate":         "Holes inadequate",
-	"enclosedCavity":          "Enclosed cavity",
-	"ventHolesQty":            "Vent holes",
-	"drainHolesQty":           "Drain holes",
-	"jigHolesQty":             "Jig holes",
-	"cavityVentHolesQty":      "Cavity vent holes",
-	"sharpEdges":              "Sharp edges",
-	"contactWithGround":       "Contact with ground",
-	"materialMarkingMissing":  "Material marking missing",
-	"weldQuality":             "Weld quality",
-	"surfaceContamination":    "Surface contamination",
-	"physicalDamage":          "Physical damage",
-	"rust":                    "Rust",
+	"oilGreaseDiesel":        "Oil/Grease/Diesel",
+	"holesInadequate":        "Holes inadequate",
+	"enclosedCavity":         "Enclosed cavity",
+	"ventHolesQty":           "Vent holes",
+	"drainHolesQty":          "Drain holes",
+	"jigHolesQty":            "Jig holes",
+	"cavityVentHolesQty":     "Cavity vent holes",
+	"sharpEdges":             "Sharp edges",
+	"contactWithGround":      "Contact with ground",
+	"materialMarkingMissing": "Material marking missing",
+	"weldQuality":            "Weld quality",
+	"surfaceContamination":   "Surface contamination",
+	"physicalDamage":         "Physical damage",
+	"rust":                   "Rust",
 }
 
 func clip(s string, n int) string {

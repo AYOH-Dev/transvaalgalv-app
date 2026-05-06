@@ -23,51 +23,51 @@ var (
 )
 
 type Receipt struct {
-	ID                      string             `json:"id"`
-	ReceiptNumber           string             `json:"receipt_number"`
-	SupplierName            string             `json:"supplier_name"`
-	CustomerName            string             `json:"customer_name"`
-	SupplierReference       string             `json:"supplier_reference"`
-	PurchaseOrderNumber     string             `json:"purchase_order_number"`
-	DeliveryNoteNumber      string             `json:"delivery_note_number"`
-	WeighbridgeTicketNumber string             `json:"weighbridge_ticket_number"`
-	VehicleRegistration     string             `json:"vehicle_registration"`
-	JobNumber               string             `json:"job_number"`
-	SourceDocuWareDocument  string             `json:"source_docuware_document_id"`
-	SourceDocuWareCabinet   string             `json:"source_docuware_cabinet_id"`
-	DocuWareRecordID        string             `json:"docuware_record_id"`
-	DocuWareGroupReference  string             `json:"docuware_group_reference"`
-	DocuWareDocURL          string             `json:"docuware_doc_url"`
-	ReceivedAt              time.Time          `json:"received_at"`
-	Status                  ReceiptStatus      `json:"status"`
-	SyncStatus              string             `json:"sync_status"`
-	Notes                   string             `json:"notes"`
-	Lines                   []ReceiptLine      `json:"lines"`
-	Documents               []ReceiptDocument  `json:"documents"`
-	Exceptions              []ReceiptException `json:"exceptions"`
-	GRNDocumentID           string             `json:"grn_document_id,omitempty"`
-	GRNDocuWareDocID        string             `json:"grn_docuware_doc_id,omitempty"`
-	GRNGeneratedAt          *time.Time         `json:"grn_generated_at,omitempty"`
-	DocuWarePODStatus       string             `json:"docuware_pod_status,omitempty"`
-	DocuWarePODStatusSyncedAt *time.Time       `json:"docuware_pod_status_synced_at,omitempty"`
-	ImportedAt              *time.Time         `json:"imported_at,omitempty"`
-	LastSyncedAt            *time.Time         `json:"last_synced_at,omitempty"`
-	CreatedAt               time.Time          `json:"created_at"`
-	UpdatedAt               time.Time          `json:"updated_at"`
+	ID                        string             `json:"id"`
+	ReceiptNumber             string             `json:"receipt_number"`
+	SupplierName              string             `json:"supplier_name"`
+	CustomerName              string             `json:"customer_name"`
+	SupplierReference         string             `json:"supplier_reference"`
+	PurchaseOrderNumber       string             `json:"purchase_order_number"`
+	DeliveryNoteNumber        string             `json:"delivery_note_number"`
+	WeighbridgeTicketNumber   string             `json:"weighbridge_ticket_number"`
+	VehicleRegistration       string             `json:"vehicle_registration"`
+	JobNumber                 string             `json:"job_number"`
+	SourceDocuWareDocument    string             `json:"source_docuware_document_id"`
+	SourceDocuWareCabinet     string             `json:"source_docuware_cabinet_id"`
+	DocuWareRecordID          string             `json:"docuware_record_id"`
+	DocuWareGroupReference    string             `json:"docuware_group_reference"`
+	DocuWareDocURL            string             `json:"docuware_doc_url"`
+	ReceivedAt                time.Time          `json:"received_at"`
+	Status                    ReceiptStatus      `json:"status"`
+	SyncStatus                string             `json:"sync_status"`
+	Notes                     string             `json:"notes"`
+	Lines                     []ReceiptLine      `json:"lines"`
+	Documents                 []ReceiptDocument  `json:"documents"`
+	Exceptions                []ReceiptException `json:"exceptions"`
+	GRNDocumentID             string             `json:"grn_document_id,omitempty"`
+	GRNDocuWareDocID          string             `json:"grn_docuware_doc_id,omitempty"`
+	GRNGeneratedAt            *time.Time         `json:"grn_generated_at,omitempty"`
+	DocuWarePODStatus         string             `json:"docuware_pod_status,omitempty"`
+	DocuWarePODStatusSyncedAt *time.Time         `json:"docuware_pod_status_synced_at,omitempty"`
+	ImportedAt                *time.Time         `json:"imported_at,omitempty"`
+	LastSyncedAt              *time.Time         `json:"last_synced_at,omitempty"`
+	CreatedAt                 time.Time          `json:"created_at"`
+	UpdatedAt                 time.Time          `json:"updated_at"`
 }
 
 type ReceiptLine struct {
-	ID                  string     `json:"id"`
-	LineNumber          int        `json:"line_number"`
-	ItemCode            string     `json:"item_code"`
-	Description         string     `json:"description"`
-	MaterialCode        string     `json:"material_code"`
-	MaterialDescription string     `json:"material_description"`
-	MaterialSize        string     `json:"material_size"`
-	MaterialMarkings    string     `json:"material_markings"`
-	MaterialThickness   string     `json:"material_thickness"`
-	MaterialLength      string     `json:"material_length"`
-	Weight              string     `json:"weight"`
+	ID                    string     `json:"id"`
+	LineNumber            int        `json:"line_number"`
+	ItemCode              string     `json:"item_code"`
+	Description           string     `json:"description"`
+	MaterialCode          string     `json:"material_code"`
+	MaterialDescription   string     `json:"material_description"`
+	MaterialSize          string     `json:"material_size"`
+	MaterialMarkings      string     `json:"material_markings"`
+	MaterialThickness     string     `json:"material_thickness"`
+	MaterialLength        string     `json:"material_length"`
+	Weight                string     `json:"weight"`
 	InternalDescription   string     `json:"internal_description"`
 	ItemType              string     `json:"item_type"`
 	PackagingMethod       string     `json:"packaging_method"`
@@ -75,20 +75,20 @@ type ReceiptLine struct {
 	Comments              string     `json:"comments"`
 	RequiredGalvThickness string     `json:"required_galv_thickness"`
 	Process               string     `json:"process"`
-	StoredIn            string     `json:"stored_in"`
-	Bay                 string     `json:"bay"`
-	ExpectedQuantity    float64    `json:"expected_quantity"`
-	ReceivedQuantity    float64    `json:"received_quantity"`
-	UnitOfMeasure       string     `json:"unit_of_measure"`
-	ReceivingStatus     string     `json:"receiving_status"`
-	Discrepancy         string     `json:"discrepancy"`
-	QuantityDiscrepancy string     `json:"quantity_discrepancy"`
-	ConditionNotes      string     `json:"condition_notes"`
-	DocuWareRecordLine  string     `json:"docuware_record_line_id"`
-	DocuWareUniqueNo    string     `json:"docuware_unique_number"`
-	DocuWarePrimaryKey  string     `json:"docuware_primary_key"`
-	DocuWareDocID       string     `json:"docuware_doc_id"`
-	LastSyncedAt        *time.Time `json:"last_synced_at,omitempty"`
+	StoredIn              string     `json:"stored_in"`
+	Bay                   string     `json:"bay"`
+	ExpectedQuantity      float64    `json:"expected_quantity"`
+	ReceivedQuantity      float64    `json:"received_quantity"`
+	UnitOfMeasure         string     `json:"unit_of_measure"`
+	ReceivingStatus       string     `json:"receiving_status"`
+	Discrepancy           string     `json:"discrepancy"`
+	QuantityDiscrepancy   string     `json:"quantity_discrepancy"`
+	ConditionNotes        string     `json:"condition_notes"`
+	DocuWareRecordLine    string     `json:"docuware_record_line_id"`
+	DocuWareUniqueNo      string     `json:"docuware_unique_number"`
+	DocuWarePrimaryKey    string     `json:"docuware_primary_key"`
+	DocuWareDocID         string     `json:"docuware_doc_id"`
+	LastSyncedAt          *time.Time `json:"last_synced_at,omitempty"`
 }
 
 type ReceiptDocument struct {
@@ -158,8 +158,8 @@ type UpdateReceiptLineInput struct {
 // BulkDefectEntry is a defect key with a resolved severity and toggle-only
 // mitigations. Used in BulkDefectDiff.Add.
 type BulkDefectEntry struct {
-	Key        string   `json:"key"`
-	Severity   string   `json:"severity"`
+	Key         string   `json:"key"`
+	Severity    string   `json:"severity"`
 	Mitigations []string `json:"mitigations"`
 }
 
@@ -177,9 +177,9 @@ type BulkDefectDiff struct {
 // Defects is optional; when set it is merged into each line's condition_notes
 // rather than replacing it wholesale.
 type BulkUpdateReceiptLinesInput struct {
-	LineIDs []string                `json:"line_ids"`
-	Patch   UpdateReceiptLineInput  `json:"patch"`
-	Defects *BulkDefectDiff         `json:"defects,omitempty"`
+	LineIDs []string               `json:"line_ids"`
+	Patch   UpdateReceiptLineInput `json:"patch"`
+	Defects *BulkDefectDiff        `json:"defects,omitempty"`
 }
 
 // BulkUpdateReceiptLinesResult reports per-line outcomes. Updated holds the
@@ -191,18 +191,18 @@ type BulkUpdateReceiptLinesResult struct {
 }
 
 type CreateGRNInput struct {
-	DeliveryNoteNumber      string             `json:"delivery_note_number"`
-	OrderNumber             string             `json:"order_number"`
-	VehicleRegistration     string             `json:"vehicle_registration"`
-	DeliveryDate            string             `json:"delivery_date"`
-	WeighbridgeTicketNumber string             `json:"weighbridge_ticket_number"`
-	Company                 string             `json:"company"`
-	Fabricator              string             `json:"fabricator"`
-	JobComments             string             `json:"job_comments"`
-	StoredBy                string             `json:"stored_by"`
-	CompletionDate          string             `json:"completion_date"`
-	ProductName             string             `json:"product_name"`
-	ProcessingStatus        string             `json:"processing_status"`
+	DeliveryNoteNumber      string               `json:"delivery_note_number"`
+	OrderNumber             string               `json:"order_number"`
+	VehicleRegistration     string               `json:"vehicle_registration"`
+	DeliveryDate            string               `json:"delivery_date"`
+	WeighbridgeTicketNumber string               `json:"weighbridge_ticket_number"`
+	Company                 string               `json:"company"`
+	Fabricator              string               `json:"fabricator"`
+	JobComments             string               `json:"job_comments"`
+	StoredBy                string               `json:"stored_by"`
+	CompletionDate          string               `json:"completion_date"`
+	ProductName             string               `json:"product_name"`
+	ProcessingStatus        string               `json:"processing_status"`
 	Lines                   []CreateGRNLineInput `json:"lines"`
 
 	// ReceivedByUserID and ReceivedByName are set server-side from the

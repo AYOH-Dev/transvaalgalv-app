@@ -274,7 +274,7 @@ func (a *App) handleSyncReceiptLineDocuWare(w http.ResponseWriter, r *http.Reque
 	}
 
 	writeJSON(w, http.StatusAccepted, map[string]string{
-		"status": "queued",
+		"status":  "queued",
 		"message": "Line sync queued for DocuWare",
 	})
 }

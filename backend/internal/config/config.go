@@ -10,21 +10,21 @@ import (
 )
 
 type Config struct {
-	AppName               string
-	Environment           string
-	Port                  string
-	PublicBaseURL         string
-	AccessTokenTTL        time.Duration
-	DatabaseURL           string
-	JWTSecret             string
-	BootstrapAdminToken   string
-	DocuWareBaseURL       string
-	DocuWareFileCabinetID string
-	DocuWarePushUsername  string
-	DocuWarePushPassword  string
-	DocuWareUsername      string
-	DocuWarePassword      string
-	DocuWareSyncInterval  time.Duration
+	AppName                string
+	Environment            string
+	Port                   string
+	PublicBaseURL          string
+	AccessTokenTTL         time.Duration
+	DatabaseURL            string
+	JWTSecret              string
+	BootstrapAdminToken    string
+	DocuWareBaseURL        string
+	DocuWareFileCabinetID  string
+	DocuWarePushUsername   string
+	DocuWarePushPassword   string
+	DocuWareUsername       string
+	DocuWarePassword       string
+	DocuWareSyncInterval   time.Duration
 	DocuWareSyncMaxWorkers int
 
 	// DocuWare integration-URL parameters for receiver-facing POD viewing.
@@ -38,8 +38,8 @@ type Config struct {
 
 	// Filesystem location for captured photos (defect photos, future arrival/per-line).
 	// Files live here until the DocuWare worker pushes them as Sections.
-	PhotoStorageDir    string
-	PhotoMaxBytes      int64
+	PhotoStorageDir string
+	PhotoMaxBytes   int64
 
 	// How many days a 'matched' receipt remains in the active list before
 	// being auto-archived. Archived receipts are still queryable via
@@ -69,21 +69,21 @@ func Load() (Config, error) {
 	}
 
 	cfg := Config{
-		AppName:               "transvaalgalv-app",
-		Environment:           getenv("APP_ENV", "development"),
-		Port:                  getenv("PORT", "8080"),
-		PublicBaseURL:         getenv("PUBLIC_BASE_URL", "https://transvaal.ayai.live"),
-		AccessTokenTTL:        accessTokenTTL,
-		DatabaseURL:           os.Getenv("TRANSVAAL_DATABASE_URL"),
-		JWTSecret:             os.Getenv("JWT_SECRET"),
-		BootstrapAdminToken:   os.Getenv("BOOTSTRAP_ADMIN_TOKEN"),
-		DocuWareBaseURL:       os.Getenv("DOCUWARE_BASE_URL"),
-		DocuWareFileCabinetID: os.Getenv("DOCUWARE_FILE_CABINET_ID"),
-		DocuWarePushUsername:  strings.TrimSpace(os.Getenv("DOCUWARE_PUSH_USERNAME")),
-		DocuWarePushPassword:  strings.TrimSpace(os.Getenv("DOCUWARE_PUSH_PASSWORD")),
-		DocuWareUsername:      os.Getenv("DOCUWARE_USERNAME"),
-		DocuWarePassword:      os.Getenv("DOCUWARE_PASSWORD"),
-		DocuWareSyncInterval:  syncInterval,
+		AppName:                "transvaalgalv-app",
+		Environment:            getenv("APP_ENV", "development"),
+		Port:                   getenv("PORT", "8080"),
+		PublicBaseURL:          getenv("PUBLIC_BASE_URL", "https://transvaal.ayai.live"),
+		AccessTokenTTL:         accessTokenTTL,
+		DatabaseURL:            os.Getenv("TRANSVAAL_DATABASE_URL"),
+		JWTSecret:              os.Getenv("JWT_SECRET"),
+		BootstrapAdminToken:    os.Getenv("BOOTSTRAP_ADMIN_TOKEN"),
+		DocuWareBaseURL:        os.Getenv("DOCUWARE_BASE_URL"),
+		DocuWareFileCabinetID:  os.Getenv("DOCUWARE_FILE_CABINET_ID"),
+		DocuWarePushUsername:   strings.TrimSpace(os.Getenv("DOCUWARE_PUSH_USERNAME")),
+		DocuWarePushPassword:   strings.TrimSpace(os.Getenv("DOCUWARE_PUSH_PASSWORD")),
+		DocuWareUsername:       os.Getenv("DOCUWARE_USERNAME"),
+		DocuWarePassword:       os.Getenv("DOCUWARE_PASSWORD"),
+		DocuWareSyncInterval:   syncInterval,
 		DocuWareSyncMaxWorkers: maxWorkers,
 
 		DocuWareIntegrationPassphraseB64: strings.TrimSpace(os.Getenv("DOCUWARE_INTEGRATION_PASSPHRASE_B64")),

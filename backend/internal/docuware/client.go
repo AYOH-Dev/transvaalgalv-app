@@ -15,14 +15,14 @@ import (
 )
 
 type Client struct {
-	baseURL         string
-	cabinetID       string
-	username        string
-	password        string
-	tokenEndpoint   string
-	httpClient      *http.Client
-	token           string
-	tokenExpiry     time.Time
+	baseURL            string
+	cabinetID          string
+	username           string
+	password           string
+	tokenEndpoint      string
+	httpClient         *http.Client
+	token              string
+	tokenExpiry        time.Time
 	discoveredEndpoint bool
 }
 
@@ -41,8 +41,8 @@ type IdentityServiceInfo struct {
 }
 
 type FieldUpdate struct {
-	FieldName         string  `json:"FieldName"`
-	Item              string  `json:"Item,omitempty"`
+	FieldName string `json:"FieldName"`
+	Item      string `json:"Item,omitempty"`
 	// ItemElementName is the XML-choice-type discriminator. DocuWare's
 	// deserializer rejects the request when this is present-but-empty
 	// (BadRequest: "Error converting value \"\" to type 'ItemChoiceType'").
@@ -57,20 +57,20 @@ type FieldUpdate struct {
 }
 
 type FieldsUpdateRequest struct {
-	Field                  []FieldUpdate `json:"Field"`
-	DialogId               string        `json:"DialogId"`
-	NormalizeCoordinates   bool          `json:"NormalizeCoordinates"`
+	Field                []FieldUpdate `json:"Field"`
+	DialogId             string        `json:"DialogId"`
+	NormalizeCoordinates bool          `json:"NormalizeCoordinates"`
 }
 
 func NewClient(baseURL, cabinetID, username, password string) *Client {
 	// For this project, the OAuth token endpoint is fixed (tenant-specific identity server)
 	// Future enhancement: could be made configurable via environment variable
 	return &Client{
-		baseURL:        strings.TrimSuffix(baseURL, "/"),
-		cabinetID:      cabinetID,
-		username:       username,
-		password:       password,
-		tokenEndpoint:  "https://login-emea.docuware.cloud/b4a3e702-f181-4371-a2b0-a94f26b8d7b7/connect/token",
+		baseURL:            strings.TrimSuffix(baseURL, "/"),
+		cabinetID:          cabinetID,
+		username:           username,
+		password:           password,
+		tokenEndpoint:      "https://login-emea.docuware.cloud/b4a3e702-f181-4371-a2b0-a94f26b8d7b7/connect/token",
 		discoveredEndpoint: true,
 		httpClient: &http.Client{
 			Timeout: 30 * time.Second,
@@ -85,9 +85,9 @@ func (c *Client) ensureToken(ctx context.Context) error {
 
 	body := strings.NewReader(
 		"grant_type=password&" +
-		"client_id=docuware.platform.net.client&" +
-		"scope=docuware.platform&" +
-		fmt.Sprintf("username=%s&password=%s", c.username, c.password),
+			"client_id=docuware.platform.net.client&" +
+			"scope=docuware.platform&" +
+			fmt.Sprintf("username=%s&password=%s", c.username, c.password),
 	)
 
 	req, err := http.NewRequestWithContext(ctx, "POST", c.tokenEndpoint, body)
