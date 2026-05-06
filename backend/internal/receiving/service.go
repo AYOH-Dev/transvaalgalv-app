@@ -559,6 +559,76 @@ func (s *Service) UpdateReceiptLine(ctx context.Context, receiptID, lineID strin
 	return line, nil
 }
 
+// BulkUpdateReceiptLines applies the same patch to every line ID provided.
+// Per-line failures are collected into the result rather than aborting the
+// batch — the frontend treats partial success as the contract. Side effects
+// shared across the batch (POD status recompute, auto-advance to received)
+// fire once at the end instead of per line.
+func (s *Service) BulkUpdateReceiptLines(ctx context.Context, receiptID string, input BulkUpdateReceiptLinesInput) (BulkUpdateReceiptLinesResult, error) {
+	if s.repository == nil {
+		return BulkUpdateReceiptLinesResult{}, ErrUnavailable
+	}
+	if strings.TrimSpace(receiptID) == "" {
+		return BulkUpdateReceiptLinesResult{}, fmt.Errorf("%w: receipt id is required", ErrInvalidInput)
+	}
+	if len(input.LineIDs) == 0 {
+		return BulkUpdateReceiptLinesResult{}, fmt.Errorf("%w: line_ids is required", ErrInvalidInput)
+	}
+
+	result := BulkUpdateReceiptLinesResult{
+		Updated: make([]ReceiptLine, 0, len(input.LineIDs)),
+		Errors:  map[string]string{},
+	}
+
+	// Per-line repository updates. We deliberately call the repository here
+	// rather than s.UpdateReceiptLine to suppress the per-line POD status /
+	// auto-advance side effects — those run once at the end of the batch.
+	// DocuWare line sync still fires per line because each line is its own
+	// DocuWare record.
+	patch := input.Patch
+	for _, lineID := range input.LineIDs {
+		id := strings.TrimSpace(lineID)
+		if id == "" {
+			continue
+		}
+		line, err := s.repository.UpdateReceiptLine(ctx, receiptID, id, patch)
+		if err != nil {
+			result.Errors[id] = err.Error()
+			continue
+		}
+		result.Updated = append(result.Updated, line)
+
+		// Per-line DocuWare sync mirrors UpdateReceiptLine. Best-effort.
+		if patch.ReceivingStatus != nil && s.syncEnqueuer != nil {
+			if err := s.syncEnqueuer.SyncLineNow(ctx, receiptID, id); err != nil {
+				log.Printf("warn: failed to sync line to docuware (receipt=%s, line=%s): %v", receiptID, id, err)
+			}
+		}
+	}
+
+	// Auto-advance to received once — only if the batch flipped at least one
+	// line to received and now all lines on the receipt are received.
+	if patch.ReceivingStatus != nil && *patch.ReceivingStatus == "received" && len(result.Updated) > 0 {
+		if receipt, err := s.repository.GetReceipt(ctx, receiptID); err == nil {
+			if receipt.Status == ReceiptStatusDraft && len(receipt.Lines) > 0 && allLinesReceived(receipt.Lines) {
+				newStatus := ReceiptStatusReceived
+				if _, err := s.repository.UpdateReceipt(ctx, receiptID, UpdateReceiptInput{Status: &newStatus}); err != nil {
+					log.Printf("warn: failed to auto-advance receipt to received (receipt=%s): %v", receiptID, err)
+				}
+			}
+		}
+	}
+
+	// POD status recompute fires once per batch.
+	if patch.ReceivingStatus != nil && len(result.Updated) > 0 {
+		if err := s.MaybeUpdatePODStatus(ctx, receiptID); err != nil {
+			log.Printf("warn: failed to enqueue pod status update (receipt=%s): %v", receiptID, err)
+		}
+	}
+
+	return result, nil
+}
+
 func allLinesReceived(lines []ReceiptLine) bool {
 	for _, l := range lines {
 		if l.ReceivingStatus != "received" {

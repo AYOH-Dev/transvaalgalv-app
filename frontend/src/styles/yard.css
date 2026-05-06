@@ -1197,3 +1197,246 @@
   .defect-row { grid-template-columns: 1fr; gap: 8px; }
   .review-row, .review-row--col { grid-template-columns: 1fr; gap: 4px; }
 }
+
+/* ── Multi-select bulk action ──────────────────────────────────────────── */
+.yard-line-selectall {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 8px 14px; min-height: 44px;
+  border-radius: 10px;
+  background: var(--yard-surface);
+  border: 1px solid var(--yard-line-2);
+  color: var(--yard-ink-2);
+  font-family: inherit; font-size: var(--yard-fs-sm); font-weight: 600;
+  cursor: pointer;
+  user-select: none;
+}
+.yard-line-selectall:hover { background: var(--yard-bg); }
+.yard-line-selectall input[type="checkbox"] {
+  width: 22px; height: 22px;
+  accent-color: var(--yard-brand);
+  cursor: pointer;
+}
+
+.yard-line__select {
+  display: inline-flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  padding: 4px;
+  cursor: pointer;
+}
+.yard-line__select input[type="checkbox"] {
+  width: 26px; height: 26px;
+  accent-color: var(--yard-brand);
+  cursor: pointer;
+}
+.yard-line--selected {
+  background: color-mix(in srgb, var(--yard-brand) 8%, var(--yard-surface));
+  border-color: var(--yard-brand);
+}
+
+/* Sticky bulk action bar — appears when lines are selected. Keep above the
+ * viewport bottom on tablets so it clears the OS gesture area. */
+.yard-bulkbar {
+  position: sticky; bottom: 12px;
+  margin-top: 16px;
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 12px 18px;
+  background: var(--yard-ink);
+  color: var(--yard-surface);
+  border-radius: 14px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.18);
+  z-index: 5;
+}
+.yard-bulkbar__count {
+  font-size: var(--yard-fs-md);
+}
+.yard-bulkbar__count strong {
+  font-size: var(--yard-fs-lg);
+  font-weight: 800;
+  margin-right: 4px;
+}
+.yard-bulkbar__actions {
+  display: flex; gap: 8px;
+}
+.yard-bulkbar .yard-btn-ghost {
+  background: transparent;
+  color: var(--yard-surface);
+  border: 1px solid color-mix(in srgb, var(--yard-surface) 40%, transparent);
+}
+.yard-bulkbar .yard-btn-ghost:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--yard-surface) 12%, transparent);
+}
+
+/* Outdoor mode: bigger checkboxes, stronger contrast on selected rows */
+.yard-shell--outdoor .yard-line__select input[type="checkbox"] { width: 30px; height: 30px; }
+.yard-shell--outdoor .yard-line-selectall input[type="checkbox"] { width: 26px; height: 26px; }
+.yard-shell--outdoor .yard-line--selected {
+  background: color-mix(in srgb, var(--yard-brand) 14%, var(--yard-surface));
+}
+.yard-shell--outdoor .yard-bulkbar {
+  padding: 16px 22px;
+  font-size: var(--yard-fs-lg);
+}
+
+/* ── Bulk-edit side sheet ──────────────────────────────────────────────── */
+.bulk-sheet__overlay {
+  position: fixed; inset: 0;
+  background: rgba(15, 23, 42, 0.55);
+  display: flex; justify-content: flex-end;
+  z-index: 50;
+  animation: bulk-sheet-fade 0.12s ease-out;
+}
+@keyframes bulk-sheet-fade { from { opacity: 0; } to { opacity: 1; } }
+
+.bulk-sheet {
+  width: min(560px, 100%);
+  height: 100%;
+  background: var(--yard-bg);
+  display: flex; flex-direction: column;
+  box-shadow: -8px 0 32px rgba(0,0,0,0.25);
+  animation: bulk-sheet-slide 0.18s ease-out;
+}
+@keyframes bulk-sheet-slide { from { transform: translateX(100%); } to { transform: translateX(0); } }
+
+.bulk-sheet__head {
+  padding: 18px 22px;
+  border-bottom: 1px solid var(--yard-line);
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
+  background: var(--yard-surface);
+}
+.bulk-sheet__title {
+  margin: 0;
+  font-size: var(--yard-fs-lg);
+  font-weight: 800;
+  color: var(--yard-ink);
+}
+.bulk-sheet__sub {
+  margin: 4px 0 0;
+  font-size: var(--yard-fs-sm);
+  color: var(--yard-ink-3);
+}
+.bulk-sheet__close {
+  background: transparent;
+  border: 1px solid var(--yard-line);
+  border-radius: 8px;
+  width: 36px; height: 36px;
+  font-size: 24px; line-height: 1;
+  color: var(--yard-ink-2);
+  cursor: pointer;
+}
+.bulk-sheet__close:hover:not(:disabled) { background: var(--yard-line); }
+.bulk-sheet__close:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.bulk-sheet__body {
+  flex: 1; overflow-y: auto;
+  padding: 18px 22px;
+  display: flex; flex-direction: column; gap: 14px;
+}
+
+.bulk-field {
+  background: var(--yard-surface);
+  border: 1px solid var(--yard-line);
+  border-radius: 12px;
+  padding: 12px 14px;
+  transition: border-color 0.12s, background 0.12s;
+}
+.bulk-field--touched {
+  border-color: var(--yard-brand);
+  background: color-mix(in srgb, var(--yard-brand) 6%, var(--yard-surface));
+}
+.bulk-field--disabled { opacity: 0.55; }
+.bulk-field__head {
+  display: flex; align-items: center; gap: 10px;
+  margin-bottom: 8px;
+}
+.bulk-field__label {
+  font-size: var(--yard-fs-sm);
+  text-transform: uppercase; letter-spacing: 0.06em;
+  font-weight: 700; color: var(--yard-ink-2);
+}
+.bulk-field__badge {
+  font-size: var(--yard-fs-xs, 0.75rem);
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--yard-bg);
+  color: var(--yard-ink-3);
+  font-weight: 600;
+}
+.bulk-field__badge--touched {
+  background: var(--yard-brand);
+  color: #fff;
+}
+.bulk-field__clear {
+  margin-left: auto;
+  background: transparent; border: 0;
+  font-size: var(--yard-fs-xs, 0.75rem); font-weight: 700;
+  color: var(--yard-ink-3);
+  cursor: pointer;
+  text-decoration: underline;
+}
+.bulk-field__clear:hover { color: var(--yard-ink); }
+.bulk-field__note {
+  margin: 6px 0 0;
+  font-size: var(--yard-fs-xs, 0.75rem);
+  color: var(--yard-ink-3);
+}
+
+.bulk-sheet__input {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--yard-line-2);
+  background: var(--yard-surface); color: var(--yard-ink);
+  font-family: inherit; font-size: var(--yard-fs-md);
+  min-height: 44px;
+  resize: vertical;
+}
+.bulk-sheet__input:focus {
+  outline: none; border-color: var(--yard-brand);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--yard-brand) 30%, transparent);
+}
+
+.bulk-sheet__receive {
+  margin-top: 4px;
+  padding: 12px 14px;
+  background: var(--yard-surface);
+  border: 1px solid var(--yard-line);
+  border-radius: 12px;
+}
+.bulk-sheet__receive label {
+  display: inline-flex; align-items: center; gap: 10px;
+  font-size: var(--yard-fs-md); font-weight: 700;
+  color: var(--yard-ink); cursor: pointer;
+}
+.bulk-sheet__receive input[type="checkbox"] {
+  width: 22px; height: 22px;
+  accent-color: var(--yard-brand);
+}
+.bulk-sheet__hint {
+  margin: 6px 0 0 32px;
+  font-size: var(--yard-fs-xs, 0.75rem);
+  color: var(--yard-ink-3);
+}
+
+.bulk-sheet__error {
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: var(--yard-error-bg, rgba(239,68,68,0.08));
+  color: var(--yard-error-fg, #b91c1c);
+  border: 1px solid var(--yard-error-border, rgba(239,68,68,0.4));
+  font-size: var(--yard-fs-sm); font-weight: 600;
+}
+
+.bulk-sheet__foot {
+  padding: 14px 22px;
+  border-top: 1px solid var(--yard-line);
+  display: flex; gap: 10px;
+  background: var(--yard-surface);
+}
+
+@media (max-width: 600px) {
+  .bulk-sheet { width: 100%; }
+}
+
+/* Outdoor mode tweaks */
+.yard-shell--outdoor .bulk-sheet__input { min-height: 52px; font-size: var(--yard-fs-lg); }
+.yard-shell--outdoor .bulk-sheet__receive input[type="checkbox"] { width: 26px; height: 26px; }

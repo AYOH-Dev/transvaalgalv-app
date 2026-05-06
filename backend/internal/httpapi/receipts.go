@@ -198,6 +198,39 @@ func (a *App) handleUpdateReceiptLine(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, line)
 }
 
+func (a *App) handleBulkUpdateReceiptLines(w http.ResponseWriter, r *http.Request) {
+	receiptID := r.PathValue("id")
+
+	var input receiving.BulkUpdateReceiptLinesInput
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	// Stamp the confirmer once for the whole batch — same pattern as the
+	// per-line handler (the repository only writes received_by_* on the
+	// transition to "received").
+	subject, ok := currentSubject(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "authentication required")
+		return
+	}
+	input.Patch.ReceivedByUserID = subject.UserID
+	if user, err := a.users.CurrentUser(r.Context(), subject.UserID); err == nil {
+		input.Patch.ReceivedByName = user.DisplayName
+	} else {
+		input.Patch.ReceivedByName = subject.Email
+	}
+
+	result, err := a.receiving.BulkUpdateReceiptLines(r.Context(), receiptID, input)
+	if err != nil {
+		mapReceivingError(w, err)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, result)
+}
+
 func (a *App) handleSyncReceiptLineDocuWare(w http.ResponseWriter, r *http.Request) {
 	receiptID := r.PathValue("id")
 	var payload struct {

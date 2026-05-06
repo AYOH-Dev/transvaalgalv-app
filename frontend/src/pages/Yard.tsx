@@ -10,6 +10,7 @@ import {
   type MitigationQuantity,
   DEFECT_CATEGORIES,
   MITIGATION_NO_QTY,
+  BAY_OPTIONS,
   availableProcesses,
   defaultDefectValues,
   hasAnyDefect,
@@ -18,6 +19,7 @@ import {
   fetchGRNBlobUrl,
 } from '../lib/receipts'
 import PhotoCapture from '../components/PhotoCapture'
+import { BulkLineEditSheet, type BulkPatch } from '../components/BulkLineEditSheet'
 import '../styles/yard.css'
 
 // All defect items flattened from the canonical category list. The yard surfaces
@@ -55,6 +57,10 @@ type YardLineState = {
   item_type?: string
   process?: string
   packaging?: string
+  bay?: string
+  stored_in?: string
+  accessories?: string
+  comments?: string
   defects?: Record<string, string>
   mitigations?: MitigationSelection
   quantities?: MitigationQuantity
@@ -192,6 +198,12 @@ export default function Yard({ onLogout }: { onLogout?: () => void }) {
       packaging_method: st.packaging,
       receiving_status: 'received',
     }
+    // Storage fields are optional — only send when the receiver supplied a
+    // value, so omitted fields don't blank out anything saved earlier.
+    if (st.bay !== undefined)         edit.bay = st.bay
+    if (st.stored_in !== undefined)   edit.stored_in = st.stored_in
+    if (st.accessories !== undefined) edit.accessories = st.accessories
+    if (st.comments !== undefined)    edit.comments = st.comments
     const notes = (st.notes ?? '').trim()
     const hasDefects = !!(st.defects && st.hasDefects)
     if (hasDefects || notes) {
@@ -236,6 +248,63 @@ export default function Yard({ onLogout }: { onLogout?: () => void }) {
       return { ok: false, error: (err as Error).message === 'unauthorized' ? 'Session expired — sign in again' : 'Network error — try again' }
     } finally { setSavingLineId(null) }
   }, [showToast])
+
+  // Bulk apply: single round-trip to the backend bulk endpoint. The server
+  // applies the patch per line and returns per-line results; partial success
+  // is the contract.
+  const persistBulk = useCallback(async (
+    receiptId: string,
+    lineIds: string[],
+    edit: LineEdit,
+    markReceived: boolean,
+  ): Promise<{ updated: ReceiptLine[]; errors: Record<string, string> }> => {
+    const patch: LineEdit = { ...edit }
+    if (markReceived) patch.receiving_status = 'received'
+
+    let updated: ReceiptLine[] = []
+    let errors: Record<string, string> = {}
+    try {
+      const res = await apiFetch(`/receipts/${receiptId}/lines/bulk-update`, {
+        method: 'POST',
+        body: JSON.stringify({ line_ids: lineIds, patch }),
+      })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        // Whole-batch failure (auth/validation/etc) — surface against every id.
+        const msg = body.error || `Save failed (${res.status})`
+        for (const id of lineIds) errors[id] = msg
+        return { updated, errors }
+      }
+      const body = await res.json() as { updated?: ReceiptLine[]; errors?: Record<string, string> }
+      updated = body.updated ?? []
+      errors = body.errors ?? {}
+    } catch (err) {
+      const msg = (err as Error).message === 'unauthorized'
+        ? 'Session expired — sign in again'
+        : 'Network error — try again'
+      for (const id of lineIds) errors[id] = msg
+      return { updated, errors }
+    }
+
+    if (updated.length) {
+      const byId = new Map(updated.map(l => [l.id, l]))
+      setReceipts(prev => prev.map(r => r.id === receiptId
+        ? { ...r, lines: r.lines.map(l => byId.get(l.id) ?? l) }
+        : r))
+      // Mirror per-line behavior: persisting receiving_status='received' should
+      // also flip the lineState flag so list/walkthrough views update.
+      if (markReceived) {
+        setLineState(prev => {
+          const next = { ...prev }
+          for (const l of updated) {
+            next[l.id] = { ...next[l.id], received: true }
+          }
+          return next
+        })
+      }
+    }
+    return { updated, errors }
+  }, [])
 
   const [viewingPODFor, setViewingPODFor] = useState<string | null>(null)
   const [podModal, setPodModal] = useState<{ url: string; receiptId: string } | null>(null)
@@ -411,6 +480,7 @@ export default function Yard({ onLogout }: { onLogout?: () => void }) {
           onIssueGRN={() => issueGRN(active.id)}
           onViewGRN={() => viewGRN(active.id)}
           onSaveHeader={persistReceipt}
+          onBulkApply={persistBulk}
           onViewPOD={viewPOD}
           viewingPODFor={viewingPODFor}
         />
@@ -615,7 +685,7 @@ function YardLoadsList({ pods, lineState, onOpen, onViewPOD, viewingPODFor }: {
 // ════════════════════════════════════════════════════════════════════════════
 // DETAIL
 // ════════════════════════════════════════════════════════════════════════════
-function YardLoadDetail({ pod, lineState, savingLineId, onBack, onWalk, onConfirmAsExpected, onIssueGRN, onViewGRN, onSaveHeader, onViewPOD, viewingPODFor }: {
+function YardLoadDetail({ pod, lineState, savingLineId, onBack, onWalk, onConfirmAsExpected, onIssueGRN, onViewGRN, onSaveHeader, onBulkApply, onViewPOD, viewingPODFor }: {
   pod: Receipt
   lineState: LineStateMap
   savingLineId: string | null
@@ -625,6 +695,7 @@ function YardLoadDetail({ pod, lineState, savingLineId, onBack, onWalk, onConfir
   onIssueGRN: () => void
   onViewGRN: () => void
   onSaveHeader: (receiptId: string, edits: ReceiptEdit) => Promise<{ ok: true } | { ok: false; error: string }>
+  onBulkApply: (receiptId: string, lineIds: string[], edit: LineEdit, markReceived: boolean) => Promise<{ updated: ReceiptLine[]; errors: Record<string, string> }>
   onViewPOD: (receiptId: string) => void
   viewingPODFor: string | null
 }) {
@@ -653,6 +724,63 @@ function YardLoadDetail({ pod, lineState, savingLineId, onBack, onWalk, onConfir
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'received' | 'flagged'>('all')
 
+  // Multi-select for bulk actions. Scoped to this load — cleared on back-nav
+  // because the component unmounts. Hidden once the GRN is issued.
+  const [selectedLineIds, setSelectedLineIds] = useState<Set<string>>(new Set())
+  const toggleSelect = useCallback((lineId: string) => {
+    setSelectedLineIds(prev => {
+      const next = new Set(prev)
+      if (next.has(lineId)) next.delete(lineId); else next.add(lineId)
+      return next
+    })
+  }, [])
+  const clearSelection = useCallback(() => setSelectedLineIds(new Set()), [])
+
+  // Bulk-edit sheet state. Per-line errors surface inside the sheet so the
+  // receiver can see which lines failed and retry without losing the edit.
+  const [sheetOpen, setSheetOpen] = useState(false)
+  const [sheetBusy, setSheetBusy] = useState(false)
+  const [sheetErrors, setSheetErrors] = useState<Record<string, string>>({})
+  const { showToast: showSheetToast } = useToast()
+
+  const openSheet = () => { setSheetErrors({}); setSheetOpen(true) }
+  const closeSheet = () => { if (!sheetBusy) { setSheetOpen(false); setSheetErrors({}) } }
+
+  const applyBulk = async ({ patch, markReceived }: BulkPatch) => {
+    const ids = [...selectedLineIds]
+    if (ids.length === 0) return
+    setSheetBusy(true)
+    setSheetErrors({})
+    try {
+      const { updated, errors } = await onBulkApply(pod.id, ids, patch, markReceived)
+      const failedCount = Object.keys(errors).length
+      if (failedCount === 0) {
+        showSheetToast(`Updated ${updated.length} line${updated.length === 1 ? '' : 's'}`, 'success')
+        setSheetOpen(false)
+        setSelectedLineIds(prev => {
+          const next = new Set(prev)
+          for (const l of updated) next.delete(l.id)
+          return next
+        })
+      } else {
+        setSheetErrors(errors)
+        showSheetToast(
+          `Updated ${updated.length} of ${ids.length} — ${failedCount} failed`,
+          updated.length === 0 ? 'error' : 'info',
+        )
+        // Keep failed lines selected so the receiver can retry; drop the
+        // successful ones so a retry only re-runs the failures.
+        setSelectedLineIds(prev => {
+          const next = new Set(prev)
+          for (const l of updated) next.delete(l.id)
+          return next
+        })
+      }
+    } finally {
+      setSheetBusy(false)
+    }
+  }
+
   const filteredLines = lines.filter((l) => {
     const st = lineState[l.id] || {}
     const isReceived = st.received || l.receiving_status === 'received'
@@ -668,6 +796,23 @@ function YardLoadDetail({ pod, lineState, savingLineId, onBack, onWalk, onConfir
     ].filter(Boolean).join(' ').toLowerCase()
     return hay.includes(q)
   })
+
+  // Bulk-action select-all targets only currently-visible (filtered) lines so
+  // the receiver can scope a bulk action by status/search before selecting.
+  const visibleIds = filteredLines.map(l => l.id)
+  const allVisibleSelected = visibleIds.length > 0 && visibleIds.every(id => selectedLineIds.has(id))
+  const someVisibleSelected = visibleIds.some(id => selectedLineIds.has(id))
+  const toggleSelectAllVisible = () => {
+    setSelectedLineIds(prev => {
+      const next = new Set(prev)
+      if (allVisibleSelected) {
+        for (const id of visibleIds) next.delete(id)
+      } else {
+        for (const id of visibleIds) next.add(id)
+      }
+      return next
+    })
+  }
 
   const headerVal = (field: keyof ReceiptEdit): string =>
     (field in edits ? (edits[field] ?? '') : ((pod as any)[field] ?? '')) as string
@@ -787,6 +932,18 @@ function YardLoadDetail({ pod, lineState, savingLineId, onBack, onWalk, onConfir
 
       {lines.length > 0 && (
         <div className="yard-line-toolbar">
+          {!grnIssued && (
+            <label className="yard-line-selectall" title={allVisibleSelected ? 'Clear visible selection' : 'Select all visible'}>
+              <input
+                type="checkbox"
+                checked={allVisibleSelected}
+                ref={el => { if (el) el.indeterminate = !allVisibleSelected && someVisibleSelected }}
+                onChange={toggleSelectAllVisible}
+                aria-label="Select all visible lines"
+              />
+              <span>Select</span>
+            </label>
+          )}
           <input
             type="search"
             className="yard-line-search"
@@ -828,6 +985,9 @@ function YardLoadDetail({ pod, lineState, savingLineId, onBack, onWalk, onConfir
             state={lineState[l.id] || {}}
             saving={savingLineId === l.id}
             disabled={grnIssued}
+            selectable={!grnIssued}
+            selected={selectedLineIds.has(l.id)}
+            onToggleSelect={() => toggleSelect(l.id)}
             onConfirm={() => onConfirmAsExpected(l)}
             onWalk={() => onWalk(l.id)}
           />
@@ -847,16 +1007,53 @@ function YardLoadDetail({ pod, lineState, savingLineId, onBack, onWalk, onConfir
           </div>
         )}
       </div>
+
+      {selectedLineIds.size > 0 && (
+        <div className="yard-bulkbar" role="region" aria-label="Bulk action">
+          <div className="yard-bulkbar__count">
+            <strong>{selectedLineIds.size}</strong> selected
+          </div>
+          <div className="yard-bulkbar__actions">
+            <button
+              type="button"
+              className="yard-btn-ghost yard-btn-md"
+              onClick={clearSelection}
+            >
+              Clear
+            </button>
+            <button
+              type="button"
+              className="yard-btn-primary yard-btn-md"
+              onClick={openSheet}
+            >
+              Bulk Action
+            </button>
+          </div>
+        </div>
+      )}
+
+      {sheetOpen && (
+        <BulkLineEditSheet
+          selectedLines={lines.filter(l => selectedLineIds.has(l.id))}
+          busy={sheetBusy}
+          errorByLineId={sheetErrors}
+          onApply={applyBulk}
+          onClose={closeSheet}
+        />
+      )}
     </div>
   )
 }
 
-function YardLineSummary({ line, idx, state, saving, disabled, onConfirm, onWalk }: {
+function YardLineSummary({ line, idx, state, saving, disabled, selectable, selected, onToggleSelect, onConfirm, onWalk }: {
   line: ReceiptLine
   idx: number
   state: YardLineState
   saving: boolean
   disabled: boolean
+  selectable: boolean
+  selected: boolean
+  onToggleSelect: () => void
   onConfirm: () => void
   onWalk: () => void
 }) {
@@ -866,7 +1063,20 @@ function YardLineSummary({ line, idx, state, saving, disabled, onConfirm, onWalk
     || line.discrepancy === 'defects_noted'
   const cls = received ? (flagged ? 'yard-line--flagged' : 'yard-line--ok') : 'yard-line--pending'
   return (
-    <div className={'yard-line ' + cls}>
+    <div className={'yard-line ' + cls + (selected ? ' yard-line--selected' : '')}>
+      {selectable && (
+        <label
+          className="yard-line__select"
+          onClick={e => e.stopPropagation()}
+          aria-label={`Select line ${idx+1}`}
+        >
+          <input
+            type="checkbox"
+            checked={selected}
+            onChange={onToggleSelect}
+          />
+        </label>
+      )}
       <div className="yard-line__num">{String(idx+1).padStart(2,'0')}</div>
       <div className="yard-line__main">
         <div className="yard-line__desc">{line.description || line.material_description || line.item_code || `Line ${line.line_number}`}</div>
@@ -1009,7 +1219,7 @@ function YardPODModal({ url, onClose }: { url: string; onClose: () => void }) {
 // 'photo' is conditional: shown only when the receiver flagged a defect on
 // the previous step. goNext/goPrev skip it for clean lines so the 90% case
 // stays a one-tap walkthrough.
-const STEPS = ['qty', 'type', 'process', 'packaging', 'defects', 'photo', 'review'] as const
+const STEPS = ['qty', 'type', 'process', 'packaging', 'storage', 'defects', 'photo', 'review'] as const
 type Step = typeof STEPS[number]
 
 function shouldSkipStep(step: Step, state: YardLineState): boolean {
@@ -1153,6 +1363,7 @@ function YardWalkthrough({ pod, startLineId, lineState, updateLine, savingLineId
         {step === 'packaging' && <StepPackaging state={state} set={set}/>}
         {step === 'defects'   && <StepDefects   state={state} set={set}/>}
         {step === 'photo'     && <StepPhoto     state={state} set={set}/>}
+        {step === 'storage'   && <StepStorage   state={state} set={set}/>}
         {step === 'review'    && <StepReview    line={line} state={state} set={set} idx={idx} total={total}/>}
       </div>
 
@@ -1210,6 +1421,8 @@ function canAdvance(step: Step, state: YardLineState): boolean {
   if (step === 'defects')   return state.defects_done === true
   // Photo is optional — receiver can skip with no file selected.
   if (step === 'photo')     return true
+  // Storage is optional — bay/stored_in/accessories/comments can be left blank.
+  if (step === 'storage')   return true
   return true
 }
 
@@ -1571,6 +1784,74 @@ function StepPhoto({ state, set }: {
   )
 }
 
+function StepStorage({ state, set }: {
+  state: YardLineState
+  set: (p: Partial<YardLineState>) => void
+}) {
+  const bay = state.bay ?? ''
+  return (
+    <div>
+      <h2 className="walk-step__title">Where is it stored?</h2>
+      <p className="walk-step__sub">Pick the bay and add any extra storage detail. All optional — leave blank if unknown.</p>
+
+      <div className="review-notes" style={{ marginTop: 0 }}>
+        <span className="review-notes__label">Bay</span>
+        <div className="big-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: 10 }}>
+          {BAY_OPTIONS.map(b => (
+            <button
+              key={b}
+              type="button"
+              className={'big-grid__cell ' + (bay === b ? 'big-grid__cell--on' : '')}
+              style={{ minHeight: 64, padding: '14px 8px', fontSize: 'var(--yard-fs-md)' }}
+              onClick={() => set({ bay: b })}
+            >
+              {b}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="review-notes">
+        <label htmlFor="yard-stored-in" className="review-notes__label">Stored In</label>
+        <input
+          id="yard-stored-in"
+          type="text"
+          className="review-notes__input"
+          style={{ minHeight: 48 }}
+          placeholder="Storage area"
+          value={state.stored_in ?? ''}
+          onChange={e => set({ stored_in: e.target.value })}
+        />
+      </div>
+
+      <div className="review-notes">
+        <label htmlFor="yard-accessories" className="review-notes__label">Accessories</label>
+        <input
+          id="yard-accessories"
+          type="text"
+          className="review-notes__input"
+          style={{ minHeight: 48 }}
+          placeholder="e.g. bolts, brackets"
+          value={state.accessories ?? ''}
+          onChange={e => set({ accessories: e.target.value })}
+        />
+      </div>
+
+      <div className="review-notes">
+        <label htmlFor="yard-comments" className="review-notes__label">Comments</label>
+        <textarea
+          id="yard-comments"
+          className="review-notes__input"
+          placeholder="General comments"
+          rows={3}
+          value={state.comments ?? ''}
+          onChange={e => set({ comments: e.target.value })}
+        />
+      </div>
+    </div>
+  )
+}
+
 function StepReview({ line, state, set, idx, total }: {
   line: ReceiptLine
   state: YardLineState
@@ -1605,6 +1886,24 @@ function StepReview({ line, state, set, idx, total }: {
         <div className="review-row"><span className="k">Material</span><span className="v">{state.item_type}</span></div>
         <div className="review-row"><span className="k">Process</span><span className="v">{processLabel || '—'}</span></div>
         <div className="review-row"><span className="k">Packaging</span><span className="v">{state.packaging}</span></div>
+        {(state.bay || state.stored_in) && (
+          <div className="review-row">
+            <span className="k">Storage</span>
+            <span className="v">
+              {state.bay || '—'}
+              {state.stored_in ? ` · ${state.stored_in}` : ''}
+            </span>
+          </div>
+        )}
+        {state.accessories && (
+          <div className="review-row"><span className="k">Accessories</span><span className="v">{state.accessories}</span></div>
+        )}
+        {state.comments && (
+          <div className="review-row review-row--col">
+            <span className="k">Comments</span>
+            <span className="v" style={{ whiteSpace: 'pre-wrap' }}>{state.comments}</span>
+          </div>
+        )}
         <div className="review-row review-row--col">
           <span className="k">Defects</span>
           {flaggedDefects.length === 0 ? (

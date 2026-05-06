@@ -47,6 +47,7 @@ func NewServer(cfg config.Config, userService *users.Service, receivingService *
 	mux.Handle("GET /receipts/{id}/pod-link", app.requireAuth(http.HandlerFunc(app.handleGetReceiptPODLink)))
 	mux.Handle("POST /receipts/{id}/sync-docuware", app.requireAuth(http.HandlerFunc(app.handleSyncReceiptLineDocuWare)))
 	mux.Handle("PATCH /receipts/{id}/lines/{lineId}", app.requireAuth(http.HandlerFunc(app.handleUpdateReceiptLine)))
+	mux.Handle("POST /receipts/{id}/lines/bulk-update", app.requireAuth(http.HandlerFunc(app.handleBulkUpdateReceiptLines)))
 	mux.Handle("POST /receipts/{id}/lines/{lineId}/photos", app.requireReceiverOrAdmin(http.HandlerFunc(app.handleUploadDefectPhoto)))
 	mux.Handle("GET /receipts/{id}/photos/{photoId}", app.requireAuth(http.HandlerFunc(app.handleGetDefectPhoto)))
 	mux.Handle("DELETE /receipts/{id}/photos/{photoId}", app.requireReceiverOrAdmin(http.HandlerFunc(app.handleDeleteDefectPhoto)))

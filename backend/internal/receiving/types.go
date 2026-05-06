@@ -155,6 +155,22 @@ type UpdateReceiptLineInput struct {
 	ReceivedByName   string `json:"-"`
 }
 
+// BulkUpdateReceiptLinesInput drives POST /receipts/{id}/lines:bulk-update.
+// LineIDs are the lines to apply Patch to. Patch uses the same pointer-field
+// convention as UpdateReceiptLineInput — nil fields are not modified.
+type BulkUpdateReceiptLinesInput struct {
+	LineIDs []string                 `json:"line_ids"`
+	Patch   UpdateReceiptLineInput   `json:"patch"`
+}
+
+// BulkUpdateReceiptLinesResult reports per-line outcomes. Updated holds the
+// fresh ReceiptLine objects for successes; Errors maps line ID → error
+// message for failures. Partial success is the contract.
+type BulkUpdateReceiptLinesResult struct {
+	Updated []ReceiptLine     `json:"updated"`
+	Errors  map[string]string `json:"errors"`
+}
+
 type CreateGRNInput struct {
 	DeliveryNoteNumber      string             `json:"delivery_note_number"`
 	OrderNumber             string             `json:"order_number"`
