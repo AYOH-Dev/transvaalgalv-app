@@ -155,12 +155,31 @@ type UpdateReceiptLineInput struct {
 	ReceivedByName   string `json:"-"`
 }
 
-// BulkUpdateReceiptLinesInput drives POST /receipts/{id}/lines:bulk-update.
+// BulkDefectEntry is a defect key with a resolved severity and toggle-only
+// mitigations. Used in BulkDefectDiff.Add.
+type BulkDefectEntry struct {
+	Key        string   `json:"key"`
+	Severity   string   `json:"severity"`
+	Mitigations []string `json:"mitigations"`
+}
+
+// BulkDefectDiff describes a merge operation on per-line condition_notes.
+// Add entries are written/overwritten on each line; Remove keys are stripped.
+// Lines keep any defects not mentioned in either list.
+type BulkDefectDiff struct {
+	Add    []BulkDefectEntry `json:"add"`
+	Remove []string          `json:"remove"`
+}
+
+// BulkUpdateReceiptLinesInput drives POST /receipts/{id}/lines/bulk-update.
 // LineIDs are the lines to apply Patch to. Patch uses the same pointer-field
 // convention as UpdateReceiptLineInput — nil fields are not modified.
+// Defects is optional; when set it is merged into each line's condition_notes
+// rather than replacing it wholesale.
 type BulkUpdateReceiptLinesInput struct {
-	LineIDs []string                 `json:"line_ids"`
-	Patch   UpdateReceiptLineInput   `json:"patch"`
+	LineIDs []string                `json:"line_ids"`
+	Patch   UpdateReceiptLineInput  `json:"patch"`
+	Defects *BulkDefectDiff         `json:"defects,omitempty"`
 }
 
 // BulkUpdateReceiptLinesResult reports per-line outcomes. Updated holds the

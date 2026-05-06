@@ -2,20 +2,18 @@ import { useMemo, useState } from 'react'
 import {
   type ReceiptLine,
   type LineEdit,
+  type BulkDefectDiff,
   BAY_OPTIONS,
   ITEM_TYPE_OPTIONS,
   PACKAGING_OPTIONS,
   availableProcesses,
+  defectIntersection,
 } from '../lib/receipts'
-
-// Phase 3: scalar bulk-edit only. Defects + photo are intentionally excluded
-// here — defects need merge semantics across lines (Phase 4) and photos are
-// per-line evidence. Each field is independently editable; only fields the
-// receiver "touches" are sent in the patch, so untouched fields don't blank
-// out values saved earlier.
+import { DefectModal } from './DefectModal'
 
 export type BulkPatch = {
   patch: LineEdit
+  defectDiff?: BulkDefectDiff
   // 'receive' marks selected lines as received in addition to applying patch.
   // Status-flip only — no walkthrough fan-out.
   markReceived: boolean
@@ -62,6 +60,19 @@ export function BulkLineEditSheet({
   const [touched, setTouched] = useState<Set<keyof LineEdit>>(new Set())
   const [patch, setPatch] = useState<LineEdit>({})
   const [markReceived, setMarkReceived] = useState(false)
+  const [defectDiff, setDefectDiff] = useState<BulkDefectDiff | null>(null)
+  const [defectModalOpen, setDefectModalOpen] = useState(false)
+
+  const intersection = useMemo(
+    () => defectIntersection(selectedLines.map(l => l.condition_notes || '')),
+    [selectedLines],
+  )
+
+  const defectBadge = defectDiff
+    ? `${defectDiff.add.length} to add, ${defectDiff.remove.length} to remove`
+    : intersection.length > 0
+      ? `${intersection.length} common defect${intersection.length === 1 ? '' : 's'}`
+      : 'No common defects'
 
   const touch = (field: keyof LineEdit, value: string | undefined) => {
     setTouched(prev => new Set(prev).add(field))
@@ -96,12 +107,12 @@ export function BulkLineEditSheet({
   const packagingLabel = (v: string) => PACKAGING_OPTIONS.find(o => o.value === v)?.label ?? v
   const processLabel = (v: string) => processOpts.find(o => o.value === v)?.label ?? v
 
-  const hasChanges = touched.size > 0 || markReceived
+  const hasChanges = touched.size > 0 || markReceived || defectDiff != null
   const failedCount = Object.keys(errorByLineId).length
 
   const apply = () => {
     if (!hasChanges) return
-    onApply({ patch, markReceived })
+    onApply({ patch, markReceived, defectDiff: defectDiff ?? undefined })
   }
 
   return (
@@ -233,10 +244,22 @@ export function BulkLineEditSheet({
             />
           </BulkField>
 
-          {/* Defects — placeholder for Phase 4 */}
-          <BulkField label="Defects" badge="Coming next" disabled>
-            <button type="button" className="bulk-sheet__input" disabled>
-              Edit defects for {n} line{n === 1 ? '' : 's'}
+          {/* Defects — bulk merge mode */}
+          <BulkField
+            label="Defects"
+            badge={defectBadge}
+            touched={defectDiff != null}
+            onClear={defectDiff != null ? () => setDefectDiff(null) : undefined}
+          >
+            <button
+              type="button"
+              className="bulk-sheet__input"
+              style={{ cursor: 'pointer', textAlign: 'left' }}
+              onClick={() => setDefectModalOpen(true)}
+            >
+              {defectDiff
+                ? `${defectDiff.add.length} add · ${defectDiff.remove.length} remove — click to edit`
+                : `Edit defects for ${n} line${n === 1 ? '' : 's'}`}
             </button>
           </BulkField>
 
@@ -272,6 +295,16 @@ export function BulkLineEditSheet({
           </button>
         </footer>
       </div>
+
+      {defectModalOpen && (
+        <DefectModal
+          mode="bulk"
+          lineCount={n}
+          intersection={intersection}
+          onConfirm={diff => { setDefectDiff(diff); setDefectModalOpen(false) }}
+          onClose={() => setDefectModalOpen(false)}
+        />
+      )}
     </div>
   )
 }

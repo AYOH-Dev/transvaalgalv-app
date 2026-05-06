@@ -510,6 +510,69 @@ export function parseConditionNotes(notes: string): {
   return { defects, mitigations, quantities, comments }
 }
 
+// ─── Bulk defect helpers ─────────────────────────────────────────────────────
+
+// A defect key paired with a severity value and optional mitigations for bulk ops.
+export type BulkDefectEntry = {
+  key: string
+  severity: string      // non-default value, e.g. 'light', 'yes', 'heavy'
+  mitigations: string[] // toggle-only in bulk mode — no quantities
+}
+
+// Diff emitted by DefectModal in bulk mode. The backend applies add/remove
+// against each line's existing condition_notes rather than replacing wholesale.
+export type BulkDefectDiff = {
+  add: BulkDefectEntry[]   // defects the receiver added or kept (with chosen severity)
+  remove: string[]         // defect keys the receiver explicitly removed
+}
+
+// Compute the intersection of defects across multiple lines' condition_notes.
+// A defect is "common" only if every line has it flagged. Severity conflicts
+// (different values on different lines) are represented as kind='mixed'.
+export type DefectIntersectionEntry = {
+  key: string
+  kind: 'all'              // same non-default severity on every line
+  severity: string
+  mitigations: string[]    // mitigations common to ALL lines for this defect
+} | {
+  key: string
+  kind: 'mixed'            // flagged on all lines but severities differ
+  severities: string[]     // distinct values present
+  mitigations: string[]    // mitigations common to ALL lines for this defect
+}
+
+export function defectIntersection(conditionNotesArr: string[]): DefectIntersectionEntry[] {
+  if (conditionNotesArr.length === 0) return []
+
+  const parsed = conditionNotesArr.map(n => parseConditionNotes(n))
+
+  // Find defect keys flagged (non-default) on every line
+  const allItems = DEFECT_CATEGORIES.flatMap(c => c.items)
+  const result: DefectIntersectionEntry[] = []
+
+  for (const item of allItems) {
+    const vals = parsed.map(p => p.defects[item.key] ?? item.default)
+    // Must be non-default on every line
+    if (vals.some(v => v === item.default)) continue
+
+    const uniqueVals = [...new Set(vals)]
+
+    // Common mitigations: only those present on every line
+    const mitSets = parsed.map(p => new Set(p.mitigations[item.key] ?? []))
+    const commonMits = mitSets.length > 0
+      ? [...mitSets[0]].filter(m => mitSets.every(s => s.has(m)))
+      : []
+
+    if (uniqueVals.length === 1) {
+      result.push({ key: item.key, kind: 'all', severity: uniqueVals[0], mitigations: commonMits })
+    } else {
+      result.push({ key: item.key, kind: 'mixed', severities: uniqueVals, mitigations: commonMits })
+    }
+  }
+
+  return result
+}
+
 // ─── Display helpers ─────────────────────────────────────────────────────────
 
 export function fmtDate(iso: string) {

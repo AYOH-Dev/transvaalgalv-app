@@ -580,16 +580,34 @@ func (s *Service) BulkUpdateReceiptLines(ctx context.Context, receiptID string, 
 		Errors:  map[string]string{},
 	}
 
+	// If a defect diff is provided, fetch the receipt once to get current
+	// condition_notes for each line so we can merge rather than replace.
+	var linesByID map[string]ReceiptLine
+	if input.Defects != nil && (len(input.Defects.Add) > 0 || len(input.Defects.Remove) > 0) {
+		if receipt, err := s.repository.GetReceipt(ctx, receiptID); err == nil {
+			linesByID = make(map[string]ReceiptLine, len(receipt.Lines))
+			for _, l := range receipt.Lines {
+				linesByID[l.ID] = l
+			}
+		}
+	}
+
 	// Per-line repository updates. We deliberately call the repository here
 	// rather than s.UpdateReceiptLine to suppress the per-line POD status /
 	// auto-advance side effects — those run once at the end of the batch.
 	// DocuWare line sync still fires per line because each line is its own
 	// DocuWare record.
-	patch := input.Patch
+	basePatch := input.Patch
 	for _, lineID := range input.LineIDs {
 		id := strings.TrimSpace(lineID)
 		if id == "" {
 			continue
+		}
+		patch := basePatch // copy so per-line condition_notes override is safe
+		if input.Defects != nil && linesByID != nil {
+			existing := linesByID[id]
+			merged := applyDefectDiff(existing.ConditionNotes, input.Defects)
+			patch.ConditionNotes = &merged
 		}
 		line, err := s.repository.UpdateReceiptLine(ctx, receiptID, id, patch)
 		if err != nil {
@@ -608,7 +626,7 @@ func (s *Service) BulkUpdateReceiptLines(ctx context.Context, receiptID string, 
 
 	// Auto-advance to received once — only if the batch flipped at least one
 	// line to received and now all lines on the receipt are received.
-	if patch.ReceivingStatus != nil && *patch.ReceivingStatus == "received" && len(result.Updated) > 0 {
+	if basePatch.ReceivingStatus != nil && *basePatch.ReceivingStatus == "received" && len(result.Updated) > 0 {
 		if receipt, err := s.repository.GetReceipt(ctx, receiptID); err == nil {
 			if receipt.Status == ReceiptStatusDraft && len(receipt.Lines) > 0 && allLinesReceived(receipt.Lines) {
 				newStatus := ReceiptStatusReceived
@@ -620,13 +638,54 @@ func (s *Service) BulkUpdateReceiptLines(ctx context.Context, receiptID string, 
 	}
 
 	// POD status recompute fires once per batch.
-	if patch.ReceivingStatus != nil && len(result.Updated) > 0 {
+	if basePatch.ReceivingStatus != nil && len(result.Updated) > 0 {
 		if err := s.MaybeUpdatePODStatus(ctx, receiptID); err != nil {
 			log.Printf("warn: failed to enqueue pod status update (receipt=%s): %v", receiptID, err)
 		}
 	}
 
 	return result, nil
+}
+
+// applyDefectDiff merges a BulkDefectDiff into an existing condition_notes
+// JSON string. Remove keys and their Mitigation siblings are deleted; Add
+// entries are written (overwriting any existing value for the same key).
+// If the existing notes are empty or unparseable the diff is applied to a
+// fresh object. Returns the updated JSON string.
+func applyDefectDiff(existing string, diff *BulkDefectDiff) string {
+	if diff == nil {
+		return existing
+	}
+
+	obj := map[string]interface{}{}
+	if existing != "" {
+		_ = json.Unmarshal([]byte(existing), &obj)
+	}
+
+	for _, key := range diff.Remove {
+		delete(obj, key)
+		delete(obj, key+"Mitigation")
+	}
+
+	for _, entry := range diff.Add {
+		// Yes/no defects store boolean true; all others store the severity string.
+		if entry.Severity == "yes" {
+			obj[entry.Key] = true
+		} else {
+			obj[entry.Key] = entry.Severity
+		}
+		if len(entry.Mitigations) > 0 {
+			obj[entry.Key+"Mitigation"] = entry.Mitigations
+		} else {
+			delete(obj, entry.Key+"Mitigation")
+		}
+	}
+
+	out, err := json.Marshal(obj)
+	if err != nil {
+		return existing
+	}
+	return string(out)
 }
 
 func allLinesReceived(lines []ReceiptLine) bool {
