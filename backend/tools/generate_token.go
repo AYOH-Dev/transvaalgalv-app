@@ -22,4 +22,9 @@ func main() {
 	tm := auth.NewTokenManager(secret, 24*time.Hour)
 	token, exp, err := tm.Generate(auth.Subject{UserID: userID, Email: email, Role: role})
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: 
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		os.Exit(1)
+	}
+
+	fmt.Printf("token=%s\nexpires_at=%s\n", token, exp.UTC().Format(time.RFC3339))
+}
