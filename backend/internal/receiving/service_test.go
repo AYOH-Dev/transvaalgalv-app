@@ -125,7 +125,7 @@ func TestImportDocuWareRowsGroupsRowsIntoOneReceipt(t *testing.T) {
 	}
 
 	imported := repo.importedInput[0]
-	if imported.DocuWareGroupReference != "group-100|DN-123|PO-1|WB-88|Fabricator A" {
+	if imported.DocuWareGroupReference != "DN-123|WB-88" {
 		t.Fatalf("group reference = %q", imported.DocuWareGroupReference)
 	}
 
