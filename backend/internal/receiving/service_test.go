@@ -141,8 +141,8 @@ func TestImportDocuWareRowsGroupsRowsIntoOneReceipt(t *testing.T) {
 		t.Fatalf("first line item code = %q, want ITEM-1", imported.Lines[0].ItemCode)
 	}
 
-	if imported.Lines[1].DocuWareRecordLine != "line-2" {
-		t.Fatalf("second line record id = %q, want line-2", imported.Lines[1].DocuWareRecordLine)
+	if imported.Lines[1].DocuWareRecordLine != "UNIQ-2" {
+		t.Fatalf("second line record id = %q, want UNIQ-2", imported.Lines[1].DocuWareRecordLine)
 	}
 }
 
