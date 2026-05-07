@@ -134,6 +134,9 @@ type UpdateReceiptLineInput struct {
 	ReceivedQuantity      *float64 `json:"received_quantity"`
 	QuantityDiscrepancy   *string  `json:"quantity_discrepancy"`
 	InternalDescription   *string  `json:"internal_description"`
+	ItemCode              *string  `json:"item_code"`
+	Description           *string  `json:"description"`
+	MaterialSize          *string  `json:"material_size"`
 	ItemType              *string  `json:"item_type"`
 	Process               *string  `json:"process"`
 	PackagingMethod       *string  `json:"packaging_method"`

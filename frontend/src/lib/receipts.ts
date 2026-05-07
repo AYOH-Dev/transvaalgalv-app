@@ -84,6 +84,9 @@ export type LineEdit = {
   received_quantity?: number
   quantity_discrepancy?: string
   internal_description?: string
+  item_code?: string
+  description?: string
+  material_size?: string
   item_type?: string
   packaging_method?: string
   accessories?: string

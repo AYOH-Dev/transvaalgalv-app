@@ -999,6 +999,24 @@ func (r *PostgresRepository) UpdateReceiptLine(ctx context.Context, receiptID, l
 		argIdx++
 	}
 
+	if input.ItemCode != nil {
+		setClauses = append(setClauses, fmt.Sprintf("item_code = $%d", argIdx))
+		args = append(args, *input.ItemCode)
+		argIdx++
+	}
+
+	if input.Description != nil {
+		setClauses = append(setClauses, fmt.Sprintf("description = $%d", argIdx))
+		args = append(args, *input.Description)
+		argIdx++
+	}
+
+	if input.MaterialSize != nil {
+		setClauses = append(setClauses, fmt.Sprintf("material_size = $%d", argIdx))
+		args = append(args, *input.MaterialSize)
+		argIdx++
+	}
+
 	if input.Process != nil {
 		setClauses = append(setClauses, fmt.Sprintf("process = $%d", argIdx))
 		args = append(args, *input.Process)

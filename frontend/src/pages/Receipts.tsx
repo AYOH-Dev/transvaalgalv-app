@@ -34,9 +34,11 @@ import {
   deleteDefectPhoto,
   fetchDefectPhotoBlobUrl,
   fetchGRNBlobUrl,
+  type BulkDefectDiff,
 } from '../lib/receipts'
 import PhotoCapture, { useObjectUrl, type PhotoSyncStatus } from '../components/PhotoCapture'
 import { DefectModal } from '../components/DefectModal'
+import { BulkLineEditSheet, type BulkPatch } from '../components/BulkLineEditSheet'
 
 
 // ─── Main component ───────────────────────────────────────────────────────────
@@ -64,6 +66,12 @@ export default function Receipts({ onLogout }: { onLogout?: () => void }) {
   type LineStatusFilter = 'all' | 'draft' | 'received' | 'defects'
   const [lineSearch, setLineSearch] = useState<Record<string, string>>({})
   const [lineStatusFilter, setLineStatusFilter] = useState<Record<string, LineStatusFilter>>({})
+
+  // Bulk operations — per-receipt line selection; at most one sheet open at a time
+  const [bulkSelected, setBulkSelected] = useState<Record<string, Set<string>>>({})
+  const [bulkSheetFor, setBulkSheetFor] = useState<string | null>(null)
+  const [bulkSheetBusy, setBulkSheetBusy] = useState(false)
+  const [bulkSheetErrors, setBulkSheetErrors] = useState<Record<string, string>>({})
 
   // Defect modal — store receiptId + lineId so we always look up the live line from state
   const [defectModal, setDefectModal] = useState<{
@@ -253,8 +261,51 @@ export default function Receipts({ onLogout }: { onLogout?: () => void }) {
     finally { setSavingReceipt(null) }
   }
 
-  function openDefectModal(receiptId: string, line: ReceiptLine) {
-    const liveConditionNotes = (lineEdits[line.id]?.condition_notes ?? line.condition_notes) || ''
+  async function handleBulkApply(receiptId: string, { patch, markReceived, defectDiff }: BulkPatch) {
+    const lineIds = [...(bulkSelected[receiptId] ?? [])]
+    if (lineIds.length === 0) return
+    setBulkSheetBusy(true)
+    setBulkSheetErrors({})
+    try {
+      const finalPatch = { ...patch }
+      if (markReceived) finalPatch.receiving_status = 'received'
+      const bodyData: Record<string, unknown> = { line_ids: lineIds, patch: finalPatch }
+      if (defectDiff && (defectDiff.add.length > 0 || defectDiff.remove.length > 0)) bodyData.defects = defectDiff
+      const res = await apiFetch(`/receipts/${receiptId}/lines/bulk-update`, {
+        method: 'POST',
+        body: JSON.stringify(bodyData),
+      })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        const msg = body.error || `Save failed (${res.status})`
+        const errs: Record<string, string> = {}
+        for (const id of lineIds) errs[id] = msg
+        setBulkSheetErrors(errs)
+        showToast(msg, 'error')
+        return
+      }
+      const body = await res.json() as { updated?: ReceiptLine[]; errors?: Record<string, string> }
+      const updated = body.updated ?? []
+      const errors = body.errors ?? {}
+      if (updated.length > 0) {
+        const byId = new Map(updated.map(l => [l.id, l]))
+        setReceipts(prev => prev.map(r => r.id === receiptId
+          ? { ...r, lines: r.lines.map(l => byId.get(l.id) ?? l) }
+          : r))
+      }
+      if (Object.keys(errors).length > 0) {
+        setBulkSheetErrors(errors)
+        showToast(`Updated ${updated.length} of ${lineIds.length} — ${Object.keys(errors).length} failed`, 'info')
+      } else {
+        showToast(`Updated ${updated.length} line${updated.length === 1 ? '' : 's'}`, 'success')
+        setBulkSheetFor(null)
+        setBulkSelected(prev => { const n = { ...prev }; delete n[receiptId]; return n })
+      }
+    } catch { showToast('Network error', 'error') }
+    finally { setBulkSheetBusy(false) }
+  }
+
+  function openDefectModal(receiptId: string, line: ReceiptLine) {    const liveConditionNotes = (lineEdits[line.id]?.condition_notes ?? line.condition_notes) || ''
     const { defects, mitigations, quantities, comments } = parseConditionNotes(liveConditionNotes)
     setDefectModal({
       receiptId,
@@ -312,6 +363,22 @@ export default function Receipts({ onLogout }: { onLogout?: () => void }) {
 
   return (
     <div>
+      {/* Bulk edit sheet — portalled to body so it escapes stacking context */}
+      {bulkSheetFor && (() => {
+        const sheetReceipt = receipts.find(r => r.id === bulkSheetFor)
+        const sheetLines = (sheetReceipt?.lines ?? []).filter(l => bulkSelected[bulkSheetFor!]?.has(l.id))
+        return createPortal(
+          <BulkLineEditSheet
+            selectedLines={sheetLines}
+            busy={bulkSheetBusy}
+            errorByLineId={bulkSheetErrors}
+            onApply={p => handleBulkApply(bulkSheetFor!, p)}
+            onClose={() => { if (!bulkSheetBusy) { setBulkSheetFor(null); setBulkSheetErrors({}) } }}
+          />,
+          document.body,
+        )
+      })()}
+
       {/* Defect modal — portalled to body to escape any stacking context */}
       {defectModal && createPortal((() => {
         const liveLine = receipts
@@ -323,6 +390,7 @@ export default function Receipts({ onLogout }: { onLogout?: () => void }) {
         const existingPhoto = findDefectPhoto(defectModal.receiptId, defectModal.lineId)
         return (
           <DefectModal
+            mode="single"
             lineLabel={label}
             initial={defectModal.initial}
             initialMitigations={defectModal.initialMitigations}
@@ -550,6 +618,31 @@ export default function Receipts({ onLogout }: { onLogout?: () => void }) {
                           )}
                         </div>
 
+                        {/* Bulk selection action bar */}
+                        {(bulkSelected[r.id]?.size ?? 0) > 0 && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', padding: '0.5rem 0.75rem', background: 'var(--blue)', borderRadius: 'var(--radius)', marginBottom: '0.75rem', flexWrap: 'wrap' }}>
+                            <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: '#fff', flex: 1 }}>
+                              {bulkSelected[r.id].size} line{bulkSelected[r.id].size === 1 ? '' : 's'} selected
+                            </span>
+                            <button
+                              type="button"
+                              className="btn btn-sm"
+                              style={{ background: '#fff', color: 'var(--blue)', border: 'none', fontWeight: 600 }}
+                              onClick={() => { setBulkSheetErrors({}); setBulkSheetFor(r.id) }}
+                            >
+                              Bulk edit
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btn-sm btn-ghost"
+                              style={{ color: 'rgba(255,255,255,0.85)', border: '1px solid rgba(255,255,255,0.4)' }}
+                              onClick={() => setBulkSelected(prev => { const n = { ...prev }; delete n[r.id]; return n })}
+                            >
+                              Clear
+                            </button>
+                          </div>
+                        )}
+
                         {showFilterBar && (
                           <div style={{ position: 'sticky', top: 0, zIndex: 2, background: 'var(--surface-2, #f8fafc)', padding: '0.625rem', borderRadius: 'var(--radius)', border: '1px solid var(--border)', marginBottom: '0.75rem', display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
                             <div style={{ position: 'relative', flex: '1 1 220px', minWidth: 180 }}>
@@ -616,6 +709,19 @@ export default function Receipts({ onLogout }: { onLogout?: () => void }) {
 
                                 {/* Line header */}
                                 <div style={{ padding: '0.75rem 1rem', background: isReceived ? 'var(--green-dim, #f0fdf4)' : 'var(--surface-2)', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap' }}>
+                                  <label style={{ display: 'flex', alignItems: 'center', flexShrink: 0, marginTop: '0.125rem', cursor: 'pointer' }}>
+                                    <input
+                                      type="checkbox"
+                                      checked={bulkSelected[r.id]?.has(line.id) ?? false}
+                                      onChange={() => setBulkSelected(prev => {
+                                        const cur = new Set(prev[r.id] ?? [])
+                                        if (cur.has(line.id)) cur.delete(line.id); else cur.add(line.id)
+                                        return { ...prev, [r.id]: cur }
+                                      })}
+                                      aria-label={`Select line ${line.line_number}`}
+                                      style={{ width: 18, height: 18, cursor: 'pointer', accentColor: 'var(--blue)' }}
+                                    />
+                                  </label>
                                   <div style={{ flex: 1, minWidth: 0 }}>
                                     <div style={{ fontWeight: 600, fontSize: '0.9375rem' }}>
                                       {line.description || line.material_description || line.item_code || '—'}
@@ -736,7 +842,7 @@ export default function Receipts({ onLogout }: { onLogout?: () => void }) {
                                         </select>
                                       </LineField>
                                       <LineField label="Stored In">
-                                        <input type="text" value={lv('stored_in') as string} onChange={e => patchLineEdit(line.id, 'stored_in', e.target.value)} placeholder="Storage area" style={inputStyle} />
+                                        <input type="text" value={lv('stored_in') as string} onChange={e => patchLineEdit(line.id, 'stored_in', e.target.value)} placeholder="e.g. Cold room, Wash bay" style={inputStyle} />
                                       </LineField>
                                       <LineField label="Accessories" style={{ gridColumn: 'span 2' }}>
                                         <input type="text" value={lv('accessories') as string} onChange={e => patchLineEdit(line.id, 'accessories', e.target.value)} placeholder="e.g. bolts, brackets" style={inputStyle} />

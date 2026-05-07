@@ -8,6 +8,7 @@ import {
   type ReceiptEdit,
   type MitigationSelection,
   type MitigationQuantity,
+  type BulkDefectDiff,
   DEFECT_CATEGORIES,
   MITIGATION_NO_QTY,
   BAY_OPTIONS,
@@ -257,6 +258,7 @@ export default function Yard({ onLogout }: { onLogout?: () => void }) {
     lineIds: string[],
     edit: LineEdit,
     markReceived: boolean,
+    defects?: BulkDefectDiff,
   ): Promise<{ updated: ReceiptLine[]; errors: Record<string, string> }> => {
     const patch: LineEdit = { ...edit }
     if (markReceived) patch.receiving_status = 'received'
@@ -264,9 +266,11 @@ export default function Yard({ onLogout }: { onLogout?: () => void }) {
     let updated: ReceiptLine[] = []
     let errors: Record<string, string> = {}
     try {
+      const body: Record<string, unknown> = { line_ids: lineIds, patch }
+      if (defects && (defects.add.length > 0 || defects.remove.length > 0)) body.defects = defects
       const res = await apiFetch(`/receipts/${receiptId}/lines/bulk-update`, {
         method: 'POST',
-        body: JSON.stringify({ line_ids: lineIds, patch }),
+        body: JSON.stringify(body),
       })
       if (!res.ok) {
         const body = await res.json().catch(() => ({}))
@@ -695,7 +699,7 @@ function YardLoadDetail({ pod, lineState, savingLineId, onBack, onWalk, onConfir
   onIssueGRN: () => void
   onViewGRN: () => void
   onSaveHeader: (receiptId: string, edits: ReceiptEdit) => Promise<{ ok: true } | { ok: false; error: string }>
-  onBulkApply: (receiptId: string, lineIds: string[], edit: LineEdit, markReceived: boolean) => Promise<{ updated: ReceiptLine[]; errors: Record<string, string> }>
+  onBulkApply: (receiptId: string, lineIds: string[], edit: LineEdit, markReceived: boolean, defects?: BulkDefectDiff) => Promise<{ updated: ReceiptLine[]; errors: Record<string, string> }>
   onViewPOD: (receiptId: string) => void
   viewingPODFor: string | null
 }) {
@@ -746,13 +750,13 @@ function YardLoadDetail({ pod, lineState, savingLineId, onBack, onWalk, onConfir
   const openSheet = () => { setSheetErrors({}); setSheetOpen(true) }
   const closeSheet = () => { if (!sheetBusy) { setSheetOpen(false); setSheetErrors({}) } }
 
-  const applyBulk = async ({ patch, markReceived }: BulkPatch) => {
+  const applyBulk = async ({ patch, markReceived, defectDiff }: BulkPatch) => {
     const ids = [...selectedLineIds]
     if (ids.length === 0) return
     setSheetBusy(true)
     setSheetErrors({})
     try {
-      const { updated, errors } = await onBulkApply(pod.id, ids, patch, markReceived)
+      const { updated, errors } = await onBulkApply(pod.id, ids, patch, markReceived, defectDiff)
       const failedCount = Object.keys(errors).length
       if (failedCount === 0) {
         showSheetToast(`Updated ${updated.length} line${updated.length === 1 ? '' : 's'}`, 'success')
@@ -1812,13 +1816,13 @@ function StepStorage({ state, set }: {
       </div>
 
       <div className="review-notes">
-        <label htmlFor="yard-stored-in" className="review-notes__label">Stored In</label>
+        <label htmlFor="yard-stored-in" className="review-notes__label">Stored In <span style={{ fontWeight: 400, color: 'var(--text-muted)', fontSize: '0.75rem' }}>(free text — e.g. Cold room, Outside)</span></label>
         <input
           id="yard-stored-in"
           type="text"
           className="review-notes__input"
           style={{ minHeight: 48 }}
-          placeholder="Storage area"
+          placeholder="e.g. Cold room, Wash bay, Outside Plant 2"
           value={state.stored_in ?? ''}
           onChange={e => set({ stored_in: e.target.value })}
         />
