@@ -7,6 +7,7 @@ Thumbs.db
 backend/bin/
 backend/.cache/
 backend/coverage.out
+backend/tmp-*/
 
 frontend/node_modules/
 frontend/dist/
