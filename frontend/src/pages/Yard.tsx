@@ -266,11 +266,11 @@ export default function Yard({ onLogout }: { onLogout?: () => void }) {
     let updated: ReceiptLine[] = []
     let errors: Record<string, string> = {}
     try {
-      const body: Record<string, unknown> = { line_ids: lineIds, patch }
-      if (defects && (defects.add.length > 0 || defects.remove.length > 0)) body.defects = defects
+      const reqBody: Record<string, unknown> = { line_ids: lineIds, patch }
+      if (defects && (defects.add.length > 0 || defects.remove.length > 0)) reqBody.defects = defects
       const res = await apiFetch(`/receipts/${receiptId}/lines/bulk-update`, {
         method: 'POST',
-        body: JSON.stringify(body),
+        body: JSON.stringify(reqBody),
       })
       if (!res.ok) {
         const body = await res.json().catch(() => ({}))
