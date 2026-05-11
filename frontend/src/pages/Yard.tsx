@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react'
 import { apiBaseUrl, apiFetch, clearToken } from '../auth'
+import { BRAND } from '../lib/branding'
 import { useToast } from '../components/Toast'
 import {
   type Receipt,
@@ -506,10 +507,10 @@ function YardTopbar({ online, queueCount, outdoor, onToggleOutdoor }: {
   return (
     <div className="yard-topbar">
       <div className="yard-topbar__brand">
-        <div className="yard-topbar__logo">TG</div>
+        <div className="yard-topbar__logo">{BRAND.monogram}</div>
         <div>
           <div className="yard-topbar__title">Yard Receiving</div>
-          <div className="yard-topbar__sub">Transvaal Galvanisers · Nigel</div>
+          <div className="yard-topbar__sub">{BRAND.fullName} · {BRAND.location}</div>
         </div>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>

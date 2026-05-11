@@ -3,9 +3,23 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Transvaal Galv App</title>
-    <script type="module" crossorigin src="/assets/index-HQmLhlBm.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-D_hQKda2.css">
+    <meta name="color-scheme" content="light dark" />
+    <title>Transvaal Galv</title>
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <script>
+      // Apply theme before paint to avoid a flash of the wrong theme.
+      (function () {
+        try {
+          var pref = localStorage.getItem('tg-theme') || 'system';
+          var dark = pref === 'dark' ||
+            (pref === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+          if (dark) document.documentElement.setAttribute('data-theme', 'dark');
+        } catch (e) {}
+      })();
+    </script>
+    <script type="module" crossorigin src="/assets/index-BPmKjWiM.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-FelnoE_H.css">
   </head>
   <body>
     <div id="root"></div>

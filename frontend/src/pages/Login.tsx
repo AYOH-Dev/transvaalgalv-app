@@ -1,7 +1,6 @@
 import React, { useState, useRef } from 'react'
 import { saveToken } from '../auth'
-import Logo from '../assets/transvaal-logo.svg'
-import AyohLogo from '../assets/ayoh.png'
+import { BRAND } from '../lib/branding'
 
 export default function Login({ onLogin }: { onLogin?: () => void }) {
   const [email, setEmail]       = useState('')
@@ -42,10 +41,10 @@ export default function Login({ onLogin }: { onLogin?: () => void }) {
           {/* Brand */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
             <div style={{ width: 52, height: 52, borderRadius: 14, background: 'var(--blue-dim)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, overflow: 'hidden' }}>
-              <img src={Logo} alt="" style={{ width: 40, height: 40, objectFit: 'contain' }} />
+              <img src={BRAND.logoSvg} alt="" style={{ width: 40, height: 40, objectFit: 'contain' }} />
             </div>
             <div>
-              <h1 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>Transvaal Galv</h1>
+              <h1 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>{BRAND.name}</h1>
               <p style={{ margin: '0.2rem 0 0', fontSize: '0.8rem', color: 'var(--text-muted)' }}>Sign in to your account</p>
             </div>
           </div>
@@ -111,8 +110,10 @@ export default function Login({ onLogin }: { onLogin?: () => void }) {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', borderTop: '1px solid var(--border)', paddingTop: '1.25rem' }}>
-            <img src={AyohLogo} alt="AYOH Group" style={{ height: 16, opacity: 0.5 }} />
-            <span style={{ fontSize: '0.7rem', color: 'var(--text-subtle)' }}>Powered by AYOH Group</span>
+            <a href={BRAND.ayohUrl} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', textDecoration: 'none', color: 'inherit' }}>
+              <img src={BRAND.ayohLogo} alt="AYOH Group" style={{ height: 16, opacity: 0.5 }} />
+              <span style={{ fontSize: '0.7rem', color: 'var(--text-subtle)' }}>Powered by AYOH Group</span>
+            </a>
           </div>
         </div>
       </div>

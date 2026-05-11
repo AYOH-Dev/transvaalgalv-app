@@ -1,7 +1,6 @@
 import React, { useState } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
-import Logo from '../assets/transvaal-logo.svg'
-import AyohLogo from '../assets/ayoh.png'
+import { BRAND } from '../lib/branding'
 import { useTheme } from '../theme'
 import { useCurrentUser } from './CurrentUser'
 
@@ -69,7 +68,7 @@ export default function Layout({ children, onLogout }: { children: React.ReactNo
   }, [mobileOpen])
 
   const visibleNav = NAV.filter(n => !n.roles || (user && n.roles.includes(user.role)))
-  const currentLabel = visibleNav.find(n => n.exact ? location.pathname === n.to : location.pathname.startsWith(n.to))?.label ?? 'Transvaal Galv'
+  const currentLabel = visibleNav.find(n => n.exact ? location.pathname === n.to : location.pathname.startsWith(n.to))?.label ?? BRAND.name
 
   // Yard route gets full-bleed page-wrap (via .app-shell--yard in yard.css)
   // but keeps the sidebar mounted so users can navigate out.
@@ -87,11 +86,11 @@ export default function Layout({ children, onLogout }: { children: React.ReactNo
           {!collapsed && (
             <div className="sidebar__brand">
               <div className="sidebar__brand-icon">
-                <img src={Logo} alt="" />
+                <img src={BRAND.logoSvg} alt="" />
               </div>
               <div className="sidebar__brand-text">
-                <span className="sidebar__brand-name">Transvaal Galv</span>
-                <span className="sidebar__brand-sub">Management</span>
+                <span className="sidebar__brand-name">{BRAND.name}</span>
+                <span className="sidebar__brand-sub">{BRAND.sub}</span>
               </div>
             </div>
           )}
@@ -126,7 +125,7 @@ export default function Layout({ children, onLogout }: { children: React.ReactNo
         <div className="sidebar__footer">
           {!collapsed && (
             <div style={{ padding: '0 0.25rem 0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <img src={AyohLogo} alt="AYOH Group" style={{ height: 18, opacity: 0.5 }} />
+              <img src={BRAND.ayohLogo} alt="AYOH Group" style={{ height: 18, opacity: 0.5 }} />
               <span style={{ fontSize: '0.7rem', color: 'var(--text-subtle)' }}>Powered by AYOH</span>
             </div>
           )}
