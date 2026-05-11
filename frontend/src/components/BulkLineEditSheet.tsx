@@ -85,10 +85,12 @@ export function BulkLineEditSheet({
 
   // Per-field summaries across the selection
   const summaries = useMemo(() => ({
-    item_code:        summarise(selectedLines, l => l.item_code),
-    description:      summarise(selectedLines, l => l.description),
-    material_size:    summarise(selectedLines, l => l.material_size),
-    item_type:        summarise(selectedLines, l => l.item_type),
+    item_code:           summarise(selectedLines, l => l.item_code),
+    description:         summarise(selectedLines, l => l.description),
+    internal_description:summarise(selectedLines, l => l.internal_description),
+    material_size:       summarise(selectedLines, l => l.material_size),
+    material_thickness:  summarise(selectedLines, l => l.material_thickness),
+    item_type:           summarise(selectedLines, l => l.item_type),
     process:          summarise(selectedLines, l => l.process),
     packaging_method: summarise(selectedLines, l => l.packaging_method),
     bay:              summarise(selectedLines, l => l.bay),
@@ -123,7 +125,7 @@ export function BulkLineEditSheet({
       <div className="bulk-sheet">
         <header className="bulk-sheet__head">
           <div>
-            <h2 className="bulk-sheet__title">Bulk edit · {n} line{n === 1 ? '' : 's'}</h2>
+            <h2 className="bulk-sheet__title">{n === 1 ? 'Edit line' : `Bulk edit · ${n} lines`}</h2>
             <p className="bulk-sheet__sub">Only the fields you change will be applied. Untouched fields stay as-is.</p>
           </div>
           <button type="button" className="bulk-sheet__close" onClick={onClose} aria-label="Close" disabled={busy}>×</button>
@@ -162,9 +164,25 @@ export function BulkLineEditSheet({
             />
           </BulkField>
 
+          {/* Internal Description */}
+          <BulkField
+            label="Internal Description"
+            badge={summaryBadge(summaries.internal_description)}
+            touched={touched.has('internal_description')}
+            onClear={() => untouch('internal_description')}
+          >
+            <input
+              type="text"
+              className="bulk-sheet__input"
+              placeholder="Internal name / description"
+              value={touched.has('internal_description') ? (patch.internal_description ?? '') : ''}
+              onChange={e => touch('internal_description', e.target.value)}
+            />
+          </BulkField>
+
           {/* Size */}
           <BulkField
-            label="Size"
+            label="Item Size"
             badge={summaryBadge(summaries.material_size)}
             touched={touched.has('material_size')}
             onClear={() => untouch('material_size')}
@@ -175,6 +193,22 @@ export function BulkLineEditSheet({
               placeholder="Override size"
               value={touched.has('material_size') ? (patch.material_size ?? '') : ''}
               onChange={e => touch('material_size', e.target.value)}
+            />
+          </BulkField>
+
+          {/* Thickness */}
+          <BulkField
+            label="Thickness"
+            badge={summaryBadge(summaries.material_thickness)}
+            touched={touched.has('material_thickness')}
+            onClear={() => untouch('material_thickness')}
+          >
+            <input
+              type="text"
+              className="bulk-sheet__input"
+              placeholder="e.g. 6mm"
+              value={touched.has('material_thickness') ? (patch.material_thickness ?? '') : ''}
+              onChange={e => touch('material_thickness', e.target.value)}
             />
           </BulkField>
 

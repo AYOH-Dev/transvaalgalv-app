@@ -207,7 +207,8 @@ func extractDefectFields(conditionNotesJSON string) []FieldUpdate {
 		"noHanging":            {field: "NO_HANGING_METHOD", defaultValue: "no"},
 	}
 
-	// Map of mitigation keys → DocuWare field names
+	// Map of mitigation keys → DocuWare field names.
+	// These mitigations are stored as string arrays in condition_notes.
 	mitigationFields := map[string]string{
 		"paintMitigation":                "PAINT_MITIGATION",
 		"damagedMitigation":              "DAMAGE_MITIGATION",
@@ -216,16 +217,11 @@ func extractDefectFields(conditionNotesJSON string) []FieldUpdate {
 		"nonConformingPreGalvMitigation": "NON_CONFORMING_PRE_GALV_MITIG",
 		"threadedArticleMitigation":      "THREADED_ARTICLE_MITIGATION",
 		"enclosedCavityMitigation":       "ENCLOSED_CAVITY_HOLES_REQUIRE",
+		"articleOverlapMitigation":       "ARTICLE_OVERLAP_VENT_HOLES",
 	}
 
-	// Map of mitigation quantity keys → DocuWare field names
-	mitigationQtyFields := map[string]string{
-		"noHangingLiftingLugNutQty": "NO_HANGING_LIFTING_LUG_NUT_R1",
-		"noHangingHangNotchQty":     "NO_HANGING_HANG_NOTCH_REQUIR1",
-		"enclosedCavityHolesQty":    "ENCLOSED_CAVITY_HOLES_QUANTIT",
-	}
-
-	// Hole quantity fields (from holesInadequate defect)
+	// Hole quantity fields (from holesInadequate defect).
+	// These are written as explicit numeric keys in condition_notes.
 	holeQtyFields := map[string]string{
 		"ventHolesQty":  "VENT_HOLES_REQUIRED",
 		"drainHolesQty": "DRAIN_HOLES_REQUIRED",
@@ -277,16 +273,41 @@ func extractDefectFields(conditionNotesJSON string) []FieldUpdate {
 		}
 	}
 
-	// Mitigation quantity fields (for no hanging method)
-	for wizardKey, dwField := range mitigationQtyFields {
-		if val, ok := data[wizardKey]; ok {
-			if numVal, isNum := val.(float64); isNum {
-				fields = append(fields, newStringField(dwField, strconv.FormatInt(int64(numVal), 10)))
+	// noHanging mitigation: stored as ["Lifting lug-nut required=2", "Hang notch required=1"].
+	// Parse each entry to populate the text fields and quantity fields separately.
+	if val, ok := data["noHangingMitigation"]; ok {
+		if arr, isArr := val.([]interface{}); isArr {
+			for _, entry := range arr {
+				token, isStr := entry.(string)
+				if !isStr {
+					continue
+				}
+				// Split on last '=' to separate name from optional quantity.
+				eqIdx := strings.LastIndex(token, "=")
+				name := token
+				qty := ""
+				if eqIdx != -1 {
+					name = strings.TrimSpace(token[:eqIdx])
+					qty = strings.TrimSpace(token[eqIdx+1:])
+				}
+				switch name {
+				case "Lifting lug-nut required":
+					fields = append(fields, newStringField("NO_HANGING_LIFTING_LUG_NUT_RE", name))
+					if qty != "" {
+						fields = append(fields, newStringField("NO_HANGING_LIFTING_LUG_NUT_R1", qty))
+					}
+				case "Hang notch required":
+					fields = append(fields, newStringField("NO_HANGING_HANG_NOTCH_REQUIRE", name))
+					if qty != "" {
+						fields = append(fields, newStringField("NO_HANGING_HANG_NOTCH_REQUIR1", qty))
+					}
+				}
 			}
 		}
 	}
 
-	// Cavity vent holes quantity
+	// cavityVentHolesQty is written as an explicit numeric key in condition_notes
+	// by the enclosedCavity defect handler.
 	if val, ok := data["cavityVentHolesQty"]; ok {
 		if numVal, isNum := val.(float64); isNum {
 			fields = append(fields, newStringField("ENCLOSED_CAVITY_HOLES_QUANTIT", strconv.FormatInt(int64(numVal), 10)))

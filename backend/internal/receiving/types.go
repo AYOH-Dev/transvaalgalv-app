@@ -137,6 +137,7 @@ type UpdateReceiptLineInput struct {
 	ItemCode              *string  `json:"item_code"`
 	Description           *string  `json:"description"`
 	MaterialSize          *string  `json:"material_size"`
+	MaterialThickness     *string  `json:"material_thickness"`
 	ItemType              *string  `json:"item_type"`
 	Process               *string  `json:"process"`
 	PackagingMethod       *string  `json:"packaging_method"`

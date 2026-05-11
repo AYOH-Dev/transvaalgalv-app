@@ -527,11 +527,20 @@ func (s *Service) UpdateReceiptLine(ctx context.Context, receiptID, lineID strin
 		return ReceiptLine{}, err
 	}
 
-	// Sync immediately if receiving_status is set (triggers when line is marked received)
-	if input.ReceivingStatus != nil && s.syncEnqueuer != nil {
-		if err := s.syncEnqueuer.SyncLineNow(ctx, receiptID, lineID); err != nil {
-			// Log but don't fail the update — sync can be retried later
-			log.Printf("warn: failed to sync line to docuware (receipt=%s, line=%s): %v", receiptID, lineID, err)
+	// Sync to DocuWare on any field change so that updates (e.g. received
+	// quantity edits made without simultaneously marking as received) are
+	// not silently dropped. Use SyncLineNow for status transitions to keep
+	// the "received" state visible in DocuWare quickly; for all other edits
+	// enqueue so the background worker batches them.
+	if s.syncEnqueuer != nil {
+		if input.ReceivingStatus != nil {
+			if err := s.syncEnqueuer.SyncLineNow(ctx, receiptID, lineID); err != nil {
+				log.Printf("warn: failed to sync line to docuware (receipt=%s, line=%s): %v", receiptID, lineID, err)
+			}
+		} else {
+			if err := s.syncEnqueuer.EnqueueLineSync(ctx, receiptID, lineID); err != nil {
+				log.Printf("warn: failed to enqueue line sync to docuware (receipt=%s, line=%s): %v", receiptID, lineID, err)
+			}
 		}
 	}
 
@@ -616,10 +625,17 @@ func (s *Service) BulkUpdateReceiptLines(ctx context.Context, receiptID string, 
 		}
 		result.Updated = append(result.Updated, line)
 
-		// Per-line DocuWare sync mirrors UpdateReceiptLine. Best-effort.
-		if patch.ReceivingStatus != nil && s.syncEnqueuer != nil {
-			if err := s.syncEnqueuer.SyncLineNow(ctx, receiptID, id); err != nil {
-				log.Printf("warn: failed to sync line to docuware (receipt=%s, line=%s): %v", receiptID, id, err)
+		// Per-line DocuWare sync — fire on any field change, not just status
+		// transitions, so edits like received_quantity are not silently dropped.
+		if s.syncEnqueuer != nil {
+			if patch.ReceivingStatus != nil {
+				if err := s.syncEnqueuer.SyncLineNow(ctx, receiptID, id); err != nil {
+					log.Printf("warn: failed to sync line to docuware (receipt=%s, line=%s): %v", receiptID, id, err)
+				}
+			} else {
+				if err := s.syncEnqueuer.EnqueueLineSync(ctx, receiptID, id); err != nil {
+					log.Printf("warn: failed to enqueue line sync to docuware (receipt=%s, line=%s): %v", receiptID, id, err)
+				}
 			}
 		}
 	}

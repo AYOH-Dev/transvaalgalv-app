@@ -87,6 +87,7 @@ export type LineEdit = {
   item_code?: string
   description?: string
   material_size?: string
+  material_thickness?: string
   item_type?: string
   packaging_method?: string
   accessories?: string

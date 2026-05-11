@@ -1017,6 +1017,12 @@ func (r *PostgresRepository) UpdateReceiptLine(ctx context.Context, receiptID, l
 		argIdx++
 	}
 
+	if input.MaterialThickness != nil {
+		setClauses = append(setClauses, fmt.Sprintf("material_thickness = $%d", argIdx))
+		args = append(args, *input.MaterialThickness)
+		argIdx++
+	}
+
 	if input.Process != nil {
 		setClauses = append(setClauses, fmt.Sprintf("process = $%d", argIdx))
 		args = append(args, *input.Process)
