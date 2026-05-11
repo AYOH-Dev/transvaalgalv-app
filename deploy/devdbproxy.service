@@ -1,0 +1,16 @@
+[Unit]
+Description=PostgreSQL Development DB Proxy
+Documentation=https://github.com/AYOH-Dev/transvaalgalv-app
+After=network.target
+
+[Service]
+Type=simple
+User=dane.summers
+Environment=DEV_DB_PROXY_LISTEN_ADDR=127.0.0.1:6543
+Environment=DEV_DB_PROXY_TARGET_ADDR=10.100.0.1:5432
+ExecStart=/usr/local/bin/devdbproxy
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

@@ -1,7 +1,7 @@
 [Unit]
 Description=Transvaal Galv API
-After=network.target transvaal-dbproxy.service
-Requires=transvaal-dbproxy.service
+After=network.target devdbproxy.service
+Requires=devdbproxy.service
 
 [Service]
 Type=simple
