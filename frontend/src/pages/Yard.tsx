@@ -507,7 +507,9 @@ function YardTopbar({ online, queueCount, outdoor, onToggleOutdoor }: {
   return (
     <div className="yard-topbar">
       <div className="yard-topbar__brand">
-        <div className="yard-topbar__logo">{BRAND.monogram}</div>
+        <div className="yard-topbar__logo">
+          <img src={BRAND.logoPng} alt={BRAND.monogram} style={{ width: 32, height: 32, objectFit: 'contain' }} />
+        </div>
         <div>
           <div className="yard-topbar__title">Yard Receiving</div>
           <div className="yard-topbar__sub">{BRAND.fullName} · {BRAND.location}</div>
