@@ -58,10 +58,6 @@ func (s *stubRepository) UpdateReceiptLine(_ context.Context, _ string, _ string
 	return ReceiptLine{}, nil
 }
 
-func (s *stubRepository) ArchiveStaleMatched(_ context.Context, _ time.Duration) (int64, error) {
-	return 0, nil
-}
-
 func TestImportDocuWareRowsGroupsRowsIntoOneReceipt(t *testing.T) {
 	repo := &stubRepository{
 		importResult: []Receipt{{ID: "receipt-1", ReceiptNumber: "imported"}},
