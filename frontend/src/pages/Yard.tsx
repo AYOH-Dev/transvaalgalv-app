@@ -573,13 +573,17 @@ function YardLoadsList({ pods, lineState, onOpen, onViewPOD, viewingPODFor }: {
   viewingPODFor: string | null
 }) {
   const [filter, setFilter] = useState<'today' | 'all' | 'done'>('today')
+  const [search, setSearch] = useState('')
 
   // A receipt is treated as "done" once every line has receiving_status === 'received'
   // (either persisted or marked locally in lineState). "GRN issued" is folded in via
   // future status tracking; for now we approximate using the persisted status.
   const enriched = pods.map(p => {
     const lines = p.lines || []
-    const total = lines.length
+    // line_count comes from the list endpoint's aggregate; lines.length is
+    // only populated after the detail view lazy-loads them. Prefer whichever
+    // is higher so freshly-loaded receipts keep the right total.
+    const total = Math.max(p.line_count ?? 0, lines.length)
     const done = lines.filter(l => l.receiving_status === 'received' || lineState[l.id]?.received).length
     const flagged = lines.filter(l => {
       const ls = lineState[l.id]
@@ -596,16 +600,48 @@ function YardLoadsList({ pods, lineState, onOpen, onViewPOD, viewingPODFor }: {
   })
 
   const visible = enriched.filter(p => {
-    if (filter === 'done') return p._allDone || p._grnIssued
-    if (filter === 'today') return !p._grnIssued
+    if (filter === 'done' && !p._allDone && !p._grnIssued) return false
+    if (filter === 'today' && p._grnIssued) return false
+    if (search) {
+      const q = search.trim().toLowerCase()
+      const haystack = [
+        p.weighbridge_ticket_number,
+        p.delivery_note_number,
+        p.customer_name,
+        p.supplier_name,
+        p.vehicle_registration,
+        p.receipt_number,
+      ].filter(Boolean).join(' ').toLowerCase()
+      if (!haystack.includes(q)) return false
+    }
     return true
   })
 
   return (
     <div className="yard-page">
       <div className="yard-page__header">
-        <h1 className="yard-h1">Today's loads</h1>
-        <p className="yard-sub">Pick a load to receive</p>
+        <div className="yard-page__title">
+          <h1 className="yard-h1">Today's loads</h1>
+          <p className="yard-sub">Pick a load to receive</p>
+        </div>
+        <div className="yard-search">
+          <svg className="yard-search__icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
+          <input
+            type="search"
+            className="yard-search__input"
+            placeholder="Search WB, del note, customer, vehicle…"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            aria-label="Search loads"
+          />
+          {search && (
+            <button type="button" className="yard-search__clear" onClick={() => setSearch('')} aria-label="Clear search">
+              <Icon name="close" size={14}/>
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="yard-tabs" role="tablist">
@@ -650,6 +686,9 @@ function YardLoadsList({ pods, lineState, onOpen, onViewPOD, viewingPODFor }: {
                 <div className="yard-load-card__customer">{p.customer_name || p.supplier_name || '—'}</div>
                 <div className="yard-load-card__meta">
                   <span><Icon name="truck" size={14}/> {p.vehicle_registration || '—'}</span>
+                  {p.delivery_note_number && p.weighbridge_ticket_number && (
+                    <><span>·</span><span>DN {p.delivery_note_number}</span></>
+                  )}
                   <span>·</span>
                   <span>{p._total} line{p._total !== 1 ? 's' : ''}</span>
                   {p._flagged > 0 && <><span>·</span><span style={{ color: 'var(--yard-amber)' }}><Icon name="flag" size={14}/> {p._flagged} flagged</span></>}
@@ -680,8 +719,9 @@ function YardLoadsList({ pods, lineState, onOpen, onViewPOD, viewingPODFor }: {
         })}
         {visible.length === 0 && (
           <div className="yard-empty">
-            <div className="yard-empty__title">Nothing in this view</div>
-            <div className="yard-empty__sub">Try a different tab</div>
+            <div className="yard-empty__title">{search ? 'No matching loads' : 'Nothing in this view'}</div>
+            <div className="yard-empty__sub">{search ? 'Try a different search term.' : 'Try a different tab'}</div>
+            {search && <button className="btn btn-ghost btn-sm" style={{ marginTop: '0.5rem' }} onClick={() => setSearch('')}>Clear search</button>}
           </div>
         )}
       </div>

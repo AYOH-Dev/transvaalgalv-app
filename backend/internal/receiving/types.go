@@ -43,6 +43,7 @@ type Receipt struct {
 	SyncStatus                string             `json:"sync_status"`
 	Notes                     string             `json:"notes"`
 	Lines                     []ReceiptLine      `json:"lines"`
+	LineCount                 int                `json:"line_count"`
 	Documents                 []ReceiptDocument  `json:"documents"`
 	Exceptions                []ReceiptException `json:"exceptions"`
 	GRNDocumentID             string             `json:"grn_document_id,omitempty"`

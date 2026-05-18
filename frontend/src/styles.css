@@ -393,6 +393,28 @@ pre { background: var(--surface-2); padding: 1rem; border-radius: var(--radius);
   color: var(--red-fg); font-size: 0.875rem; margin-bottom: 1.25rem;
 }
 
+.deprecation-banner {
+  display: flex; align-items: center; gap: 0.625rem;
+  background: var(--amber-dim); border: 1px solid rgba(245,158,11,0.35);
+  border-radius: var(--radius); padding: 0.75rem 1rem;
+  color: var(--amber-fg); font-size: 0.875rem; margin-bottom: 1.25rem;
+}
+.deprecation-banner svg { flex: 0 0 auto; color: var(--amber); }
+.deprecation-banner a { color: inherit; text-decoration: underline; font-weight: 600; }
+
+.nav-pill {
+  display: inline-block;
+  margin-left: 0.5rem;
+  padding: 1px 6px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-radius: 999px;
+  vertical-align: middle;
+}
+.nav-pill--deprecated { background: var(--amber-dim); color: var(--amber-fg); }
+
 /* ─── Skeleton ─────────────────────────────────────────────────────────────── */
 @keyframes shimmer {
   0%   { background-position: -600px 0; }

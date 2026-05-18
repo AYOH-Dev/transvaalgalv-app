@@ -29,41 +29,45 @@ func NewRepository(pool *pgxpool.Pool) *PostgresRepository {
 // excluded by default; pass includeArchived=true (admin-only at the HTTP
 // layer) to include them.
 func (r *PostgresRepository) ListReceipts(ctx context.Context, includeArchived bool) ([]Receipt, error) {
-	whereClause := "WHERE status != 'archived'"
+	whereClause := "WHERE r.status != 'archived'"
 	if includeArchived {
 		whereClause = ""
 	}
+	// Line bodies are intentionally omitted from the list payload (loaded
+	// lazily by GetReceipt). The card UI only needs a count, so a single
+	// aggregate subquery keeps the list endpoint cheap.
 	query := `
-		SELECT id::text,
-		       receipt_number,
-		       supplier_name,
-		       customer_name,
-		       supplier_reference,
-		       purchase_order_number,
-		       delivery_note_number,
-		       weighbridge_ticket_number,
-		       vehicle_registration,
-		       job_number,
-		       source_docuware_document_id,
-		       source_docuware_cabinet_id,
-		       docuware_record_id,
-		       docuware_group_reference,
-		       docuware_doc_url,
-		       received_at,
-		       status::text,
-		       sync_status,
-		       notes,
-		       COALESCE(grn_document_id::text, ''),
-		       grn_docuware_doc_id,
-		       grn_generated_at,
-		       docuware_pod_status,
-		       docuware_pod_status_synced_at,
-		       imported_at,
-		       last_synced_at,
-		       created_at,
-		       updated_at
-		FROM receipts ` + whereClause + `
-		ORDER BY received_at DESC, created_at DESC
+		SELECT r.id::text,
+		       r.receipt_number,
+		       r.supplier_name,
+		       r.customer_name,
+		       r.supplier_reference,
+		       r.purchase_order_number,
+		       r.delivery_note_number,
+		       r.weighbridge_ticket_number,
+		       r.vehicle_registration,
+		       r.job_number,
+		       r.source_docuware_document_id,
+		       r.source_docuware_cabinet_id,
+		       r.docuware_record_id,
+		       r.docuware_group_reference,
+		       r.docuware_doc_url,
+		       r.received_at,
+		       r.status::text,
+		       r.sync_status,
+		       r.notes,
+		       COALESCE(r.grn_document_id::text, ''),
+		       r.grn_docuware_doc_id,
+		       r.grn_generated_at,
+		       r.docuware_pod_status,
+		       r.docuware_pod_status_synced_at,
+		       r.imported_at,
+		       r.last_synced_at,
+		       r.created_at,
+		       r.updated_at,
+		       (SELECT COUNT(*) FROM receipt_lines rl WHERE rl.receipt_id = r.id) AS line_count
+		FROM receipts r ` + whereClause + `
+		ORDER BY r.received_at DESC, r.created_at DESC
 	`
 	rows, err := r.pool.Query(ctx, query)
 	if err != nil {
@@ -73,7 +77,7 @@ func (r *PostgresRepository) ListReceipts(ctx context.Context, includeArchived b
 
 	receipts := []Receipt{}
 	for rows.Next() {
-		receipt, err := scanReceipt(rows)
+		receipt, err := scanReceiptWithLineCount(rows)
 		if err != nil {
 			return nil, fmt.Errorf("scan receipt: %w", err)
 		}
@@ -1216,6 +1220,69 @@ func scanReceipt(row rowScanner) (Receipt, error) {
 	if podStatusSyncedAt.Valid {
 		value := podStatusSyncedAt.Time
 		receipt.DocuWarePODStatusSyncedAt = &value
+	}
+
+	return receipt, nil
+}
+
+// scanReceiptWithLineCount mirrors scanReceipt but trails one extra column
+// (line_count) — used by ListReceipts so cards can show an accurate count
+// without paying for the full line bodies.
+func scanReceiptWithLineCount(row rowScanner) (Receipt, error) {
+	var receipt Receipt
+	var status string
+	var importedAt, lastSyncedAt, grnGeneratedAt, podStatusSyncedAt sql.NullTime
+
+	err := row.Scan(
+		&receipt.ID,
+		&receipt.ReceiptNumber,
+		&receipt.SupplierName,
+		&receipt.CustomerName,
+		&receipt.SupplierReference,
+		&receipt.PurchaseOrderNumber,
+		&receipt.DeliveryNoteNumber,
+		&receipt.WeighbridgeTicketNumber,
+		&receipt.VehicleRegistration,
+		&receipt.JobNumber,
+		&receipt.SourceDocuWareDocument,
+		&receipt.SourceDocuWareCabinet,
+		&receipt.DocuWareRecordID,
+		&receipt.DocuWareGroupReference,
+		&receipt.DocuWareDocURL,
+		&receipt.ReceivedAt,
+		&status,
+		&receipt.SyncStatus,
+		&receipt.Notes,
+		&receipt.GRNDocumentID,
+		&receipt.GRNDocuWareDocID,
+		&grnGeneratedAt,
+		&receipt.DocuWarePODStatus,
+		&podStatusSyncedAt,
+		&importedAt,
+		&lastSyncedAt,
+		&receipt.CreatedAt,
+		&receipt.UpdatedAt,
+		&receipt.LineCount,
+	)
+	if err != nil {
+		return Receipt{}, err
+	}
+
+	receipt.Status = ReceiptStatus(status)
+	receipt.Lines = []ReceiptLine{}
+	receipt.Documents = []ReceiptDocument{}
+	receipt.Exceptions = []ReceiptException{}
+	if importedAt.Valid {
+		receipt.ImportedAt = &importedAt.Time
+	}
+	if lastSyncedAt.Valid {
+		receipt.LastSyncedAt = &lastSyncedAt.Time
+	}
+	if grnGeneratedAt.Valid {
+		receipt.GRNGeneratedAt = &grnGeneratedAt.Time
+	}
+	if podStatusSyncedAt.Valid {
+		receipt.DocuWarePODStatusSyncedAt = &podStatusSyncedAt.Time
 	}
 
 	return receipt, nil

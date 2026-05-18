@@ -54,6 +54,7 @@ export type Receipt = {
   source_docuware_document_id?: string
   notes: string
   lines: ReceiptLine[]
+  line_count?: number
   documents?: ReceiptDocument[]
   grn_document_id?: string
   grn_docuware_doc_id?: string
