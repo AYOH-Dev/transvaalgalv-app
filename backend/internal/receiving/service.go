@@ -802,10 +802,10 @@ func applyDefectDiff(existing string, diff *BulkDefectDiff) string {
 	// Top-level qty keys mirror buildConditionNotes in the frontend
 	// (lib/receipts.ts). Cleared on remove, repopulated on add when present.
 	holeTopLevelByMitigation := map[string]string{
-		"Vent holes required":         "ventHolesQty",
-		"Drain holes required":        "drainHolesQty",
-		"Jig holes required":          "jigHolesQty",
-		"Cavity Vent holes required":  "cavityVentHolesQty",
+		"Vent holes required":        "ventHolesQty",
+		"Drain holes required":       "drainHolesQty",
+		"Jig holes required":         "jigHolesQty",
+		"Cavity Vent holes required": "cavityVentHolesQty",
 	}
 	mitigationsThatCarryQty := map[string]bool{
 		"holesInadequate": true,

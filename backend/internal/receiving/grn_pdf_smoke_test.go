@@ -33,7 +33,11 @@ func TestRenderGRNPDF_Smoke(t *testing.T) {
 		},
 	}
 	b, err := RenderGRNPDF(in, TransvaalCompany)
-	if err != nil { t.Fatal(err) }
-	if err := os.WriteFile("/tmp/grn_smoke.pdf", b, 0o644); err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile("/tmp/grn_smoke.pdf", b, 0o644); err != nil {
+		t.Fatal(err)
+	}
 	t.Logf("wrote /tmp/grn_smoke.pdf (%d bytes)", len(b))
 }
