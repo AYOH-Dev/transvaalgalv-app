@@ -85,18 +85,20 @@ export function BulkLineEditSheet({
 
   // Per-field summaries across the selection
   const summaries = useMemo(() => ({
-    item_code:           summarise(selectedLines, l => l.item_code),
-    description:         summarise(selectedLines, l => l.description),
-    internal_description:summarise(selectedLines, l => l.internal_description),
-    material_size:       summarise(selectedLines, l => l.material_size),
-    material_thickness:  summarise(selectedLines, l => l.material_thickness),
-    item_type:           summarise(selectedLines, l => l.item_type),
-    process:          summarise(selectedLines, l => l.process),
-    packaging_method: summarise(selectedLines, l => l.packaging_method),
-    bay:              summarise(selectedLines, l => l.bay),
-    stored_in:        summarise(selectedLines, l => l.stored_in),
-    accessories:      summarise(selectedLines, l => l.accessories),
-    comments:         summarise(selectedLines, l => l.comments),
+    item_code:               summarise(selectedLines, l => l.item_code),
+    description:             summarise(selectedLines, l => l.description),
+    internal_description:    summarise(selectedLines, l => l.internal_description),
+    material_size:           summarise(selectedLines, l => l.material_size),
+    material_thickness:      summarise(selectedLines, l => l.material_thickness),
+    item_type:               summarise(selectedLines, l => l.item_type),
+    process:                 summarise(selectedLines, l => l.process),
+    required_galv_thickness: summarise(selectedLines, l => l.required_galv_thickness),
+    packaging_method:        summarise(selectedLines, l => l.packaging_method),
+    bay:                     summarise(selectedLines, l => l.bay),
+    stored_in:               summarise(selectedLines, l => l.stored_in),
+    accessories:             summarise(selectedLines, l => l.accessories),
+    comments:                summarise(selectedLines, l => l.comments),
+    job_number:              summarise(selectedLines, l => l.job_number),
   }), [selectedLines])
 
   // Process options: depend on item type. If the receiver selected an item
@@ -248,6 +250,22 @@ export function BulkLineEditSheet({
             </select>
           </BulkField>
 
+          {/* Required Galv Thickness */}
+          <BulkField
+            label="Req. Galv Thickness"
+            badge={summaryBadge(summaries.required_galv_thickness)}
+            touched={touched.has('required_galv_thickness')}
+            onClear={() => untouch('required_galv_thickness')}
+          >
+            <input
+              type="text"
+              className="bulk-sheet__input"
+              placeholder="e.g. 85µm"
+              value={touched.has('required_galv_thickness') ? (patch.required_galv_thickness ?? '') : ''}
+              onChange={e => touch('required_galv_thickness', e.target.value)}
+            />
+          </BulkField>
+
           {/* Packaging */}
           <BulkField
             label="Packaging"
@@ -294,6 +312,22 @@ export function BulkLineEditSheet({
               placeholder="e.g. Cold room, Wash bay, Outside Plant 2"
               value={touched.has('stored_in') ? (patch.stored_in ?? '') : ''}
               onChange={e => touch('stored_in', e.target.value)}
+            />
+          </BulkField>
+
+          {/* Job Number — per-line override; the load header has a "set all" field */}
+          <BulkField
+            label="Job Number"
+            badge={summaryBadge(summaries.job_number)}
+            touched={touched.has('job_number')}
+            onClear={() => untouch('job_number')}
+          >
+            <input
+              type="text"
+              className="bulk-sheet__input"
+              placeholder="Override job number"
+              value={touched.has('job_number') ? (patch.job_number ?? '') : ''}
+              onChange={e => touch('job_number', e.target.value)}
             />
           </BulkField>
 
@@ -358,7 +392,7 @@ export function BulkLineEditSheet({
               />
               <span>Mark {n} line{n === 1 ? '' : 's'} as received</span>
             </label>
-            <p className="bulk-sheet__hint">Status flip only. Use the walkthrough if any line needs qty/defect attention.</p>
+            <p className="bulk-sheet__hint">Marks each line received with its expected quantity. Use the walkthrough if any line needs a different qty or defect attention.</p>
           </div>
 
           {failedCount > 0 && (

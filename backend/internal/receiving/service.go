@@ -21,6 +21,7 @@ type Repository interface {
 	CreateReceipt(ctx context.Context, receipt importedReceipt) (Receipt, error)
 	UpdateReceipt(ctx context.Context, id string, input UpdateReceiptInput) (Receipt, error)
 	UpdateReceiptLine(ctx context.Context, receiptID, lineID string, input UpdateReceiptLineInput) (ReceiptLine, error)
+	MarkLinesReceivedAfterGRN(ctx context.Context, receiptID string) error
 	ArchiveStaleMatched(ctx context.Context, olderThan time.Duration) (int64, error)
 }
 
@@ -83,6 +84,7 @@ type importedReceiptLine struct {
 	Discrepancy         string
 	QuantityDiscrepancy string
 	ConditionNotes      string
+	JobNumber           string
 	DocuWareRecordLine  string
 	DocuWareUniqueNo    string
 	DocuWarePrimaryKey  string
@@ -297,6 +299,7 @@ func (s *Service) CreateGRN(ctx context.Context, input CreateGRNInput) (Receipt,
 			MaterialMarkings: strings.TrimSpace(raw.MaterialMarkings),
 			MaterialLength:   strings.TrimSpace(raw.MaterialLength),
 			Weight:           strings.TrimSpace(raw.Weight),
+			JobNumber:        strings.TrimSpace(raw.JobNumber),
 			ExpectedQuantity: quantity,
 			ReceivingStatus:  "draft",
 			SourcePayload: map[string]any{
@@ -352,11 +355,18 @@ func (s *Service) CreateGRN(ctx context.Context, input CreateGRNInput) (Receipt,
 		return Receipt{}, err
 	}
 
-	// TODO(grn-upload): push a generated GRN document to the DocuWare Documents
-	// cabinet. Requires a CreateDocument method on docuware.Client (multipart
-	// POST to /FileCabinets/{id}/Documents). Tracked via sync_status=pending_grn_upload.
-	log.Printf("[create-pod] receipt=%s lines=%d sync_status=%s — DocuWare GRN push pending implementation",
-		created.ID, len(created.Lines), created.SyncStatus)
+	// Enqueue DocuWare sync for each line so records are created in the
+	// Receiving Data cabinet. The worker creates new DocuWare documents for
+	// lines that have no docuware_doc_id (all GRN-originated lines).
+	if s.syncEnqueuer != nil {
+		for _, l := range created.Lines {
+			if err := s.syncEnqueuer.EnqueueLineSync(ctx, created.ID, l.ID); err != nil {
+				log.Printf("warn: failed to enqueue line sync after GRN create (receipt=%s, line=%s): %v", created.ID, l.ID, err)
+			}
+		}
+	}
+
+	log.Printf("[create-pod] receipt=%s lines=%d — queued %d DocuWare line syncs", created.ID, len(created.Lines), len(created.Lines))
 
 	return created, nil
 }
@@ -468,14 +478,25 @@ func (s *Service) UpdateReceipt(ctx context.Context, id string, input UpdateRece
 
 	// Status -> 'matched': generate the GRN PDF + queue a DocuWare push.
 	// Idempotent — MaybeGenerate is a no-op if a GRN already exists.
-	if input.Status != nil && *input.Status == ReceiptStatusMatched && s.grnService != nil {
-		if err := s.grnService.MaybeGenerate(ctx, receipt.ID); err != nil {
-			// Log only — we don't fail the user's status update because the
-			// GRN can be regenerated later (manual retry, or a re-trigger
-			// once the underlying issue is fixed).
-			log.Printf("grn generation failed for receipt %s: %v", receipt.ID, err)
-		} else if s.grnPushNotify != nil {
-			s.grnPushNotify(receipt.ID)
+	if input.Status != nil && *input.Status == ReceiptStatusMatched {
+		// Upgrade reviewed → received: GRN issuance finalises all checked lines.
+		if err := s.repository.MarkLinesReceivedAfterGRN(ctx, receipt.ID); err != nil {
+			log.Printf("warn: failed to mark reviewed lines received after GRN (receipt=%s): %v", receipt.ID, err)
+		} else if s.syncEnqueuer != nil {
+			// Re-enqueue syncs so DocuWare RECEIVING_STATUS reflects "Received".
+			for _, line := range receipt.Lines {
+				_ = s.syncEnqueuer.EnqueueLineSync(ctx, receipt.ID, line.ID)
+			}
+		}
+		if s.grnService != nil {
+			if err := s.grnService.MaybeGenerate(ctx, receipt.ID); err != nil {
+				// Log only — we don't fail the user's status update because the
+				// GRN can be regenerated later (manual retry, or a re-trigger
+				// once the underlying issue is fixed).
+				log.Printf("grn generation failed for receipt %s: %v", receipt.ID, err)
+			} else if s.grnPushNotify != nil {
+				s.grnPushNotify(receipt.ID)
+			}
 		}
 	}
 
@@ -522,6 +543,14 @@ func (s *Service) UpdateReceiptLine(ctx context.Context, receiptID, lineID strin
 		return ReceiptLine{}, fmt.Errorf("%w: line id is required", ErrInvalidInput)
 	}
 
+	// Walkthrough/bulk confirms arrive as "received"; write "reviewed" instead
+	// so the line is marked checked but not yet locked. Lines upgrade to final
+	// "received" only when the GRN PDF is generated (UpdateReceipt → matched).
+	if input.ReceivingStatus != nil && *input.ReceivingStatus == "received" {
+		reviewed := "reviewed"
+		input.ReceivingStatus = &reviewed
+	}
+
 	line, err := s.repository.UpdateReceiptLine(ctx, receiptID, lineID, input)
 	if err != nil {
 		return ReceiptLine{}, err
@@ -530,7 +559,7 @@ func (s *Service) UpdateReceiptLine(ctx context.Context, receiptID, lineID strin
 	// Sync to DocuWare on any field change so that updates (e.g. received
 	// quantity edits made without simultaneously marking as received) are
 	// not silently dropped. Use SyncLineNow for status transitions to keep
-	// the "received" state visible in DocuWare quickly; for all other edits
+	// the "reviewed" state visible in DocuWare quickly; for all other edits
 	// enqueue so the background worker batches them.
 	if s.syncEnqueuer != nil {
 		if input.ReceivingStatus != nil {
@@ -544,8 +573,8 @@ func (s *Service) UpdateReceiptLine(ctx context.Context, receiptID, lineID strin
 		}
 	}
 
-	// Auto-advance receipt from draft → received once every line is marked received.
-	if input.ReceivingStatus != nil && *input.ReceivingStatus == "received" {
+	// Auto-advance receipt from draft → received once every line is reviewed.
+	if input.ReceivingStatus != nil && *input.ReceivingStatus == "reviewed" {
 		if receipt, err := s.repository.GetReceipt(ctx, receiptID); err == nil {
 			if receipt.Status == ReceiptStatusDraft && len(receipt.Lines) > 0 && allLinesReceived(receipt.Lines) {
 				newStatus := ReceiptStatusReceived
@@ -589,10 +618,24 @@ func (s *Service) BulkUpdateReceiptLines(ctx context.Context, receiptID string, 
 		Errors:  map[string]string{},
 	}
 
-	// If a defect diff is provided, fetch the receipt once to get current
-	// condition_notes for each line so we can merge rather than replace.
-	var linesByID map[string]ReceiptLine
+	// Translate "received" → "reviewed" (same as single-line path).
+	if input.Patch.ReceivingStatus != nil && *input.Patch.ReceivingStatus == "received" {
+		reviewed := "reviewed"
+		input.Patch.ReceivingStatus = &reviewed
+	}
+
+	// Fetch the receipt once if we need per-line data:
+	//   - merging defects into existing condition_notes (defect diff path), or
+	//   - defaulting received_quantity to expected_quantity when the batch
+	//     flips lines to "reviewed" without an explicit quantity (matches the
+	//     walkthrough Confirm behavior — "received as expected").
+	flippingToReviewed := input.Patch.ReceivingStatus != nil && *input.Patch.ReceivingStatus == "reviewed"
+	needLines := flippingToReviewed && input.Patch.ReceivedQuantity == nil
 	if input.Defects != nil && (len(input.Defects.Add) > 0 || len(input.Defects.Remove) > 0) {
+		needLines = true
+	}
+	var linesByID map[string]ReceiptLine
+	if needLines {
 		if receipt, err := s.repository.GetReceipt(ctx, receiptID); err == nil {
 			linesByID = make(map[string]ReceiptLine, len(receipt.Lines))
 			for _, l := range receipt.Lines {
@@ -612,11 +655,35 @@ func (s *Service) BulkUpdateReceiptLines(ctx context.Context, receiptID string, 
 		if id == "" {
 			continue
 		}
-		patch := basePatch // copy so per-line condition_notes override is safe
+		patch := basePatch // copy so per-line condition_notes / qty defaults are safe
 		if input.Defects != nil && linesByID != nil {
 			existing := linesByID[id]
 			merged := applyDefectDiff(existing.ConditionNotes, input.Defects)
 			patch.ConditionNotes = &merged
+			// Bulk defect Add must flag the line the same way the walkthrough's
+			// single-line apply does; Remove should clear the flag when no
+			// defects remain. Caller-supplied discrepancy still wins, so a
+			// downstream override is possible.
+			if patch.Discrepancy == nil {
+				var discrepancy string
+				if conditionNotesHasDefect(merged) {
+					discrepancy = "defects_noted"
+				}
+				patch.Discrepancy = &discrepancy
+			}
+		}
+		// Default received_quantity to expected_quantity and quantity_discrepancy
+		// to "none" when the batch flips a line to reviewed without explicit
+		// values. Matches walkthrough Confirm behaviour.
+		if flippingToReviewed && patch.ReceivedQuantity == nil {
+			if existing, ok := linesByID[id]; ok {
+				qty := existing.ExpectedQuantity
+				patch.ReceivedQuantity = &qty
+			}
+		}
+		if flippingToReviewed && patch.QuantityDiscrepancy == nil {
+			none := "none"
+			patch.QuantityDiscrepancy = &none
 		}
 		line, err := s.repository.UpdateReceiptLine(ctx, receiptID, id, patch)
 		if err != nil {
@@ -641,8 +708,8 @@ func (s *Service) BulkUpdateReceiptLines(ctx context.Context, receiptID string, 
 	}
 
 	// Auto-advance to received once — only if the batch flipped at least one
-	// line to received and now all lines on the receipt are received.
-	if basePatch.ReceivingStatus != nil && *basePatch.ReceivingStatus == "received" && len(result.Updated) > 0 {
+	// line to reviewed and now all lines on the receipt are reviewed.
+	if basePatch.ReceivingStatus != nil && *basePatch.ReceivingStatus == "reviewed" && len(result.Updated) > 0 {
 		if receipt, err := s.repository.GetReceipt(ctx, receiptID); err == nil {
 			if receipt.Status == ReceiptStatusDraft && len(receipt.Lines) > 0 && allLinesReceived(receipt.Lines) {
 				newStatus := ReceiptStatusReceived
@@ -663,6 +730,60 @@ func (s *Service) BulkUpdateReceiptLines(ctx context.Context, receiptID string, 
 	return result, nil
 }
 
+// qtyFor returns the qty for a given mitigation from a BulkDefectEntry, or 0
+// if not present. Used to write top-level *Qty keys in condition_notes that
+// DocuWare sync expects.
+func qtyFor(entry BulkDefectEntry, mitigation string) int {
+	if q, ok := entry.Quantities[mitigation]; ok && q > 0 {
+		return q
+	}
+	return 0
+}
+
+// defectDefaults mirrors lib/receipts.ts DEFECT_CATEGORIES defaults. Used to
+// detect whether condition_notes carries any non-default defect value.
+var defectDefaults = map[string]string{
+	"paint": "none", "damaged": "none", "rust": "normal",
+	"oilGreaseDiesel": "none", "burr": "none", "sharpEdges": "no",
+	"weldingFlux": "no", "continuousWeld": "no", "possibleDistortion": "no",
+	"holesInadequate": "no", "weldingSplatter": "no", "delamination": "no",
+	"nonConformingPreGalv": "no", "pinHoles": "none", "enclosedCavity": "no",
+	"noHanging": "no", "threadedArticle": "no", "articleOverlap": "no",
+}
+
+// conditionNotesHasDefect returns true when the parsed condition_notes carry
+// at least one defect key set to a non-default value. Mirrors hasAnyDefect in
+// frontend/src/lib/receipts.ts so bulk and single-line writes agree on the
+// "is this line flagged" question.
+func conditionNotesHasDefect(conditionNotes string) bool {
+	if strings.TrimSpace(conditionNotes) == "" {
+		return false
+	}
+	var obj map[string]interface{}
+	if err := json.Unmarshal([]byte(conditionNotes), &obj); err != nil {
+		return false
+	}
+	for key, def := range defectDefaults {
+		raw, ok := obj[key]
+		if !ok {
+			continue
+		}
+		// Yes/no defects are stored as bool true when set; other defects as
+		// the severity string.
+		switch v := raw.(type) {
+		case bool:
+			if v {
+				return true
+			}
+		case string:
+			if v != "" && v != def {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // applyDefectDiff merges a BulkDefectDiff into an existing condition_notes
 // JSON string. Remove keys and their Mitigation siblings are deleted; Add
 // entries are written (overwriting any existing value for the same key).
@@ -678,9 +799,33 @@ func applyDefectDiff(existing string, diff *BulkDefectDiff) string {
 		_ = json.Unmarshal([]byte(existing), &obj)
 	}
 
+	// Top-level qty keys mirror buildConditionNotes in the frontend
+	// (lib/receipts.ts). Cleared on remove, repopulated on add when present.
+	holeTopLevelByMitigation := map[string]string{
+		"Vent holes required":         "ventHolesQty",
+		"Drain holes required":        "drainHolesQty",
+		"Jig holes required":          "jigHolesQty",
+		"Cavity Vent holes required":  "cavityVentHolesQty",
+	}
+	mitigationsThatCarryQty := map[string]bool{
+		"holesInadequate": true,
+		"enclosedCavity":  true,
+		"noHanging":       true,
+		"articleOverlap":  true,
+	}
+
 	for _, key := range diff.Remove {
 		delete(obj, key)
 		delete(obj, key+"Mitigation")
+		// Drop top-level qty keys associated with this defect.
+		switch key {
+		case "holesInadequate":
+			delete(obj, "ventHolesQty")
+			delete(obj, "drainHolesQty")
+			delete(obj, "jigHolesQty")
+		case "enclosedCavity":
+			delete(obj, "cavityVentHolesQty")
+		}
 	}
 
 	for _, entry := range diff.Add {
@@ -690,11 +835,38 @@ func applyDefectDiff(existing string, diff *BulkDefectDiff) string {
 		} else {
 			obj[entry.Key] = entry.Severity
 		}
+
 		if len(entry.Mitigations) > 0 {
-			obj[entry.Key+"Mitigation"] = entry.Mitigations
+			// For qty-bearing defects, encode the qty inline as "mit=qty" to
+			// match the walkthrough's buildConditionNotes output. Mitigations
+			// without a qty stay bare.
+			mits := make([]string, 0, len(entry.Mitigations))
+			for _, m := range entry.Mitigations {
+				if mitigationsThatCarryQty[entry.Key] {
+					if q, ok := entry.Quantities[m]; ok && q > 0 {
+						mits = append(mits, fmt.Sprintf("%s=%d", m, q))
+						continue
+					}
+				}
+				mits = append(mits, m)
+			}
+			obj[entry.Key+"Mitigation"] = mits
 		} else {
 			delete(obj, entry.Key+"Mitigation")
 		}
+
+		// Top-level qty keys for holesInadequate / enclosedCavity (same shape
+		// as buildConditionNotes — single-mode and bulk-mode write identical
+		// JSON, so DocuWare sync sees one format).
+		switch entry.Key {
+		case "holesInadequate":
+			obj["ventHolesQty"] = qtyFor(entry, "Vent holes required")
+			obj["drainHolesQty"] = qtyFor(entry, "Drain holes required")
+			obj["jigHolesQty"] = qtyFor(entry, "Jig holes required")
+		case "enclosedCavity":
+			obj["cavityVentHolesQty"] = qtyFor(entry, "Cavity Vent holes required")
+		}
+		_ = holeTopLevelByMitigation // kept for future explicit lookups
 	}
 
 	out, err := json.Marshal(obj)
@@ -706,7 +878,7 @@ func applyDefectDiff(existing string, diff *BulkDefectDiff) string {
 
 func allLinesReceived(lines []ReceiptLine) bool {
 	for _, l := range lines {
-		if l.ReceivingStatus != "received" {
+		if l.ReceivingStatus != "received" && l.ReceivingStatus != "reviewed" {
 			return false
 		}
 	}
@@ -824,6 +996,7 @@ func buildImportedLine(payload map[string]any, recordID string, fallbackLineNumb
 		Discrepancy:         payloadString(payload, "DISCREPANCY"),
 		QuantityDiscrepancy: payloadString(payload, "QUANTITY_DISCREPANCY"),
 		ConditionNotes:      buildConditionNotesJSON(payload),
+		JobNumber:           payloadString(payload, "JOB_NUMBER"),
 		DocuWareRecordLine:  docuWareRecordLine,
 		DocuWareUniqueNo:    payloadString(payload, "UNIQUE_NUMBER"),
 		DocuWarePrimaryKey:  payloadString(payload, "PRIMARY_KEY"),

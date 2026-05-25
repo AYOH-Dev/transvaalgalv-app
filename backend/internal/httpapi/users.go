@@ -32,6 +32,14 @@ func (a *App) handleCreateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Receivers may create viewer and receiver accounts only; admin role requires admin.
+	if subject, ok := currentSubject(r.Context()); ok {
+		if users.Role(subject.Role) != users.RoleAdmin && users.Role(request.Role) == users.RoleAdmin {
+			writeError(w, http.StatusForbidden, "only admins can create admin accounts")
+			return
+		}
+	}
+
 	user, err := a.users.CreateUser(r.Context(), users.CreateUserInput{
 		Email:       request.Email,
 		DisplayName: request.DisplayName,

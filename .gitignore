@@ -3,6 +3,7 @@
 .env.local
 .DS_Store
 Thumbs.db
+_/
 
 backend/bin/
 backend/.cache/

@@ -52,9 +52,9 @@ type CompanyDetails struct {
 
 var TransvaalCompany = CompanyDetails{
 	Name:       "Transvaal Galvanisers",
-	AddressLn1: "3 3rd Avenue, Voorsterkroon, Nigel 1491",
-	Phone:      "+27 11 739 6000",
-	Email:      "info@transvaalgalv.co.za",
+	AddressLn1: "3 3rd Avenue, Vorsterkroon, Nigel, Gauteng 1490",
+	Phone:      "+27 11 814 4710",
+	Email:      "transgalv@transgalv.co.za",
 	VAT:        "VAT 4030104541",
 	Reg:        "Reg M1985/001541/07",
 }
@@ -142,7 +142,6 @@ func RenderGRNPDF(input GRNRenderInput, company CompanyDetails) ([]byte, error) 
 	totals := computeTotals(input)
 	drawTotalsBox(ctx, totals)
 	drawReceivingNotes(ctx, input)
-	drawSignatureBlock(ctx)
 
 	var buf bytes.Buffer
 	if err := pdf.Output(&buf); err != nil {
@@ -301,20 +300,17 @@ func drawLineTable(ctx renderCtx, in GRNRenderInput) {
 	ctx.cell(0, 6, "LINE ITEMS", "", 1, "L", false, 0, "")
 	pdf.Ln(1)
 
-	// Column widths sum to 180 mm (page width 195 - margins 30 + already at x=15)
-	// Total width 180mm. CODE widened from 22→32 to fit typical item codes
-	// like "60RND-EN-19-02" without bleeding into DESCRIPTION; description
-	// shrinks to 60 and we keep a small left padding via cell-internal
-	// alignment.
+	// Column widths sum to 180 mm (page width 195 - margins 30 + already at x=15).
+	// Removed UNIT / KG/U / LINE KG columns per client request — receivers don't
+	// want per-unit weight on the GRN. Renamed EXP→DN QTY and REC'D→REC QTY
+	// so the headings match what the client uses on the delivery note. Width
+	// freed by the removed columns goes to DESCRIPTION (most often clipped).
 	cols := []lineCol{
 		{"#", 8, "L"},
-		{"CODE", 32, "L"},
-		{"DESCRIPTION", 60, "L"},
-		{"EXP", 12, "R"},
-		{"REC'D", 14, "R"},
-		{"UNIT", 12, "C"},
-		{"KG/U", 18, "R"},
-		{"LINE KG", 24, "R"},
+		{"CODE", 36, "L"},
+		{"DESCRIPTION", 90, "L"},
+		{"DN QTY", 22, "R"},
+		{"REC QTY", 24, "R"},
 	}
 
 	pdf.SetFont("Helvetica", "B", 7)
@@ -346,9 +342,6 @@ func drawLineRow(ctx renderCtx, cols []lineCol, ln GRNRenderLine) {
 		{ln.Description, "L"},
 		{formatQty(ln.ExpectedQty), "R"},
 		{formatQty(ln.ReceivedQty), "R"},
-		{ln.UnitOfMeasure, "C"},
-		{formatKg(ln.UnitWeightKg), "R"},
-		{formatKg(ln.LineWeightKg), "R"},
 	}
 
 	for i, c := range cols {
@@ -361,7 +354,6 @@ func drawLineRow(ctx renderCtx, cols []lineCol, ln GRNRenderLine) {
 		x := 15 + cols[0].w + cols[1].w
 		pdf.SetXY(x, pdf.GetY())
 		drawConditionChip(ctx, pretty, cols[2].w+cols[3].w+cols[4].w)
-		pdf.Ln(5)
 	}
 
 	// Subtle row divider
@@ -382,10 +374,13 @@ func drawConditionChip(ctx renderCtx, summary string, maxW float64) {
 	pdf.SetXY(x, y)
 	ctx.cell(tagW, 4, tag, "", 0, "C", false, 0, "")
 
+	// Wrap the condition text instead of a single overflowing cell so long
+	// "Notes: …" trailers stay inside the column. MultiCell advances Y by
+	// rowH × line-count; drawLineRow doesn't need its own pdf.Ln after.
 	pdf.SetFont("Helvetica", "", 8)
 	pdf.SetTextColor(textPrimary.r, textPrimary.g, textPrimary.b)
-	pdf.SetX(x + tagW + 2)
-	ctx.cell(maxW-tagW-2, 4, summary, "", 0, "L", false, 0, "")
+	pdf.SetXY(x+tagW+2, y)
+	pdf.MultiCell(maxW-tagW-2, 4, ctx.tr(summary), "", "L", false)
 }
 
 // ── Totals box ──────────────────────────────────────────────────────────────
@@ -394,7 +389,6 @@ type grnTotals struct {
 	expectedUnits float64
 	receivedUnits float64
 	variance      float64
-	netMassKg     float64
 }
 
 func computeTotals(in GRNRenderInput) grnTotals {
@@ -402,7 +396,6 @@ func computeTotals(in GRNRenderInput) grnTotals {
 	for _, ln := range in.Lines {
 		t.expectedUnits += ln.ExpectedQty
 		t.receivedUnits += ln.ReceivedQty
-		t.netMassKg += ln.LineWeightKg
 	}
 	t.variance = t.receivedUnits - t.expectedUnits
 	return t
@@ -416,14 +409,7 @@ func drawTotalsBox(ctx renderCtx, t grnTotals) {
 	y := pdf.GetY()
 	rowH := 5.5
 
-	// Estimated net mass is only shown when we actually have weight data;
-	// otherwise printing "— kg" looks broken (the dash is the unit's empty
-	// marker, the kg suffix becomes nonsense).
-	showNetMass := t.netMassKg > 0
 	totalRows := 3
-	if showNetMass {
-		totalRows = 4
-	}
 	boxH := rowH*float64(totalRows) + 4
 
 	pdf.SetFillColor(totalsBg.r, totalsBg.g, totalsBg.b)
@@ -438,13 +424,6 @@ func drawTotalsBox(ctx renderCtx, t grnTotals) {
 		{"Total expected units", formatQty(t.expectedUnits), false},
 		{"Total received units", formatQty(t.receivedUnits), false},
 		{"Variance", formatVariance(t.variance), false},
-	}
-	if showNetMass {
-		rows = append(rows, struct {
-			label string
-			value string
-			bold  bool
-		}{"Estimated net mass received", formatKg(t.netMassKg) + " kg", true})
 	}
 	pdf.SetFont("Helvetica", "", 9)
 	pdf.SetTextColor(textPrimary.r, textPrimary.g, textPrimary.b)
@@ -492,14 +471,70 @@ func drawReceivingNotes(ctx renderCtx, in GRNRenderInput) {
 
 	x := 15.0
 	w := 180.0
-	y := pdf.GetY()
-	rows := 1
-	if notes != "" {
-		rows++
-	}
-	rows += len(flaggedLines)
-	h := 6 + float64(rows)*5
+	rowH := 4.5
+	// Two-column flagged-line layout: bold "Line N — Desc" label on the left,
+	// wrapped summary on the right. Wrapping is needed because the single-line
+	// cell() was clipping long "Notes: …" trailers past the right margin
+	// (see Issue 14a screenshot).
+	labelW := 50.0
+	summaryW := w - 8 - labelW
 
+	// We can't reliably pre-measure with fpdf.SplitText (it panics on
+	// out-of-range runes for the cp1252 font when given UTF-8). Instead,
+	// render into a buffered (off-page) cursor by advancing the visible Y
+	// rendering and then drawing the amber rectangle *behind* it at the end.
+	// Simplest reliable approach: draw the rectangle FIRST with a generous
+	// height, render content inside, then trim the rectangle at the bottom
+	// by re-drawing its border. fpdf doesn't support afters-style draws, so
+	// we just compute height with a small overshoot and let MultiCell handle
+	// the wrapping. We overshoot deterministically rather than measuring.
+	pdf.SetFont("Helvetica", "", 9)
+	estimateLines := func(s string, width float64) int {
+		// Conservative estimate: each ~75 cp1252 chars at 9pt occupies roughly
+		// width=180mm. Width-aware proportional estimate, ceiling at 1.
+		// "—"-like specials are 1 char each post-translation.
+		if s == "" {
+			return 0
+		}
+		approxCharsPerMM := 0.42 // 9pt Helvetica avg width ~2.4mm/char inverted
+		linesOnNewlines := 1
+		for _, c := range s {
+			if c == '\n' {
+				linesOnNewlines++
+			}
+		}
+		// Approx chars per visual line for this width.
+		charsPerLine := int(width * approxCharsPerMM)
+		if charsPerLine < 1 {
+			charsPerLine = 1
+		}
+		// Total chars / charsPerLine, then take max with newline count.
+		total := (len(s) + charsPerLine - 1) / charsPerLine
+		if total < linesOnNewlines {
+			total = linesOnNewlines
+		}
+		if total < 1 {
+			total = 1
+		}
+		return total
+	}
+
+	notesLines := estimateLines(notes, w-8)
+	flaggedTotal := 0
+	flaggedCounts := make([]int, len(flaggedLines))
+	for i, f := range flaggedLines {
+		c := estimateLines(f.summary, summaryW)
+		if c < 1 {
+			c = 1
+		}
+		flaggedCounts[i] = c
+		flaggedTotal += c
+	}
+	// Heading takes ~6mm; each text line takes rowH. Add 3mm padding so a
+	// slight under-count doesn't clip the bottom of the last wrapped line.
+	h := 7 + float64(notesLines)*rowH + float64(flaggedTotal)*rowH + 3
+
+	y := pdf.GetY()
 	pdf.SetFillColor(amberBg.r, amberBg.g, amberBg.b)
 	pdf.SetDrawColor(amberBorder.r, amberBorder.g, amberBorder.b)
 	pdf.SetLineWidth(0.4)
@@ -514,57 +549,25 @@ func drawReceivingNotes(ctx renderCtx, in GRNRenderInput) {
 	pdf.SetTextColor(textPrimary.r, textPrimary.g, textPrimary.b)
 	if notes != "" {
 		pdf.SetX(x + 4)
-		ctx.cell(w-8, 5, notes, "", 1, "L", false, 0, "")
+		pdf.MultiCell(w-8, rowH, ctx.tr(notes), "", "L", false)
 	}
-	for _, f := range flaggedLines {
-		pdf.SetX(x + 4)
+	for i, f := range flaggedLines {
+		rowStart := pdf.GetY()
+		pdf.SetXY(x+4, rowStart)
 		pdf.SetFont("Helvetica", "B", 9)
 		label := fmt.Sprintf("Line %d — %s", f.line.LineNumber, f.line.Description)
-		ctx.cell(60, 5, label, "", 0, "L", false, 0, "")
+		ctx.cell(labelW, rowH, label, "", 0, "L", false, 0, "")
 		pdf.SetFont("Helvetica", "", 9)
-		ctx.cell(w-68, 5, f.summary, "", 1, "L", false, 0, "")
+		pdf.SetXY(x+4+labelW, rowStart)
+		pdf.MultiCell(summaryW, rowH, ctx.tr(f.summary), "", "L", false)
+		// MultiCell advances Y; make sure the next row starts below the
+		// taller of (label, summary) so a short summary doesn't overlap.
+		minY := rowStart + float64(flaggedCounts[i])*rowH
+		if pdf.GetY() < minY {
+			pdf.SetY(minY)
+		}
 	}
 	pdf.SetY(y + h + 4)
-}
-
-// ── Signature block ─────────────────────────────────────────────────────────
-
-func drawSignatureBlock(ctx renderCtx) {
-	pdf := ctx.pdf
-	// Place the signature block immediately below preceding content with a
-	// small gap. Previous version forced y=230 and added a new page when
-	// content overflowed past 240 — that pushed everything onto a near-empty
-	// page when the rest of the page had room, producing a blank page 2.
-	pdf.Ln(8)
-	y := pdf.GetY()
-	pageH := 297.0
-	bottomMargin := 18.0
-	blockH := 25.0
-	if y+blockH > pageH-bottomMargin {
-		pdf.AddPage()
-		y = pdf.GetY()
-	}
-	w := 85.0
-	gap := 10.0
-
-	pdf.SetDrawColor(rule.r, rule.g, rule.b)
-	pdf.SetLineWidth(0.4)
-
-	pdf.RoundedRect(15, y, w, 16, 2, "1234", "D")
-	pdf.RoundedRect(15+w+gap, y, w, 16, 2, "1234", "D")
-
-	pdf.SetFont("Helvetica", "B", 7)
-	pdf.SetTextColor(textMuted.r, textMuted.g, textMuted.b)
-	pdf.SetXY(15, y+18)
-	ctx.cell(w, 4, "RECEIVED BY — TRANSVAAL GALVANISERS", "", 0, "L", false, 0, "")
-	pdf.SetXY(15+w+gap, y+18)
-	ctx.cell(w, 4, "DELIVERED BY — DRIVER", "", 0, "L", false, 0, "")
-
-	pdf.SetFont("Helvetica", "", 7)
-	pdf.SetXY(15, y+22)
-	ctx.cell(w, 4, "Name, date, signature", "", 0, "L", false, 0, "")
-	pdf.SetXY(15+w+gap, y+22)
-	ctx.cell(w, 4, "Name, date, signature", "", 0, "L", false, 0, "")
 }
 
 // ── helpers ─────────────────────────────────────────────────────────────────
@@ -581,16 +584,6 @@ func formatReceivedDate(t time.Time) string {
 }
 
 func formatQty(v float64) string {
-	if v == float64(int64(v)) {
-		return strconv.FormatInt(int64(v), 10)
-	}
-	return strconv.FormatFloat(v, 'f', 2, 64)
-}
-
-func formatKg(v float64) string {
-	if v == 0 {
-		return "—"
-	}
 	if v == float64(int64(v)) {
 		return strconv.FormatInt(int64(v), 10)
 	}

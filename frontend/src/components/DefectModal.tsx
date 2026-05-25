@@ -1,9 +1,11 @@
 import React, { useState } from 'react'
+import '../styles/yard.css'
 import {
   type ReceiptDocument,
   type MitigationSelection,
   type MitigationQuantity,
   type BulkDefectDiff,
+  type BulkDefectEntry,
   type DefectIntersectionEntry,
   DEFECT_CATEGORIES,
   MITIGATION_NO_QTY,
@@ -109,7 +111,7 @@ function SingleDefectModal({ lineLabel, initial, initialMitigations, initialQuan
         return out
       }
       if (!MITIGATION_NO_QTY.has(itemKey)) {
-        return { ...prev, [itemKey]: { ...(prev[itemKey] ?? {}), [mit]: 0 } }
+        return { ...prev, [itemKey]: { ...(prev[itemKey] ?? {}), [mit]: 1 } }
       }
       return prev
     })
@@ -173,7 +175,7 @@ function SingleDefectModal({ lineLabel, initial, initialMitigations, initialQuan
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '1rem' }}>
             {flaggedItems.map(item => {
               const val = defects[item.key] ?? item.default
-              const isYesNo = item.options[0] === 'no' || item.options[0] === 'yes'
+              const isYesNo = item.options.length === 2 && new Set(item.options).has('yes') && new Set(item.options).has('no')
               const availableMitigations = item.mitigations[val] ?? []
               const selectedMits = mitigations[item.key] ?? []
               return (
@@ -198,21 +200,45 @@ function SingleDefectModal({ lineLabel, initial, initialMitigations, initialQuan
                     })}
                   </div>
                   {availableMitigations.length > 0 && (
-                    <div style={{ marginTop: '0.875rem', paddingTop: '0.75rem', borderTop: '1px dashed var(--border)' }}>
-                      <span style={{ fontSize: '0.6875rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Mitigations</span>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.5rem' }}>
+                    <div className="defect-row__mits">
+                      <div className="defect-row__mits-label">Mitigations</div>
+                      <div className="defect-row__mits-list">
                         {availableMitigations.map(m => {
-                          const checked = selectedMits.includes(m)
-                          const showQty = !MITIGATION_NO_QTY.has(item.key)
-                          const q = quantities[item.key]?.[m] ?? 0
+                          const on = selectedMits.includes(m)
+                          const noQty = MITIGATION_NO_QTY.has(item.key)
+                          const q = quantities[item.key]?.[m] ?? 1
                           return (
-                            <div key={m} style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
-                              <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1, cursor: 'pointer', fontSize: '0.8125rem', minHeight: '40px' }}>
-                                <input type="checkbox" checked={checked} onChange={() => toggleMitigation(item.key, m)} style={{ width: 18, height: 18, accentColor: 'var(--amber)', cursor: 'pointer' }} />
-                                <span>{m}</span>
-                              </label>
-                              {showQty && (
-                                <input type="number" min="0" value={checked ? q : ''} onChange={e => setMitigationQty(item.key, m, parseInt(e.target.value || '0', 10) || 0)} disabled={!checked} placeholder="Qty" aria-label={`${m} quantity`} style={{ width: 70, padding: '0.5rem', fontSize: '0.8125rem', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', background: checked ? '#fff' : 'rgba(0,0,0,0.03)', color: checked ? 'var(--text-primary)' : 'var(--text-muted)', minHeight: '40px' }} />
+                            <div key={m} className={'mit-row ' + (on ? 'mit-row--on' : '')}>
+                              <button
+                                type="button"
+                                className="mit-row__toggle"
+                                onClick={() => toggleMitigation(item.key, m)}
+                                aria-pressed={on}
+                              >
+                                <span className={'mit-row__check' + (on ? ' mit-row__check--on' : '')}>
+                                  {on && (
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+                                  )}
+                                </span>
+                                <span className="mit-row__label">{m}</span>
+                              </button>
+                              {on && !noQty && (
+                                <div className="mit-qty">
+                                  <button type="button" className="mit-qty__btn" onClick={() => setMitigationQty(item.key, m, q - 1)} aria-label={`Decrease ${m}`}>
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                                  </button>
+                                  <input
+                                    type="number"
+                                    className="mit-qty__input"
+                                    value={q}
+                                    onChange={e => setMitigationQty(item.key, m, Math.max(1, parseInt(e.target.value || '1', 10) || 1))}
+                                    inputMode="numeric"
+                                    aria-label={`${m} quantity`}
+                                  />
+                                  <button type="button" className="mit-qty__btn" onClick={() => setMitigationQty(item.key, m, q + 1)} aria-label={`Increase ${m}`}>
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                                  </button>
+                                </div>
                               )}
                             </div>
                           )
@@ -283,13 +309,16 @@ function BulkDefectModal({ lineCount, intersection, onConfirm, onClose }: BulkMo
   // kind='mixed' → pre-selected with sentinel 'mixed' (user must resolve)
   const initDefects: Record<string, string> = {}
   const initMitigations: MitigationSelection = {}
+  const initQuantities: MitigationQuantity = {}
   for (const entry of intersection) {
     initDefects[entry.key] = entry.kind === 'all' ? entry.severity : 'mixed'
     if (entry.mitigations.length) initMitigations[entry.key] = [...entry.mitigations]
+    if (Object.keys(entry.quantities).length) initQuantities[entry.key] = { ...entry.quantities }
   }
 
   const [defects, setDefectsState] = useState<Record<string, string>>(initDefects)
   const [mitigations, setMitigations] = useState<MitigationSelection>(initMitigations)
+  const [quantities, setQuantities] = useState<MitigationQuantity>(initQuantities)
   const [pickerOpen, setPickerOpen] = useState(false)
   const [pickerSearch, setPickerSearch] = useState('')
 
@@ -301,6 +330,7 @@ function BulkDefectModal({ lineCount, intersection, onConfirm, onClose }: BulkMo
     const item = allItems.find(i => i.key === key)
     if (item && value === item.default) {
       setMitigations(prev => { const n = { ...prev }; delete n[key]; return n })
+      setQuantities(prev => { const n = { ...prev }; delete n[key]; return n })
     }
   }
 
@@ -319,13 +349,32 @@ function BulkDefectModal({ lineCount, intersection, onConfirm, onClose }: BulkMo
   }
 
   function toggleMitigation(itemKey: string, mit: string) {
+    const wasChecked = (mitigations[itemKey] ?? []).includes(mit)
     setMitigations(prev => {
       const current = prev[itemKey] ?? []
-      const next = current.includes(mit) ? current.filter(m => m !== mit) : [...current, mit]
+      const next = wasChecked ? current.filter(m => m !== mit) : [...current, mit]
       const out = { ...prev }
       if (next.length) out[itemKey] = next; else delete out[itemKey]
       return out
     })
+    setQuantities(prev => {
+      if (wasChecked) {
+        const item = { ...(prev[itemKey] ?? {}) }
+        delete item[mit]
+        const out = { ...prev }
+        if (Object.keys(item).length) out[itemKey] = item; else delete out[itemKey]
+        return out
+      }
+      if (!MITIGATION_NO_QTY.has(itemKey)) {
+        return { ...prev, [itemKey]: { ...(prev[itemKey] ?? {}), [mit]: 1 } }
+      }
+      return prev
+    })
+  }
+
+  function setMitigationQty(itemKey: string, mit: string, value: number) {
+    const clamped = Math.max(1, value)
+    setQuantities(prev => ({ ...prev, [itemKey]: { ...(prev[itemKey] ?? {}), [mit]: clamped } }))
   }
 
   const flaggedItems = allItems.filter(it => {
@@ -348,7 +397,15 @@ function BulkDefectModal({ lineCount, intersection, onConfirm, onClose }: BulkMo
       const sev = defects[item.key]
       // Skip if user left severity as 'mixed' without resolving — treat as no change
       if (sev === 'mixed') continue
-      add.push({ key: item.key, severity: sev, mitigations: mitigations[item.key] ?? [] })
+      const mits = mitigations[item.key] ?? []
+      // Build qty map restricted to the actually-selected mitigations.
+      const qmap: Record<string, number> = {}
+      const all = quantities[item.key] ?? {}
+      for (const m of mits) {
+        if (typeof all[m] === 'number') qmap[m] = Math.max(1, all[m])
+      }
+      const entry: BulkDefectEntry = { key: item.key, severity: sev, mitigations: mits, quantities: qmap }
+      add.push(entry)
     }
 
     // Keys that were in the intersection but the user removed
@@ -393,7 +450,7 @@ function BulkDefectModal({ lineCount, intersection, onConfirm, onClose }: BulkMo
             {flaggedItems.map(item => {
               const val = defects[item.key]
               const isMixed = val === 'mixed'
-              const isYesNo = item.options[0] === 'no' || item.options[0] === 'yes'
+              const isYesNo = item.options.length === 2 && new Set(item.options).has('yes') && new Set(item.options).has('no')
               const availableMitigations = isMixed ? [] : (item.mitigations[val] ?? [])
               const selectedMits = mitigations[item.key] ?? []
 
@@ -423,18 +480,49 @@ function BulkDefectModal({ lineCount, intersection, onConfirm, onClose }: BulkMo
                     })}
                   </div>
 
-                  {/* Mitigations — toggle-only in bulk mode (no qty inputs) */}
+                  {/* Mitigations — same mit-row / mit-qty stepper pattern as the walkthrough. */}
                   {!isMixed && availableMitigations.length > 0 && (
-                    <div style={{ marginTop: '0.875rem', paddingTop: '0.75rem', borderTop: '1px dashed var(--border)' }}>
-                      <span style={{ fontSize: '0.6875rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Mitigations</span>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.5rem' }}>
+                    <div className="defect-row__mits">
+                      <div className="defect-row__mits-label">Mitigations</div>
+                      <div className="defect-row__mits-list">
                         {availableMitigations.map(m => {
-                          const checked = selectedMits.includes(m)
+                          const on = selectedMits.includes(m)
+                          const noQty = MITIGATION_NO_QTY.has(item.key)
+                          const q = quantities[item.key]?.[m] ?? 1
                           return (
-                            <label key={m} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.8125rem', minHeight: '40px' }}>
-                              <input type="checkbox" checked={checked} onChange={() => toggleMitigation(item.key, m)} style={{ width: 18, height: 18, accentColor: 'var(--amber)', cursor: 'pointer' }} />
-                              <span>{m}</span>
-                            </label>
+                            <div key={m} className={'mit-row ' + (on ? 'mit-row--on' : '')}>
+                              <button
+                                type="button"
+                                className="mit-row__toggle"
+                                onClick={() => toggleMitigation(item.key, m)}
+                                aria-pressed={on}
+                              >
+                                <span className={'mit-row__check' + (on ? ' mit-row__check--on' : '')}>
+                                  {on && (
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+                                  )}
+                                </span>
+                                <span className="mit-row__label">{m}</span>
+                              </button>
+                              {on && !noQty && (
+                                <div className="mit-qty">
+                                  <button type="button" className="mit-qty__btn" onClick={() => setMitigationQty(item.key, m, q - 1)} aria-label={`Decrease ${m}`}>
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                                  </button>
+                                  <input
+                                    type="number"
+                                    className="mit-qty__input"
+                                    value={q}
+                                    onChange={e => setMitigationQty(item.key, m, parseInt(e.target.value || '1', 10) || 1)}
+                                    inputMode="numeric"
+                                    aria-label={`${m} quantity`}
+                                  />
+                                  <button type="button" className="mit-qty__btn" onClick={() => setMitigationQty(item.key, m, q + 1)} aria-label={`Increase ${m}`}>
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                                  </button>
+                                </div>
+                              )}
+                            </div>
                           )
                         })}
                       </div>

@@ -224,7 +224,15 @@ export default function NewGRN() {
               <div key={i} style={{ border: '1px solid var(--surface-3)', borderRadius: 'var(--radius-sm)', padding: '0.75rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '0.5rem', alignItems: 'end' }}>
                 <div className="form-field">
                   <label className="form-label">Item Code</label>
-                  <input className="form-input" value={line.item_code} onChange={e => setLineField(i, 'item_code', e.target.value)} />
+                  <input className="form-input" value={line.item_code} onChange={e => {
+                    const code = e.target.value
+                    setLines(prev => prev.map((l, idx) => {
+                      if (idx !== i) return l
+                      // Auto-fill markings from item code if markings is empty or still matches the old item code
+                      const markings = (!l.material_markings || l.material_markings === l.item_code) ? code : l.material_markings
+                      return { ...l, item_code: code, material_markings: markings }
+                    }))
+                  }} />
                 </div>
                 <div className="form-field">
                   <label className="form-label">Description</label>
@@ -245,7 +253,7 @@ export default function NewGRN() {
                 </div>
                 <div className="form-field">
                   <label className="form-label">Material Markings</label>
-                  <input className="form-input" value={line.material_markings} onChange={e => setLineField(i, 'material_markings', e.target.value)} />
+                  <input className="form-input" value={line.material_markings} onChange={e => setLineField(i, 'material_markings', e.target.value)} placeholder={line.item_code || 'defaults to item code'} />
                 </div>
                 <div className="form-field">
                   <label className="form-label">Material Length</label>
@@ -267,27 +275,15 @@ export default function NewGRN() {
           </div>
         </div>
 
-        {/* Additional */}
+        {/* Notes */}
         <div className="section">
-          <div className="section__header"><h2 className="section__title">Additional Details</h2></div>
+          <div className="section__header"><h2 className="section__title">Notes &amp; Storage</h2></div>
           <div className="section__body" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             <div className="form-field">
               <label className="form-label" htmlFor="jobComments">Job Comments</label>
               <textarea id="jobComments" className="form-textarea" rows={3} value={jobComments} onChange={e => setJobComments(e.target.value)} />
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
-              <div className="form-field">
-                <label className="form-label" htmlFor="productName">Product Name</label>
-                <input id="productName" className="form-input" value={productName} onChange={e => setProductName(e.target.value)} />
-              </div>
-              <div className="form-field">
-                <label className="form-label" htmlFor="processingStatus">Processing Status *</label>
-                <select id="processingStatus" className="form-input" value={processingStatus} onChange={e => setProcessingStatus(e.target.value)} required>
-                  <option value="pending">Pending</option>
-                  <option value="in_progress">In Progress</option>
-                  <option value="completed">Completed</option>
-                </select>
-              </div>
               <div className="form-field">
                 <label className="form-label" htmlFor="receivedBy">Received By</label>
                 <input
@@ -303,11 +299,6 @@ export default function NewGRN() {
                 <label className="form-label" htmlFor="storedBy">Stored By *</label>
                 <input id="storedBy" className="form-input" value={storedBy} onChange={e => setStoredBy(e.target.value)} required />
                 {errors.storedBy && <span style={{ color: 'var(--color-danger)', fontSize: '0.8rem' }}>{errors.storedBy}</span>}
-              </div>
-              <div className="form-field">
-                <label className="form-label" htmlFor="completionDate">Completion Date {processingStatus === 'completed' && '*'}</label>
-                <input id="completionDate" className="form-input" type="date" min={deliveryDate} value={completionDate} onChange={e => setCompletionDate(e.target.value)} required={processingStatus === 'completed'} />
-                {errors.completionDate && <span style={{ color: 'var(--color-danger)', fontSize: '0.8rem' }}>{errors.completionDate}</span>}
               </div>
             </div>
           </div>

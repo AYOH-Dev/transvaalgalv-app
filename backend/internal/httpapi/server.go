@@ -53,8 +53,8 @@ func NewServer(cfg config.Config, userService *users.Service, receivingService *
 	mux.Handle("DELETE /receipts/{id}/photos/{photoId}", app.requireReceiverOrAdmin(http.HandlerFunc(app.handleDeleteDefectPhoto)))
 	mux.Handle("GET /receipts/{id}/grn", app.requireAuth(http.HandlerFunc(app.handleGetGRN)))
 	mux.Handle("PATCH /receipts/{id}", app.requireAuth(http.HandlerFunc(app.handleUpdateReceipt)))
-	mux.Handle("GET /admin/users", app.requireAdmin(http.HandlerFunc(app.handleListUsers)))
-	mux.Handle("POST /admin/users", app.requireAdmin(http.HandlerFunc(app.handleCreateUser)))
+	mux.Handle("GET /admin/users", app.requireReceiverOrAdmin(http.HandlerFunc(app.handleListUsers)))
+	mux.Handle("POST /admin/users", app.requireReceiverOrAdmin(http.HandlerFunc(app.handleCreateUser)))
 	mux.Handle("PATCH /admin/users/{id}", app.requireAdmin(http.HandlerFunc(app.handleUpdateUser)))
 	mux.Handle("POST /integrations/docuware/imports", app.requireDocuWareImportAuth(http.HandlerFunc(app.handleImportDocuWareRows)))
 

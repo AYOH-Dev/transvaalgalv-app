@@ -736,13 +736,11 @@ export default function Receipts({ onLogout }: { onLogout?: () => void }) {
                                   </label>
                                   <div style={{ flex: 1, minWidth: 0 }}>
                                     <div style={{ fontWeight: 600, fontSize: '0.9375rem' }}>
-                                      {line.description || line.material_description || line.item_code || '—'}
+                                      {line.material_description || line.description || line.item_code || '—'}
                                     </div>
                                     <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.125rem', display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-                                      {line.item_code && <span>Item: {line.item_code}</span>}
                                       {line.material_code && <span>Code: {line.material_code}</span>}
                                       {line.material_size && <span>Size: {line.material_size}</span>}
-                                      {line.material_markings && <span>Markings: {line.material_markings}</span>}
                                       {line.weight && <span>Weight: {line.weight}</span>}
                                     </div>
                                   </div>
@@ -757,10 +755,9 @@ export default function Receipts({ onLogout }: { onLogout?: () => void }) {
                                   <AccordionSection title="Item Details" defaultOpen>
                                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '0.625rem' }}>
                                       {/* Read-only item info */}
-                                      {line.item_code && <div><div style={labelStyle}>Item Code</div><div style={{ fontSize: '0.875rem', padding: '0.375rem 0', color: 'var(--text-primary)' }}>{line.item_code}</div></div>}
-                                      {line.description && <div><div style={labelStyle}>Description</div><div style={{ fontSize: '0.875rem', padding: '0.375rem 0', color: 'var(--text-primary)' }}>{line.description}</div></div>}
-                                      {line.material_size && <div><div style={labelStyle}>Item Size</div><div style={{ fontSize: '0.875rem', padding: '0.375rem 0', color: 'var(--text-primary)' }}>{line.material_size}</div></div>}
-                                      {line.material_markings && <div><div style={labelStyle}>Markings</div><div style={{ fontSize: '0.875rem', padding: '0.375rem 0', color: 'var(--text-primary)' }}>{line.material_markings}</div></div>}
+                                      {line.material_description && <div><div style={labelStyle}>Description</div><div style={{ fontSize: '0.875rem', padding: '0.375rem 0', color: 'var(--text-primary)' }}>{line.material_description}</div></div>}
+                                      {line.material_code && <div><div style={labelStyle}>Material Code</div><div style={{ fontSize: '0.875rem', padding: '0.375rem 0', color: 'var(--text-primary)' }}>{line.material_code}</div></div>}
+                                      {line.material_size && <div><div style={labelStyle}>Size</div><div style={{ fontSize: '0.875rem', padding: '0.375rem 0', color: 'var(--text-primary)' }}>{line.material_size}</div></div>}
                                       {line.material_length && <div><div style={labelStyle}>Length</div><div style={{ fontSize: '0.875rem', padding: '0.375rem 0', color: 'var(--text-primary)' }}>{line.material_length}</div></div>}
                                       {line.material_thickness && <div><div style={labelStyle}>Thickness</div><div style={{ fontSize: '0.875rem', padding: '0.375rem 0', color: 'var(--text-primary)' }}>{line.material_thickness}</div></div>}
                                       {line.weight && <div><div style={labelStyle}>Weight</div><div style={{ fontSize: '0.875rem', padding: '0.375rem 0', color: 'var(--text-primary)' }}>{line.weight}</div></div>}
@@ -835,11 +832,29 @@ export default function Receipts({ onLogout }: { onLogout?: () => void }) {
                                         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
                                         {hasDefects ? 'Edit Defects' : 'Capture Defects'}
                                       </button>
-                                      {condNotes && (
-                                        <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', background: hasDefects ? 'var(--amber-dim)' : 'var(--surface-2)', border: `1px solid ${hasDefects ? 'rgba(245,158,11,0.3)' : 'var(--border)'}`, borderRadius: 'var(--radius)', padding: '0.625rem 0.75rem' }}>
-                                          {condNotes}
-                                        </div>
-                                      )}
+                                      {condNotes && (() => {
+                                        const { defects, mitigations } = parseConditionNotes(condNotes)
+                                        const items: Array<{ label: string; value: string; mits: string[] }> = []
+                                        for (const cat of DEFECT_CATEGORIES) {
+                                          for (const item of cat.items) {
+                                            const val = defects[item.key]
+                                            if (!val || val === item.default) continue
+                                            items.push({ label: item.label, value: val, mits: mitigations[item.key] ?? [] })
+                                          }
+                                        }
+                                        if (items.length === 0) return null
+                                        return (
+                                          <div style={{ fontSize: '0.8125rem', background: hasDefects ? 'var(--amber-dim)' : 'var(--surface-2)', border: `1px solid ${hasDefects ? 'rgba(245,158,11,0.3)' : 'var(--border)'}`, borderRadius: 'var(--radius)', padding: '0.5rem 0.75rem', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                                            {items.map(it => (
+                                              <div key={it.label} style={{ display: 'flex', flexWrap: 'wrap', gap: '0.25rem 0.5rem', lineHeight: 1.4 }}>
+                                                <span style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>{it.label}:</span>
+                                                <span style={{ color: 'var(--text-secondary)' }}>{it.value}</span>
+                                                {it.mits.length > 0 && <span style={{ color: 'var(--amber, #b45309)', marginLeft: '0.25rem' }}>{it.mits.join(', ')}</span>}
+                                              </div>
+                                            ))}
+                                          </div>
+                                        )
+                                      })()}
                                       <DefectPhotoSummary receiptId={r.id} photo={findDefectPhoto(r.id, line.id)} />
                                     </div>
                                   </AccordionSection>

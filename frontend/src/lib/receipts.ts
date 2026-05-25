@@ -35,6 +35,7 @@ export type ReceiptLine = {
   condition_notes: string
   stored_in: string
   bay: string
+  job_number: string
 }
 
 export type Receipt = {
@@ -100,6 +101,7 @@ export type LineEdit = {
   receiving_status?: string
   discrepancy?: string
   condition_notes?: string
+  job_number?: string
 }
 
 export type ReceiptEdit = {
@@ -315,11 +317,11 @@ export const DEFECT_CATEGORIES: DefectCategory[] = [
   {
     id: 'assembly', title: 'Assembly & Fit',
     items: [
-      { key: 'noHanging', label: 'No Hanging Method', options: ['no', 'yes'], default: 'no',
+      { key: 'noHanging', label: 'Hanging Method', options: ['no', 'yes'], default: 'no',
         mitigations: { no: [], yes: ['Lifting lug-nut required', 'Hang notch required'] } },
       { key: 'threadedArticle', label: 'Threaded Article', options: ['no', 'yes'], default: 'no',
         mitigations: { no: [], yes: ['Galv stop required'] } },
-      { key: 'articleOverlap', label: 'Article Overlap/Continuous Weld', options: ['no', 'yes'], default: 'no',
+      { key: 'articleOverlap', label: 'Article Overlap', options: ['no', 'yes'], default: 'no',
         mitigations: { no: [], yes: ['Article Overlap Vent Hole required'] } },
     ],
   },
@@ -518,10 +520,15 @@ export function parseConditionNotes(notes: string): {
 // ─── Bulk defect helpers ─────────────────────────────────────────────────────
 
 // A defect key paired with a severity value and optional mitigations for bulk ops.
+// quantities holds qty per mitigation name for items not in MITIGATION_NO_QTY
+// (e.g. {'Vent holes required': 2}). Mirrors the walkthrough's per-line capture
+// so bulk applies write the same condition_notes shape (incl. top-level *Qty
+// keys for holes/cavity, and `mit=qty` tokens for noHanging/articleOverlap).
 export type BulkDefectEntry = {
   key: string
-  severity: string      // non-default value, e.g. 'light', 'yes', 'heavy'
-  mitigations: string[] // toggle-only in bulk mode — no quantities
+  severity: string                       // non-default value, e.g. 'light', 'yes', 'heavy'
+  mitigations: string[]                  // selected mitigation labels
+  quantities: Record<string, number>     // mitigation label -> qty (omit/absent = no qty applicable)
 }
 
 // Diff emitted by DefectModal in bulk mode. The backend applies add/remove
@@ -536,14 +543,16 @@ export type BulkDefectDiff = {
 // (different values on different lines) are represented as kind='mixed'.
 export type DefectIntersectionEntry = {
   key: string
-  kind: 'all'              // same non-default severity on every line
+  kind: 'all'                         // same non-default severity on every line
   severity: string
-  mitigations: string[]    // mitigations common to ALL lines for this defect
+  mitigations: string[]               // mitigations common to ALL lines for this defect
+  quantities: Record<string, number>  // qty common to ALL lines (mitigation -> qty); only populated when every line shares the same qty
 } | {
   key: string
-  kind: 'mixed'            // flagged on all lines but severities differ
-  severities: string[]     // distinct values present
-  mitigations: string[]    // mitigations common to ALL lines for this defect
+  kind: 'mixed'                       // flagged on all lines but severities differ
+  severities: string[]                // distinct values present
+  mitigations: string[]               // mitigations common to ALL lines for this defect
+  quantities: Record<string, number>  // qty common to ALL lines (mitigation -> qty); empty when qtys differ across lines
 }
 
 export function defectIntersection(conditionNotesArr: string[]): DefectIntersectionEntry[] {
@@ -568,10 +577,19 @@ export function defectIntersection(conditionNotesArr: string[]): DefectIntersect
       ? [...mitSets[0]].filter(m => mitSets.every(s => s.has(m)))
       : []
 
+    // Common qty per mitigation: only when every line records the same qty
+    const commonQtys: Record<string, number> = {}
+    for (const mit of commonMits) {
+      const lineQtys = parsed.map(p => p.quantities[item.key]?.[mit])
+      if (lineQtys.every(q => q != null && q === lineQtys[0])) {
+        commonQtys[mit] = lineQtys[0] as number
+      }
+    }
+
     if (uniqueVals.length === 1) {
-      result.push({ key: item.key, kind: 'all', severity: uniqueVals[0], mitigations: commonMits })
+      result.push({ key: item.key, kind: 'all', severity: uniqueVals[0], mitigations: commonMits, quantities: commonQtys })
     } else {
-      result.push({ key: item.key, kind: 'mixed', severities: uniqueVals, mitigations: commonMits })
+      result.push({ key: item.key, kind: 'mixed', severities: uniqueVals, mitigations: commonMits, quantities: commonQtys })
     }
   }
 

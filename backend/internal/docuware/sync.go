@@ -141,6 +141,7 @@ func formatQuantity(qty float64) string {
 func humanizeReceivingStatus(status string) string {
 	m := map[string]string{
 		"draft":        "Draft",
+		"reviewed":     "Reviewed",
 		"received":     "Received",
 		"quality_hold": "Quality Hold",
 		"matched":      "Matched",
@@ -161,95 +162,106 @@ type SyncError struct {
 
 // SyncResult tracks the outcome of a sync attempt.
 type SyncResult struct {
-	LineID       string
-	Success      bool
-	LastSyncedAt time.Time
-	Error        *SyncError
-	FieldCount   int
-	Retryable    bool
+	LineID           string
+	Success          bool
+	LastSyncedAt     time.Time
+	Error            *SyncError
+	FieldCount       int
+	Retryable        bool
+	NewDocuWareDocID string // set when a new Receiving Data document was created
 }
 
-// extractDefectFields parses condition_notes JSON and returns defect flag + mitigation field updates.
+// extractDefectFields parses condition_notes JSON and returns defect flag +
+// mitigation field updates.
+//
+// To make removals stick in DocuWare we ALWAYS emit the full defect/mitigation
+// field set — defaults for absent keys, parsed values where present. Otherwise
+// clearing a defect locally would leave a stale "yes" sitting in DocuWare,
+// because newStringField with an empty value writes IsNull=true (a clear).
 func extractDefectFields(conditionNotesJSON string) []FieldUpdate {
-	if strings.TrimSpace(conditionNotesJSON) == "" {
-		return []FieldUpdate{}
-	}
-
+	// Empty/invalid condition_notes is treated as "no defects at all" — we
+	// still emit defaults so any previously-synced values get cleared.
 	var data map[string]interface{}
-	if err := json.Unmarshal([]byte(conditionNotesJSON), &data); err != nil {
-		return []FieldUpdate{}
+	if strings.TrimSpace(conditionNotesJSON) != "" {
+		_ = json.Unmarshal([]byte(conditionNotesJSON), &data)
+	}
+	if data == nil {
+		data = map[string]interface{}{}
 	}
 
 	fields := []FieldUpdate{}
 
-	// Map of wizard defect key → DocuWare field name + default value
-	defectFlags := map[string]struct {
+	// Map of wizard defect key → DocuWare field name + default value.
+	// Order is preserved so the payload sent to DocuWare is deterministic.
+	type defectFlag struct {
+		key          string
 		field        string
 		defaultValue string
-	}{
-		"paint":                {field: "PAINT", defaultValue: "none"},
-		"damaged":              {field: "DAMAGED", defaultValue: "none"},
-		"rust":                 {field: "RUST", defaultValue: "normal"},
-		"delamination":         {field: "DELAMINATION", defaultValue: "no"},
-		"nonConformingPreGalv": {field: "NON_CONFORMING_PRE_GALV", defaultValue: "no"},
-		"enclosedCavity":       {field: "ENCLOSED_CAVITY", defaultValue: "no"},
-		"threadedArticle":      {field: "THREADED_ARTICLE", defaultValue: "no"},
-		"burr":                 {field: "BURR", defaultValue: "none"},
-		"pinHoles":             {field: "PIN_HOLES", defaultValue: "none"},
-		"weldingSplatter":      {field: "WELD_SPLATTER", defaultValue: "no"},
-		"weldingFlux":          {field: "WELDING_FLUX", defaultValue: "no"},
-		"continuousWeld":       {field: "CONTINUOUS_WELD", defaultValue: "no"},
-		"articleOverlap":       {field: "ARTICLE_OVERLAPPED", defaultValue: "no"},
-		"possibleDistortion":   {field: "POSSIBLE_DISTORTION", defaultValue: "no"},
-		"oilGreaseDiesel":      {field: "OIL_GREASE_DIESEL", defaultValue: "none"},
-		"sharpEdges":           {field: "SHARP_EDGES", defaultValue: "no"},
-		"holesInadequate":      {field: "HOLES_INADEQUATE", defaultValue: "no"},
-		"noHanging":            {field: "NO_HANGING_METHOD", defaultValue: "no"},
+	}
+	defectFlags := []defectFlag{
+		{"paint", "PAINT", "none"},
+		{"damaged", "DAMAGED", "none"},
+		{"rust", "RUST", "normal"},
+		{"delamination", "DELAMINATION", "no"},
+		{"nonConformingPreGalv", "NON_CONFORMING_PRE_GALV", "no"},
+		{"enclosedCavity", "ENCLOSED_CAVITY", "no"},
+		{"threadedArticle", "THREADED_ARTICLE", "no"},
+		{"burr", "BURR", "none"},
+		{"pinHoles", "PIN_HOLES", "none"},
+		{"weldingSplatter", "WELD_SPLATTER", "no"},
+		{"weldingFlux", "WELDING_FLUX", "no"},
+		{"continuousWeld", "CONTINUOUS_WELD", "no"},
+		{"articleOverlap", "ARTICLE_OVERLAPPED", "no"},
+		{"possibleDistortion", "POSSIBLE_DISTORTION", "no"},
+		{"oilGreaseDiesel", "OIL_GREASE_DIESEL", "none"},
+		{"sharpEdges", "SHARP_EDGES", "no"},
+		{"holesInadequate", "HOLES_INADEQUATE", "no"},
+		{"noHanging", "NO_HANGING_METHOD", "no"},
 	}
 
-	// Map of mitigation keys → DocuWare field names.
-	// These mitigations are stored as string arrays in condition_notes.
-	mitigationFields := map[string]string{
-		"paintMitigation":                "PAINT_MITIGATION",
-		"damagedMitigation":              "DAMAGE_MITIGATION",
-		"rustMitigation":                 "RUST_MITIGATION",
-		"delaminationMitigation":         "DELAMINATION_MITIGATION",
-		"nonConformingPreGalvMitigation": "NON_CONFORMING_PRE_GALV_MITIG",
-		"threadedArticleMitigation":      "THREADED_ARTICLE_MITIGATION",
-		"enclosedCavityMitigation":       "ENCLOSED_CAVITY_HOLES_REQUIRE",
-		"articleOverlapMitigation":       "ARTICLE_OVERLAP_VENT_HOLES",
+	// Single-field mitigations: comma-joined labels go to one DocuWare field.
+	// The paired-field defects (holesInadequate, enclosedCavity, noHanging,
+	// articleOverlap) are handled separately below.
+	type mitField struct {
+		key   string
+		field string
+	}
+	mitigationFields := []mitField{
+		{"paintMitigation", "PAINT_MITIGATION"},
+		{"damagedMitigation", "DAMAGE_MITIGATION"},
+		{"rustMitigation", "RUST_MITIGATION"},
+		{"delaminationMitigation", "DELAMINATION_MITIGATION"},
+		{"nonConformingPreGalvMitigation", "NON_CONFORMING_PRE_GALV_MITIG"},
+		{"threadedArticleMitigation", "THREADED_ARTICLE_MITIGATION"},
 	}
 
-	// Hole quantity fields (from holesInadequate defect).
-	// These are written as explicit numeric keys in condition_notes.
-	holeQtyFields := map[string]string{
-		"ventHolesQty":  "VENT_HOLES_REQUIRED",
-		"drainHolesQty": "DRAIN_HOLES_REQUIRED",
-		"jigHolesQty":   "JIG_HOLE_REQUIRED",
-	}
-
-	// Check if any defect is present (non-default)
+	// Defect flags — emit default for absent, parsed value for present.
+	// Tracks whether anything is non-default so DEFECT_DETECTED can be set.
 	defectDetected := false
-	for defectKey, info := range defectFlags {
-		if val, ok := data[defectKey]; ok {
-			valStr := valueToString(val)
-			if valStr != "" && valStr != info.defaultValue {
-				defectDetected = true
-				fields = append(fields, newStringField(info.field, valStr))
+	for _, info := range defectFlags {
+		value := info.defaultValue
+		if val, ok := data[info.key]; ok {
+			if valStr := valueToString(val); valStr != "" {
+				value = valStr
 			}
 		}
+		if value != info.defaultValue {
+			defectDetected = true
+		}
+		fields = append(fields, newStringField(info.field, value))
 	}
 
-	// Set DEFECT_DETECTED based on any flag being non-default
 	if defectDetected {
 		fields = append(fields, newStringField("DEFECT_DETECTED", "Yes"))
 	} else {
 		fields = append(fields, newStringField("DEFECT_DETECTED", "No"))
 	}
 
-	// Process mitigations
-	for mitigKey, dwField := range mitigationFields {
-		if val, ok := data[mitigKey]; ok {
+	// Single-field mitigations — emit empty when absent so DocuWare clears the
+	// field; comma-join the labels when present.
+	for _, mf := range mitigationFields {
+		value := ""
+		if val, ok := data[mf.key]; ok {
 			if arr, isArr := val.([]interface{}); isArr && len(arr) > 0 {
 				mitigations := make([]string, 0, len(arr))
 				for _, m := range arr {
@@ -257,74 +269,186 @@ func extractDefectFields(conditionNotesJSON string) []FieldUpdate {
 						mitigations = append(mitigations, str)
 					}
 				}
-				if len(mitigations) > 0 {
-					fields = append(fields, newStringField(dwField, strings.Join(mitigations, ", ")))
-				}
+				value = strings.Join(mitigations, ", ")
 			}
 		}
+		fields = append(fields, newStringField(mf.field, value))
 	}
 
-	// Hole quantity fields
-	for wizardKey, dwField := range holeQtyFields {
-		if val, ok := data[wizardKey]; ok {
-			if numVal, isNum := val.(float64); isNum {
-				fields = append(fields, newStringField(dwField, strconv.FormatInt(int64(numVal), 10)))
+	// Paired-field mitigations follow. Each pair is emitted unconditionally so
+	// removals clear the previous "yes"/qty in DocuWare. Required field defaults
+	// to "no"; qty defaults to "" (clears in DocuWare).
+
+	// holesInadequate — three pairs.
+	holesMits := mapStrings(stripMitigationQtyTokens(data["holesInadequateMitigation"]))
+	type holePair struct {
+		mitigation string
+		reqField   string
+		qtyField   string
+		qtyKey     string
+	}
+	holePairs := []holePair{
+		{"Vent holes required", "VENT_HOLES_REQUIRED", "VENT_HOLES", "ventHolesQty"},
+		{"Drain holes required", "DRAIN_HOLES_REQUIRED", "DRAIN_HOLES", "drainHolesQty"},
+		{"Jig holes required", "JIG_HOLE_REQUIRED", "JIG_HOLES", "jigHolesQty"},
+	}
+	for _, p := range holePairs {
+		req := "no"
+		qty := ""
+		if holesMits[p.mitigation] {
+			req = "yes"
+			if numVal, ok := numericFromData(data, p.qtyKey); ok {
+				qty = strconv.FormatInt(int64(numVal), 10)
 			}
 		}
+		fields = append(fields, newStringField(p.reqField, req))
+		fields = append(fields, newStringField(p.qtyField, qty))
 	}
 
-	// noHanging mitigation: stored as ["Lifting lug-nut required=2", "Hang notch required=1"].
-	// Parse each entry to populate the text fields and quantity fields separately.
-	if val, ok := data["noHangingMitigation"]; ok {
-		if arr, isArr := val.([]interface{}); isArr {
-			for _, entry := range arr {
-				token, isStr := entry.(string)
-				if !isStr {
-					continue
-				}
-				// Split on last '=' to separate name from optional quantity.
-				eqIdx := strings.LastIndex(token, "=")
-				name := token
-				qty := ""
-				if eqIdx != -1 {
-					name = strings.TrimSpace(token[:eqIdx])
-					qty = strings.TrimSpace(token[eqIdx+1:])
-				}
-				switch name {
-				case "Lifting lug-nut required":
-					fields = append(fields, newStringField("NO_HANGING_LIFTING_LUG_NUT_RE", name))
-					if qty != "" {
-						fields = append(fields, newStringField("NO_HANGING_LIFTING_LUG_NUT_R1", qty))
-					}
-				case "Hang notch required":
-					fields = append(fields, newStringField("NO_HANGING_HANG_NOTCH_REQUIRE", name))
-					if qty != "" {
-						fields = append(fields, newStringField("NO_HANGING_HANG_NOTCH_REQUIR1", qty))
-					}
-				}
+	// enclosedCavity — single pair.
+	cavityMits := mapStrings(stripMitigationQtyTokens(data["enclosedCavityMitigation"]))
+	{
+		req := "no"
+		qty := ""
+		if cavityMits["Cavity Vent holes required"] {
+			req = "yes"
+			if numVal, ok := numericFromData(data, "cavityVentHolesQty"); ok {
+				qty = strconv.FormatInt(int64(numVal), 10)
 			}
 		}
+		fields = append(fields, newStringField("ENCLOSED_CAVITY_HOLES_REQUIRE", req))
+		fields = append(fields, newStringField("ENCLOSED_CAVITY_HOLES_QUANTIT", qty))
 	}
 
-	// cavityVentHolesQty is written as an explicit numeric key in condition_notes
-	// by the enclosedCavity defect handler.
-	if val, ok := data["cavityVentHolesQty"]; ok {
-		if numVal, isNum := val.(float64); isNum {
-			fields = append(fields, newStringField("ENCLOSED_CAVITY_HOLES_QUANTIT", strconv.FormatInt(int64(numVal), 10)))
+	// noHanging — two pairs, qty encoded inline in the token ("name=qty").
+	noHangingTokens := tokenMap(data["noHangingMitigation"])
+	{
+		req := "no"
+		qty := ""
+		if t, ok := noHangingTokens["Lifting lug-nut required"]; ok {
+			req = "yes"
+			qty = t
 		}
+		fields = append(fields, newStringField("NO_HANGING_LIFTING_LUG_NUT_RE", req))
+		fields = append(fields, newStringField("NO_HANGING_LIFTING_LUG_NUT_R1", qty))
+	}
+	{
+		req := "no"
+		qty := ""
+		if t, ok := noHangingTokens["Hang notch required"]; ok {
+			req = "yes"
+			qty = t
+		}
+		fields = append(fields, newStringField("NO_HANGING_HANG_NOTCH_REQUIRE", req))
+		fields = append(fields, newStringField("NO_HANGING_HANG_NOTCH_REQUIR1", qty))
 	}
 
-	// Additional comments
+	// articleOverlap — same inline-qty encoding as noHanging.
+	articleOverlapTokens := tokenMap(data["articleOverlapMitigation"])
+	{
+		req := "no"
+		qty := ""
+		if t, ok := articleOverlapTokens["Article Overlap Vent Hole required"]; ok {
+			req = "yes"
+			qty = t
+		}
+		fields = append(fields, newStringField("ARTICLE_OVERLAP_VENT_HOLES", req))
+		fields = append(fields, newStringField("ARTICLE_OVERLAP_QUANTITY", qty))
+	}
+
+	// Additional comments — clear when absent.
+	comments := ""
 	if val, ok := data["additionalComments"]; ok {
-		if str, isStr := val.(string); isStr && str != "" {
-			fields = append(fields, newStringField("ADDITIONAL_COMMENTS", str))
+		if str, isStr := val.(string); isStr {
+			comments = str
 		}
 	}
+	fields = append(fields, newStringField("ADDITIONAL_COMMENTS", comments))
 
 	return fields
 }
 
+// tokenMap parses an inline-qty mitigation array ("name=qty" entries) into a
+// name→qty map. Names without an explicit qty map to "".
+func tokenMap(v interface{}) map[string]string {
+	out := map[string]string{}
+	for _, token := range mitigationTokens(v) {
+		name, qty := splitMitigationQtyToken(token)
+		out[name] = qty
+	}
+	return out
+}
+
 // valueToString converts interface{} to string, handling bool/float64/string
+// mitigationTokens returns the raw mitigation entries from a condition_notes
+// array field. Entries may carry an inline qty (e.g. "Lifting lug-nut required=2");
+// callers that need to ignore the qty should use stripMitigationQtyTokens.
+func mitigationTokens(raw interface{}) []string {
+	arr, ok := raw.([]interface{})
+	if !ok {
+		return nil
+	}
+	out := make([]string, 0, len(arr))
+	for _, e := range arr {
+		if s, isStr := e.(string); isStr && s != "" {
+			out = append(out, s)
+		}
+	}
+	return out
+}
+
+// stripMitigationQtyTokens returns mitigation labels with any inline "=qty"
+// suffix removed. Used for defects where qty is captured separately (top-level
+// *Qty keys) and the mitigation field should only carry the label.
+func stripMitigationQtyTokens(raw interface{}) []string {
+	tokens := mitigationTokens(raw)
+	out := make([]string, 0, len(tokens))
+	for _, t := range tokens {
+		name, _ := splitMitigationQtyToken(t)
+		out = append(out, name)
+	}
+	return out
+}
+
+// splitMitigationQtyToken splits "Mitigation label=42" into ("Mitigation label", "42").
+// If no "=" is present, qty is "".
+func splitMitigationQtyToken(token string) (name, qty string) {
+	eqIdx := strings.LastIndex(token, "=")
+	if eqIdx == -1 {
+		return strings.TrimSpace(token), ""
+	}
+	return strings.TrimSpace(token[:eqIdx]), strings.TrimSpace(token[eqIdx+1:])
+}
+
+// mapStrings turns a slice into a set-style map for O(1) membership checks.
+func mapStrings(xs []string) map[string]bool {
+	out := make(map[string]bool, len(xs))
+	for _, x := range xs {
+		out[x] = true
+	}
+	return out
+}
+
+// numericFromData returns the numeric value at key in data, accepting either
+// float64 (typical JSON) or numeric strings.
+func numericFromData(data map[string]interface{}, key string) (float64, bool) {
+	v, ok := data[key]
+	if !ok {
+		return 0, false
+	}
+	switch n := v.(type) {
+	case float64:
+		return n, true
+	case string:
+		f, err := strconv.ParseFloat(strings.TrimSpace(n), 64)
+		if err != nil {
+			return 0, false
+		}
+		return f, true
+	}
+	return 0, false
+}
+
 func valueToString(val interface{}) string {
 	switch v := val.(type) {
 	case string:

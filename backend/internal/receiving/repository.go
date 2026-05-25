@@ -290,12 +290,13 @@ func (r *PostgresRepository) CreateReceipt(ctx context.Context, imported importe
 				material_markings,
 				material_length,
 				weight,
+				job_number,
 				expected_quantity,
 				received_quantity,
 				receiving_status,
 				docuware_source_payload
 			)
-			VALUES ($1::uuid, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12::jsonb)
+			VALUES ($1::uuid, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13::jsonb)
 		`,
 			receiptID,
 			line.LineNumber,
@@ -305,6 +306,7 @@ func (r *PostgresRepository) CreateReceipt(ctx context.Context, imported importe
 			line.MaterialMarkings,
 			line.MaterialLength,
 			line.Weight,
+			line.JobNumber,
 			line.ExpectedQuantity,
 			line.ReceivedQuantity,
 			line.ReceivingStatus,
@@ -445,13 +447,14 @@ func (r *PostgresRepository) upsertImportedReceiptLine(ctx context.Context, tx p
 				discrepancy,
 				quantity_discrepancy,
 				condition_notes,
+				job_number,
 				docuware_record_line_id,
 				docuware_unique_number,
 				docuware_primary_key,
 				docuware_doc_id,
 				docuware_source_payload
 			)
-			VALUES ($1::uuid, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26::jsonb)
+			VALUES ($1::uuid, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27::jsonb)
 		`,
 			receiptID,
 			line.LineNumber,
@@ -474,6 +477,7 @@ func (r *PostgresRepository) upsertImportedReceiptLine(ctx context.Context, tx p
 			line.Discrepancy,
 			line.QuantityDiscrepancy,
 			line.ConditionNotes,
+			line.JobNumber,
 			line.DocuWareRecordLine,
 			line.DocuWareUniqueNo,
 			line.DocuWarePrimaryKey,
@@ -507,10 +511,11 @@ func (r *PostgresRepository) upsertImportedReceiptLine(ctx context.Context, tx p
 		    discrepancy = $18,
 		    quantity_discrepancy = $19,
 		    condition_notes = $20,
-		    docuware_unique_number = $21,
-		    docuware_primary_key = $22,
-		    docuware_source_payload = $23::jsonb,
-		    docuware_doc_id = COALESCE(NULLIF($24, ''), docuware_doc_id),
+		    job_number = COALESCE(NULLIF($21, ''), job_number),
+		    docuware_unique_number = $22,
+		    docuware_primary_key = $23,
+		    docuware_source_payload = $24::jsonb,
+		    docuware_doc_id = COALESCE(NULLIF($25, ''), docuware_doc_id),
 		    updated_at = NOW()
 		WHERE id = $1::uuid
 	`,
@@ -534,6 +539,7 @@ func (r *PostgresRepository) upsertImportedReceiptLine(ctx context.Context, tx p
 		line.Discrepancy,
 		line.QuantityDiscrepancy,
 		line.ConditionNotes,
+		line.JobNumber,
 		line.DocuWareUniqueNo,
 		line.DocuWarePrimaryKey,
 		payloadJSON,
@@ -575,6 +581,7 @@ func (r *PostgresRepository) listReceiptLines(ctx context.Context, receiptID str
 		       discrepancy,
 		       quantity_discrepancy,
 		       condition_notes,
+		       job_number,
 		       docuware_record_line_id,
 		       docuware_unique_number,
 		       docuware_primary_key,
@@ -709,6 +716,7 @@ func (r *PostgresRepository) GetReceiptLine(ctx context.Context, receiptID, line
 		       discrepancy,
 		       quantity_discrepancy,
 		       condition_notes,
+		       job_number,
 		       docuware_record_line_id,
 		       docuware_unique_number,
 		       docuware_primary_key,
@@ -977,6 +985,18 @@ func (r *PostgresRepository) UpdateReceipt(ctx context.Context, id string, input
 		return Receipt{}, fmt.Errorf("update receipt: %w", err)
 	}
 
+	// Cascade the header job_number to every line. The header field is
+	// surfaced in the Yard "Edit details" card as a "set all" shortcut —
+	// individual lines may then be overridden via the Bulk Action sheet.
+	if input.JobNumber != nil {
+		if _, err := r.pool.Exec(ctx,
+			`UPDATE receipt_lines SET job_number = $2, updated_at = NOW() WHERE receipt_id = $1::uuid`,
+			id, *input.JobNumber,
+		); err != nil {
+			return Receipt{}, fmt.Errorf("cascade job_number to lines: %w", err)
+		}
+	}
+
 	return r.GetReceipt(ctx, id)
 }
 
@@ -1093,6 +1113,12 @@ func (r *PostgresRepository) UpdateReceiptLine(ctx context.Context, receiptID, l
 		argIdx++
 	}
 
+	if input.JobNumber != nil {
+		setClauses = append(setClauses, fmt.Sprintf("job_number = $%d", argIdx))
+		args = append(args, *input.JobNumber)
+		argIdx++
+	}
+
 	// Stamp the confirmer when (and only when) the line transitions to
 	// receiving_status='received'. Use COALESCE on the existing column so
 	// the first confirmer wins — a later edit by someone else doesn't
@@ -1150,6 +1176,7 @@ func (r *PostgresRepository) UpdateReceiptLine(ctx context.Context, receiptID, l
 		       discrepancy,
 		       quantity_discrepancy,
 		       condition_notes,
+		       job_number,
 		       docuware_record_line_id,
 		       docuware_unique_number,
 		       docuware_primary_key,
@@ -1320,6 +1347,7 @@ func scanReceiptLine(row rowScanner) (ReceiptLine, error) {
 		&line.Discrepancy,
 		&line.QuantityDiscrepancy,
 		&line.ConditionNotes,
+		&line.JobNumber,
 		&line.DocuWareRecordLine,
 		&line.DocuWareUniqueNo,
 		&line.DocuWarePrimaryKey,
@@ -1336,4 +1364,14 @@ func scanReceiptLine(row rowScanner) (ReceiptLine, error) {
 	}
 
 	return line, nil
+}
+
+// MarkLinesReceivedAfterGRN upgrades every "reviewed" line on the given receipt
+// to "received". Called when the GRN PDF is issued so lines become locked.
+func (r *PostgresRepository) MarkLinesReceivedAfterGRN(ctx context.Context, receiptID string) error {
+	_, err := r.pool.Exec(ctx,
+		`UPDATE receipt_lines SET status = 'received' WHERE receipt_id = $1::uuid AND status = 'reviewed'`,
+		receiptID,
+	)
+	return err
 }

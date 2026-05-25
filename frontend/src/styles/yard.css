@@ -725,7 +725,21 @@
 .yard-line__desc { font-size: var(--yard-fs-md); font-weight: 600; }
 .yard-line__sub  { font-size: var(--yard-fs-sm); color: var(--yard-ink-3); margin-top: 2px; }
 .yard-line__sub .mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+/* Material-spec sub-line (size / markings / length / weight / galv). Slightly
+   dimmer label so the values read first on the receiver's glance. */
+.yard-line__sub--meta { margin-top: 4px; }
+.yard-line__meta-k { color: var(--yard-ink-2); font-weight: 600; }
 .yard-line__status { flex-shrink: 0; }
+.yard-line__condition {
+  flex-shrink: 0; width: 200px;
+  font-size: var(--yard-fs-xs); line-height: 1.4;
+  color: var(--yard-ink-2);
+  border-left: 2px solid var(--yard-line-2);
+  padding-left: 10px;
+}
+.yard-line__cond-item { margin-bottom: 2px; }
+.yard-line__cond-k { font-weight: 600; color: var(--yard-ink-1); }
+.yard-line__cond-mits { color: var(--yard-amber); font-size: var(--yard-fs-xs); margin-top: 1px; }
 .yard-line__actions {
   display: flex; gap: 8px; flex-shrink: 0;
   margin-left: 8px;
@@ -966,6 +980,43 @@
   border-color: var(--yard-brand);
   background: var(--yard-brand);
   color: #fff;
+}
+
+/* Inline optional input shown under the Process step when the chosen
+   process applies galvanising. Receivers can leave it blank — it just
+   captures the spec for downstream sync to DocuWare. */
+.walk-thickness {
+  margin: 24px 0 0;
+  padding: 18px 18px 20px;
+  background: var(--yard-surface);
+  border: 2px solid var(--yard-line);
+  border-radius: 14px;
+  max-width: 480px;
+}
+.walk-thickness__label {
+  display: block;
+  font-size: var(--yard-fs-md);
+  font-weight: 600;
+  color: var(--yard-ink);
+  margin-bottom: 10px;
+}
+.walk-thickness__hint {
+  font-weight: 400;
+  color: var(--yard-ink-2);
+  margin-left: 6px;
+}
+.walk-thickness__input {
+  width: 100%;
+  padding: 14px 14px;
+  font-family: inherit; font-size: var(--yard-fs-md);
+  background: #fff;
+  border: 2px solid var(--yard-line);
+  border-radius: 12px;
+  color: var(--yard-ink);
+}
+.walk-thickness__input:focus {
+  outline: none;
+  border-color: var(--yard-brand);
 }
 
 /* Big grid (packaging) */

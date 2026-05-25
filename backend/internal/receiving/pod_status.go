@@ -41,7 +41,7 @@ func computePODStatus(lines []ReceiptLine) string {
 	}
 	receivedCount := 0
 	for _, l := range lines {
-		if l.ReceivingStatus == "received" {
+		if l.ReceivingStatus == "received" || l.ReceivingStatus == "reviewed" {
 			receivedCount++
 		}
 	}

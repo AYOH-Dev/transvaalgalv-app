@@ -126,6 +126,24 @@ func (c *Client) UpdateLineFields(ctx context.Context, docuwareRecordLineID stri
 	return c.UpdateDocumentFields(ctx, c.cabinetID, docuwareRecordLineID, fields, "i_8dd45d75-5ba2-4ca1-86a8-6b30a37082d4")
 }
 
+// CreateLineInReceivingData creates a new record in the Receiving Data cabinet
+// (using c.cabinetID) from the supplied FieldUpdate slice. A minimal placeholder
+// text stub is uploaded as the document body — DocuWare requires a file, and the
+// real content lives entirely in the index fields.
+// Returns the new DocuWare document ID.
+func (c *Client) CreateLineInReceivingData(ctx context.Context, lineID string, fields []FieldUpdate) (string, error) {
+	idx := make([]IndexField, 0, len(fields))
+	for _, f := range fields {
+		if f.IsNull || f.Item == "" {
+			continue
+		}
+		idx = append(idx, IndexField{FieldName: f.FieldName, Item: f.Item})
+	}
+	placeholder := strings.NewReader("GRN receiving record – " + lineID)
+	filename := "line-" + lineID + ".txt"
+	return c.CreateDocument(ctx, c.cabinetID, idx, filename, "text/plain", placeholder)
+}
+
 // UpdateDocumentFields updates the index fields on a specific document
 // in the named file cabinet. dialogID may be empty; DocuWare accepts
 // omitting it for plain field updates.

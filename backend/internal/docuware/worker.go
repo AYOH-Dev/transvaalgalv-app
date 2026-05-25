@@ -203,7 +203,7 @@ func (w *Worker) fetchPendingItems(ctx context.Context, limit int) ([]QueuedSync
 			r.purchase_order_number,
 			r.weighbridge_ticket_number,
 			r.vehicle_registration,
-			r.job_number
+			COALESCE(NULLIF(l.job_number, ''), r.job_number)
 		FROM docuware_sync_queue q
 		JOIN receipt_lines l ON q.receipt_line_id = l.id
 		JOIN receipts r ON q.receipt_id = r.id
@@ -289,16 +289,7 @@ func (w *Worker) syncItem(ctx context.Context, item QueuedSync) SyncResult {
 		Retryable:    false,
 	}
 
-	if item.DocuWareDocID == "" {
-		result.Success = false
-		result.Error = &SyncError{
-			Timestamp: result.LastSyncedAt,
-			Message:   "docuware_doc_id (DWDOCID) is empty",
-		}
-		return result
-	}
-
-	// Build field updates
+	// Build field updates (needed for both create and update paths)
 	line := SyncableReceiptLine{
 		ID:                    item.LineID,
 		DocuWareRecordLineID:  item.DocuWareRecordLineID,
@@ -338,6 +329,23 @@ func (w *Worker) syncItem(ctx context.Context, item QueuedSync) SyncResult {
 
 	fields := BuildFieldUpdates(line, receipt)
 	result.FieldCount = len(fields)
+
+	if item.DocuWareDocID == "" {
+		// GRN-created line: no existing DocuWare record — create one now.
+		newID, err := w.client.CreateLineInReceivingData(ctx, item.LineID, fields)
+		if err != nil {
+			result.Success = false
+			result.Error = &SyncError{
+				Timestamp: result.LastSyncedAt,
+				Message:   "create receiving-data record: " + err.Error(),
+			}
+			result.Retryable = true
+			return result
+		}
+		result.Success = true
+		result.NewDocuWareDocID = newID
+		return result
+	}
 
 	// Attempt the update using the document ID (DWDOCID), not the line ID
 	err := w.client.UpdateLineFields(ctx, item.DocuWareDocID, fields)
@@ -392,6 +400,15 @@ func (w *Worker) updateAfterSync(ctx context.Context, item QueuedSync, result Sy
 	`, item.ReceiptLineID, result.LastSyncedAt, errorMessage(result.Error))
 	if err != nil {
 		return fmt.Errorf("update receipt line: %w", err)
+	}
+
+	if result.NewDocuWareDocID != "" {
+		_, err = tx.Exec(ctx, `
+			UPDATE receipt_lines SET docuware_doc_id = $2, updated_at = NOW() WHERE id = $1::uuid
+		`, item.ReceiptLineID, result.NewDocuWareDocID)
+		if err != nil {
+			return fmt.Errorf("save new docuware_doc_id: %w", err)
+		}
 	}
 
 	if result.Success {
@@ -535,7 +552,7 @@ func (w *Worker) SyncLineNow(ctx context.Context, receiptID, lineID string) erro
 			r.purchase_order_number,
 			r.weighbridge_ticket_number,
 			r.vehicle_registration,
-			r.job_number,
+			COALESCE(NULLIF(l.job_number, ''), r.job_number),
 			COALESCE(NULLIF(l.docuware_doc_id, ''), r.docuware_record_id)
 		FROM receipt_lines l
 		JOIN receipts r ON l.receipt_id = r.id
@@ -613,6 +630,14 @@ func (w *Worker) SyncLineNow(ctx context.Context, receiptID, lineID string) erro
 		WHERE id = $1::uuid
 	`, item.ReceiptLineID, result.LastSyncedAt); err != nil {
 		w.logger.Printf("warn: sync succeeded but failed to persist last_synced_at for line %s: %v", item.LineID, err)
+	}
+
+	if result.NewDocuWareDocID != "" {
+		if _, err := w.pool.Exec(ctx, `
+			UPDATE receipt_lines SET docuware_doc_id = $2, updated_at = NOW() WHERE id = $1::uuid
+		`, item.ReceiptLineID, result.NewDocuWareDocID); err != nil {
+			w.logger.Printf("warn: failed to save new docuware_doc_id for line %s: %v", item.LineID, err)
+		}
 	}
 
 	w.logger.Printf("sync completed immediately: line_id=%s, fields=%d", item.LineID, result.FieldCount)

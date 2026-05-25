@@ -3,15 +3,31 @@ import { apiFetch } from '../auth'
 import { useToast } from '../components/Toast'
 import ConfirmDialog from '../components/ConfirmDialog'
 import { SkeletonRows } from '../components/Skeleton'
+import { useCurrentUser } from '../components/CurrentUser'
 
 type User = { id: string; email: string; display_name?: string; role: string; is_active?: boolean }
 type Form = { email: string; password: string; displayName: string; role: string }
 
+// Canonical role list — must match users.IsValidRole in the backend
+// (backend/internal/users/types.go). Sending any other value gets rejected
+// with "invalid role" 400. Receiver is the default for new accounts since
+// that's the bulk of new users on this app.
+const ALL_ROLES: { value: string; label: string }[] = [
+  { value: 'receiver',        label: 'Receiver' },
+  { value: 'reviewer',        label: 'Reviewer' },
+  { value: 'operations_lead', label: 'Operations Lead' },
+  { value: 'viewer',          label: 'Viewer' },
+  { value: 'admin',           label: 'Admin' },
+]
+const DEFAULT_ROLE = 'receiver'
+
 export default function Admin() {
   const toast = useToast()
+  const { user: currentUser } = useCurrentUser()
+  const isAdmin = currentUser?.role === 'admin'
+  const ROLES = isAdmin ? ALL_ROLES : ALL_ROLES.filter(r => r.value !== 'admin')
 
   const [users, setUsers]     = useState<User[]>([])
-  const [roles, setRoles]     = useState<string[]>(['user', 'admin'])
   const [loading, setLoading] = useState(false)
   const [search, setSearch]   = useState('')
   const [showInactive, setShowInactive] = useState(false)
@@ -19,7 +35,7 @@ export default function Admin() {
   // Create form
   const [showCreate, setShowCreate] = useState(false)
   const [creating, setCreating]     = useState(false)
-  const [form, setForm]             = useState<Form>({ email: '', password: '', displayName: '', role: 'user' })
+  const [form, setForm]             = useState<Form>({ email: '', password: '', displayName: '', role: DEFAULT_ROLE })
 
   // Edit modal
   const [editUser, setEditUser]         = useState<User | null>(null)
@@ -35,7 +51,7 @@ export default function Admin() {
   const [menuUserId, setMenuUserId]     = useState<string | null>(null)
   const menuRef = useRef<HTMLDivElement>(null)
 
-  useEffect(() => { fetchUsers(); fetchRoles() }, [])
+  useEffect(() => { fetchUsers() }, [])
 
   useEffect(() => {
     const close = (e: MouseEvent) => { if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuUserId(null) }
@@ -54,21 +70,6 @@ export default function Admin() {
     finally { setLoading(false) }
   }
 
-  async function fetchRoles() {
-    for (const url of ['/admin/roles', '/getRoles']) {
-      try {
-        const r = await apiFetch(url)
-        if (!r.ok) continue
-        const d = await r.json()
-        if (Array.isArray(d.roles)) { setRoles(d.roles); return }
-        if (d.Root?.DataPage) {
-          const parsed = d.Root.DataPage.map((it: any) => it.Record.RoleName || it.Record.Role).filter(Boolean)
-          if (parsed.length) { setRoles(parsed); return }
-        }
-      } catch { /* try next */ }
-    }
-  }
-
   async function submitCreate(e: React.FormEvent) {
     e.preventDefault()
     setCreating(true)
@@ -77,9 +78,14 @@ export default function Admin() {
         method: 'POST',
         body: JSON.stringify({ email: form.email, password: form.password, role: form.role, display_name: form.displayName }),
       })
-      if (!res.ok) { const t = await res.text(); toast.error(`Create failed: ${t || res.status}`); return }
+      if (!res.ok) {
+        const body = await res.json().catch(() => null)
+        const msg = body?.error || `Create failed (${res.status})`
+        toast.error(msg)
+        return
+      }
       toast.success(`User ${form.email} created`)
-      setForm({ email: '', password: '', displayName: '', role: 'user' })
+      setForm({ email: '', password: '', displayName: '', role: DEFAULT_ROLE })
       setShowCreate(false)
       fetchUsers()
     } catch { toast.error('Network error') }
@@ -103,7 +109,11 @@ export default function Admin() {
       if (editName) body.display_name = editName
       if (editRole) body.role = editRole
       const res = await apiFetch(`/admin/users/${editUser.id}`, { method: 'PATCH', body: JSON.stringify(body) })
-      if (!res.ok) { const t = await res.text(); toast.error(`Update failed: ${t || res.status}`); return }
+      if (!res.ok) {
+        const r = await res.json().catch(() => null)
+        toast.error(r?.error || `Update failed (${res.status})`)
+        return
+      }
       toast.success('User updated')
       setEditUser(null)
       fetchUsers()
@@ -115,7 +125,11 @@ export default function Admin() {
     if (!confirmUser) return
     try {
       const res = await apiFetch(`/admin/users/${confirmUser.id}`, { method: 'PATCH', body: JSON.stringify({ is_active: false }) })
-      if (!res.ok) { const t = await res.text(); toast.error(`Deactivate failed: ${t || res.status}`); return }
+      if (!res.ok) {
+        const r = await res.json().catch(() => null)
+        toast.error(r?.error || `Deactivate failed (${res.status})`)
+        return
+      }
       toast.success(`${confirmUser.email} deactivated`)
       fetchUsers()
     } catch { toast.error('Network error') }
@@ -197,10 +211,10 @@ export default function Admin() {
                       <td><span className={`badge ${u.is_active === false ? 'badge-red' : 'badge-green'}`}>{u.is_active === false ? 'Inactive' : 'Active'}</span></td>
                       <td>
                         <div style={{ display: 'flex', gap: '0.25rem', alignItems: 'center' }}>
-                          <button className="btn btn-ghost btn-sm" onClick={() => openEdit(u)} title="Edit user">
+                          {isAdmin && <button className="btn btn-ghost btn-sm" onClick={() => openEdit(u)} title="Edit user">
                             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                          </button>
-                          <div className="dropdown" ref={menuUserId === u.id ? menuRef : null}>
+                          </button>}
+                          {isAdmin && <div className="dropdown" ref={menuUserId === u.id ? menuRef : null}>
                             <button className="btn btn-icon btn-sm" onClick={() => setMenuUserId(id => id === u.id ? null : u.id)} aria-label="More actions" aria-expanded={menuUserId === u.id}>
                               <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg>
                             </button>
@@ -218,7 +232,7 @@ export default function Admin() {
                                 }
                               </div>
                             )}
-                          </div>
+                          </div>}
                         </div>
                       </td>
                     </tr>
@@ -308,7 +322,7 @@ export default function Admin() {
                     <div className="form-field">
                       <label htmlFor="c-role" className="form-label required">Role</label>
                       <select id="c-role" className="form-select" value={form.role} onChange={e => setForm(f => ({ ...f, role: e.target.value }))} required>
-                        {roles.map(r => <option key={r} value={r}>{r}</option>)}
+                        {ROLES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
                       </select>
                     </div>
                   </div>
@@ -358,7 +372,7 @@ export default function Admin() {
                     <div className="form-field">
                       <label htmlFor="e-role" className="form-label">Role</label>
                       <select id="e-role" className="form-select" value={editRole} onChange={e => setEditRole(e.target.value)}>
-                        {roles.map(r => <option key={r} value={r}>{r}</option>)}
+                        {ROLES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
                       </select>
                     </div>
                   </div>

@@ -17,6 +17,7 @@ import {
   defaultDefectValues,
   hasAnyDefect,
   buildConditionNotes,
+  parseConditionNotes,
   uploadDefectPhoto,
   fetchGRNBlobUrl,
 } from '../lib/receipts'
@@ -58,6 +59,7 @@ type YardLineState = {
   discrepancy?: 'none' | 'short' | 'over'
   item_type?: string
   process?: string
+  required_galv_thickness?: string
   packaging?: string
   bay?: string
   stored_in?: string
@@ -74,6 +76,11 @@ type YardLineState = {
   // upload only after the line PATCH succeeds in markReceived, so a
   // cleared/abandoned defect doesn't leave an orphaned photo on the server.
   defectPhoto?: File
+  // Material attribute overrides — only sent when receiver changes them.
+  mat_internal_description?: string
+  mat_size?: string
+  mat_thickness?: string
+  mat_job_number?: string
 }
 type LineStateMap = Record<string, YardLineState>
 
@@ -82,6 +89,19 @@ type LineStateMap = Record<string, YardLineState>
 function disabledForType(itemType?: string): string[] {
   if (!itemType) return []
   return availableProcesses(itemType).filter(o => o.disabled).map(o => o.value)
+}
+
+// A line is "flagged" when either its qty diverges from expected or it has a
+// defect noted — looking at both the persisted server fields and any unsaved
+// in-flight changes the receiver has made locally in lineState.
+function isLineFlagged(line: ReceiptLine, ls?: YardLineState): boolean {
+  const stDisc = ls?.discrepancy
+  if (stDisc && stDisc !== 'none') return true
+  if (ls?.hasDefects) return true
+  if (line.discrepancy === 'defects_noted') return true
+  const qd = line.quantity_discrepancy
+  if (qd && qd !== 'none' && qd !== '') return true
+  return false
 }
 
 // ── Reachability indicator ──────────────────────────────────────────────────
@@ -202,10 +222,16 @@ export default function Yard({ onLogout }: { onLogout?: () => void }) {
     }
     // Storage fields are optional — only send when the receiver supplied a
     // value, so omitted fields don't blank out anything saved earlier.
-    if (st.bay !== undefined)         edit.bay = st.bay
-    if (st.stored_in !== undefined)   edit.stored_in = st.stored_in
-    if (st.accessories !== undefined) edit.accessories = st.accessories
-    if (st.comments !== undefined)    edit.comments = st.comments
+    if (st.bay !== undefined)                     edit.bay = st.bay
+    if (st.stored_in !== undefined)               edit.stored_in = st.stored_in
+    if (st.accessories !== undefined)             edit.accessories = st.accessories
+    if (st.comments !== undefined)                edit.comments = st.comments
+    if (st.required_galv_thickness !== undefined) edit.required_galv_thickness = st.required_galv_thickness
+    // Material attribute overrides — only sent when the receiver changed them.
+    if (st.mat_internal_description !== undefined) edit.internal_description = st.mat_internal_description
+    if (st.mat_size !== undefined)                 edit.material_size = st.mat_size
+    if (st.mat_thickness !== undefined)            edit.material_thickness = st.mat_thickness
+    if (st.mat_job_number !== undefined)           edit.job_number = st.mat_job_number
     const notes = (st.notes ?? '').trim()
     const hasDefects = !!(st.defects && st.hasDefects)
     if (hasDefects || notes) {
@@ -215,8 +241,10 @@ export default function Yard({ onLogout }: { onLogout?: () => void }) {
         st.quantities ?? {},
         notes,
       )
+    } else {
+      edit.condition_notes = ''
     }
-    if (hasDefects) edit.discrepancy = 'defects_noted'
+    edit.discrepancy = hasDefects ? 'defects_noted' : ''
 
     setSavingLineId(line.id)
     try {
@@ -425,7 +453,17 @@ export default function Yard({ onLogout }: { onLogout?: () => void }) {
     }
   }, [showToast])
 
-  if (view === 'walk' && active) {
+  // Once a GRN has been issued the load is closed for editing — bounce any
+  // stale walkthrough entry back to the detail view so it can't reopen.
+  useEffect(() => {
+    if (view !== 'walk' || !active) return
+    if (active.status === 'matched' || active.status === 'archived') {
+      setWalkStartLineId(null)
+      setView('detail')
+    }
+  }, [view, active])
+
+  if (view === 'walk' && active && active.status !== 'matched' && active.status !== 'archived') {
     return (
       <YardWalkthrough
         pod={active}
@@ -474,9 +512,21 @@ export default function Yard({ onLogout }: { onLogout?: () => void }) {
           onBack={() => setView('list')}
           onWalk={(lineId) => { setWalkStartLineId(lineId ?? null); setView('walk') }}
           onConfirmAsExpected={async (line) => {
-            const res = await persistLine(active.id, line, lineState[line.id] || {})
+            // Client requested that "Confirm as expected" implies the common-case
+            // defaults so the receiver doesn't have to step into the walkthrough
+            // for the 90% load (Black Steel → Galvanising, no bay assignment yet).
+            const cur = lineState[line.id] || {}
+            const withDefaults: YardLineState = {
+              ...cur,
+              item_type:               cur.item_type               || (line.item_type as string)               || 'blacksteel',
+              process:                 cur.process                 || (line.process as string)                 || 'galvanising',
+              bay:                     cur.bay                     ?? (line.bay as string)                     ?? 'None',
+              packaging:               cur.packaging               || (line.packaging_method as string)        || 'loose',
+              required_galv_thickness: cur.required_galv_thickness ?? (line.required_galv_thickness as string) ?? '85',
+            }
+            const res = await persistLine(active.id, line, withDefaults)
             if (res.ok) {
-              updateLine(line.id, { received: true })
+              updateLine(line.id, { received: true, item_type: withDefaults.item_type, process: withDefaults.process, bay: withDefaults.bay, packaging: withDefaults.packaging })
               showToast('Line confirmed', 'success')
             } else {
               showToast(res.error, 'error')
@@ -584,13 +634,8 @@ function YardLoadsList({ pods, lineState, onOpen, onViewPOD, viewingPODFor }: {
     // only populated after the detail view lazy-loads them. Prefer whichever
     // is higher so freshly-loaded receipts keep the right total.
     const total = Math.max(p.line_count ?? 0, lines.length)
-    const done = lines.filter(l => l.receiving_status === 'received' || lineState[l.id]?.received).length
-    const flagged = lines.filter(l => {
-      const ls = lineState[l.id]
-      return (ls && ((ls.discrepancy && ls.discrepancy !== 'none') || ls.hasDefects))
-        || l.discrepancy === 'defects_noted'
-        || (l.quantity_discrepancy && l.quantity_discrepancy !== 'none' && l.quantity_discrepancy !== '')
-    }).length
+    const done = lines.filter(l => l.receiving_status === 'received' || l.receiving_status === 'reviewed' || lineState[l.id]?.received).length
+    const flagged = lines.filter(l => isLineFlagged(l, lineState[l.id])).length
     const allDone = total > 0 && done === total
     // Phase 2: 'matched' is when the GRN gets generated + pushed to DocuWare.
     // 'archived' is a later admin-only state (post-cleanup); treat both as
@@ -748,14 +793,10 @@ function YardLoadDetail({ pod, lineState, savingLineId, onBack, onWalk, onConfir
 }) {
   const lines = pod.lines || []
   const total = lines.length
-  const done = lines.filter(l => l.receiving_status === 'received' || lineState[l.id]?.received).length
-  const flagged = lines.filter(l => {
-    const ls = lineState[l.id]
-    return (ls && ((ls.discrepancy && ls.discrepancy !== 'none') || ls.hasDefects))
-      || l.discrepancy === 'defects_noted'
-  }).length
+  const done = lines.filter(l => l.receiving_status === 'received' || l.receiving_status === 'reviewed' || lineState[l.id]?.received).length
+  const flagged = lines.filter(l => isLineFlagged(l, lineState[l.id])).length
   const allDone = done === total && total > 0
-  const firstUndoneIdx = lines.findIndex(l => !(l.receiving_status === 'received' || lineState[l.id]?.received))
+  const firstUndoneIdx = lines.findIndex(l => !(l.receiving_status === 'received' || l.receiving_status === 'reviewed' || lineState[l.id]?.received))
   // 'matched' is when the GRN gets issued; 'archived' is the later auto-archive
   // state. Either means the GRN exists. (Mirrors the list-card precedence above.)
   const grnIssued = pod.status === 'matched' || pod.status === 'archived'
@@ -769,7 +810,7 @@ function YardLoadDetail({ pod, lineState, savingLineId, onBack, onWalk, onConfir
   // lines (we've seen 68+); kept simple — substring match on item code,
   // description, line number, material size/markings.
   const [search, setSearch] = useState('')
-  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'received' | 'flagged'>('all')
+  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'reviewed' | 'flagged'>('all')
 
   // Multi-select for bulk actions. Scoped to this load — cleared on back-nav
   // because the component unmounts. Hidden once the GRN is issued.
@@ -830,10 +871,10 @@ function YardLoadDetail({ pod, lineState, savingLineId, onBack, onWalk, onConfir
 
   const filteredLines = lines.filter((l) => {
     const st = lineState[l.id] || {}
-    const isReceived = st.received || l.receiving_status === 'received'
-    const isFlagged = (st.discrepancy && st.discrepancy !== 'none') || st.hasDefects || l.discrepancy === 'defects_noted'
+    const isReceived = st.received || l.receiving_status === 'received' || l.receiving_status === 'reviewed'
+    const isFlagged = isLineFlagged(l, st)
     if (statusFilter === 'pending'  && isReceived) return false
-    if (statusFilter === 'received' && !isReceived) return false
+    if (statusFilter === 'reviewed' && !isReceived) return false
     if (statusFilter === 'flagged'  && !isFlagged)  return false
     const q = search.trim().toLowerCase()
     if (!q) return true
@@ -919,7 +960,7 @@ function YardLoadDetail({ pod, lineState, savingLineId, onBack, onWalk, onConfir
           <div className="yard-bigring" style={{ ['--p' as any]: Math.round((done/Math.max(total,1))*100) }}>
             <div className="yard-bigring__inner">
               <div className="yard-bigring__num">{done}<span>/{total}</span></div>
-              <div className="yard-bigring__lbl">Received</div>
+              <div className="yard-bigring__lbl">{grnIssued ? 'Received' : 'Reviewed'}</div>
             </div>
           </div>
           {flagged > 0 && <div className="yard-detail__flagged"><Icon name="flag" size={16}/> {flagged} flagged</div>}
@@ -937,7 +978,6 @@ function YardLoadDetail({ pod, lineState, savingLineId, onBack, onWalk, onConfir
             <YardField label="Order #"         value={headerVal('purchase_order_number')}     onChange={v => patch('purchase_order_number', v)} mono/>
             <YardField label="Weighbridge #"   value={headerVal('weighbridge_ticket_number')} onChange={v => patch('weighbridge_ticket_number', v)} mono/>
             <YardField label="Vehicle Reg"     value={headerVal('vehicle_registration')}      onChange={v => patch('vehicle_registration', v)} mono/>
-            <YardField label="Job Number"      value={headerVal('job_number')}                onChange={v => patch('job_number', v)} mono/>
           </div>
           {headerError && <div className="yard-edit-card__error" role="alert"><Icon name="alert" size={16}/> {headerError}</div>}
           <div className="yard-edit-card__actions">
@@ -974,7 +1014,9 @@ function YardLoadDetail({ pod, lineState, savingLineId, onBack, onWalk, onConfir
 
       <div className="yard-detail__list-header">
         <span>Line items</span>
-        <button className="yard-link" onClick={() => onWalk()}>Open in walkthrough →</button>
+        {!grnIssued && (
+          <button className="yard-link" onClick={() => onWalk()}>Open in walkthrough →</button>
+        )}
       </div>
 
       {lines.length > 0 && (
@@ -1000,12 +1042,12 @@ function YardLoadDetail({ pod, lineState, savingLineId, onBack, onWalk, onConfir
             aria-label="Search lines"
           />
           <div className="yard-line-chips" role="tablist" aria-label="Filter lines by status">
-            {(['all','pending','received','flagged'] as const).map(key => {
+            {(['all','pending','reviewed','flagged'] as const).map(key => {
               const count = key === 'all' ? total
                 : key === 'pending'  ? total - done
-                : key === 'received' ? done
+                : key === 'reviewed' ? done
                 : flagged
-              const label = key === 'all' ? 'All' : key[0].toUpperCase() + key.slice(1)
+              const label = key === 'reviewed' ? 'Reviewed' : key === 'all' ? 'All' : key[0].toUpperCase() + key.slice(1)
               return (
                 <button
                   key={key}
@@ -1092,6 +1134,20 @@ function YardLoadDetail({ pod, lineState, savingLineId, onBack, onWalk, onConfir
   )
 }
 
+function lineConditionSummary(conditionNotes: string) {
+  if (!conditionNotes) return []
+  const { defects, mitigations } = parseConditionNotes(conditionNotes)
+  const result: Array<{ key: string; label: string; value: string; mits: string[] }> = []
+  for (const cat of DEFECT_CATEGORIES) {
+    for (const item of cat.items) {
+      const val = defects[item.key]
+      if (!val || val === item.default) continue
+      result.push({ key: item.key, label: item.label, value: val, mits: mitigations[item.key] ?? [] })
+    }
+  }
+  return result
+}
+
 function YardLineSummary({ line, idx, state, saving, disabled, selectable, selected, onToggleSelect, onConfirm, onWalk }: {
   line: ReceiptLine
   idx: number
@@ -1104,10 +1160,8 @@ function YardLineSummary({ line, idx, state, saving, disabled, selectable, selec
   onConfirm: () => void
   onWalk: () => void
 }) {
-  const received = state.received || line.receiving_status === 'received'
-  const flagged = (state.discrepancy && state.discrepancy !== 'none')
-    || state.hasDefects
-    || line.discrepancy === 'defects_noted'
+  const received = state.received || line.receiving_status === 'received' || line.receiving_status === 'reviewed'
+  const flagged = isLineFlagged(line, state)
   const cls = received ? (flagged ? 'yard-line--flagged' : 'yard-line--ok') : 'yard-line--pending'
   return (
     <div className={'yard-line ' + cls + (selected ? ' yard-line--selected' : '')}>
@@ -1129,12 +1183,61 @@ function YardLineSummary({ line, idx, state, saving, disabled, selectable, selec
         <div className="yard-line__desc">{line.description || line.material_description || line.item_code || `Line ${line.line_number}`}</div>
         <div className="yard-line__sub">
           <span className="mono">{line.item_code}</span>
-          <span> · {line.expected_quantity} {line.unit_of_measure} expected</span>
+          {(() => {
+            // Once a line has been received (either persisted on the server
+            // or just confirmed locally), show received / expected so any
+            // mismatch is visible at a glance. State-from-walkthrough wins
+            // over the persisted line so an in-flight edit shows immediately.
+            const rcvd = state.received_quantity ?? line.received_quantity
+            const uom = line.unit_of_measure
+            if (received) {
+              return <span> · <span className="mono">{rcvd ?? 0} / {line.expected_quantity}</span>{uom ? ` ${uom}` : ''}</span>
+            }
+            return <span> · {line.expected_quantity}{uom ? ` ${uom}` : ''} expected</span>
+          })()}
+          {line.job_number && <span> · Job <span className="mono">{line.job_number}</span></span>}
         </div>
+        {(() => {
+          // Material spec sub-line: size / markings / weight / length / galv
+          // thickness. Each only renders when present, and the row is omitted
+          // entirely if none apply — keeps the card tight on POD-light lines.
+          const galv = state.required_galv_thickness ?? line.required_galv_thickness
+          const parts: { k: string; v: string }[] = []
+          if (line.material_size)     parts.push({ k: 'Size',      v: line.material_size })
+          if (line.material_markings) parts.push({ k: 'Markings',  v: line.material_markings })
+          if (line.material_length)   parts.push({ k: 'Length',    v: line.material_length })
+          if (line.weight)            parts.push({ k: 'Weight',    v: line.weight })
+          if (galv)                   parts.push({ k: 'Galv',      v: galv })
+          if (parts.length === 0) return null
+          return (
+            <div className="yard-line__sub yard-line__sub--meta">
+              {parts.map((p, i) => (
+                <span key={p.k}>
+                  {i > 0 && <span> · </span>}
+                  <span className="yard-line__meta-k">{p.k}:</span> <span>{p.v}</span>
+                </span>
+              ))}
+            </div>
+          )
+        })()}
       </div>
+      {received && (() => {
+        const conds = lineConditionSummary(line.condition_notes)
+        if (conds.length === 0) return null
+        return (
+          <div className="yard-line__condition">
+            {conds.map(d => (
+              <div key={d.key} className="yard-line__cond-item">
+                <span className="yard-line__cond-k">{d.label}:</span> {d.value}
+                {d.mits.length > 0 && <div className="yard-line__cond-mits">{d.mits.join(' · ')}</div>}
+              </div>
+            ))}
+          </div>
+        )
+      })()}
       <div className="yard-line__status">
         {!received && <span className="yard-pill yard-pill--neutral">Pending</span>}
-        {received && !flagged && <span className="yard-pill yard-pill--success"><Icon name="check" size={12}/> Received</span>}
+        {received && !flagged && <span className="yard-pill yard-pill--success"><Icon name="check" size={12}/> {line.receiving_status === 'received' ? 'Received' : 'Reviewed'}</span>}
         {received &&  flagged && <span className="yard-pill yard-pill--warn"><Icon name="flag" size={12}/> Flagged</span>}
       </div>
       {!received && !disabled && (
@@ -1158,6 +1261,20 @@ function YardLineSummary({ line, idx, state, saving, disabled, selectable, selec
             title="Open the walkthrough for this line if there's a discrepancy or defect."
           >
             <Icon name="flag" size={16}/> Has issues
+          </button>
+        </div>
+      )}
+      {received && !disabled && (
+        <div className="yard-line__actions">
+          <button
+            type="button"
+            className="yard-btn-ghost yard-btn-md"
+            onClick={onWalk}
+            disabled={saving}
+            aria-label={`Re-open walkthrough for line ${idx+1}`}
+            title="Re-open the walkthrough to correct qty or defects on an already-received line."
+          >
+            <Icon name="pencil" size={16}/> Receive Again
           </button>
         </div>
       )}
@@ -1266,7 +1383,7 @@ function YardPODModal({ url, onClose }: { url: string; onClose: () => void }) {
 // 'photo' is conditional: shown only when the receiver flagged a defect on
 // the previous step. goNext/goPrev skip it for clean lines so the 90% case
 // stays a one-tap walkthrough.
-const STEPS = ['qty', 'type', 'process', 'packaging', 'storage', 'defects', 'photo', 'review'] as const
+const STEPS = ['qty', 'materials', 'type', 'process', 'packaging', 'storage', 'defects', 'photo', 'review'] as const
 type Step = typeof STEPS[number]
 
 function shouldSkipStep(step: Step, state: YardLineState): boolean {
@@ -1309,9 +1426,10 @@ function YardWalkthrough({ pod, startLineId, lineState, updateLine, savingLineId
   const carryForward = () => {
     if (!prevState) return
     set({
-      item_type: prevState.item_type ?? state.item_type,
-      process:   prevState.process   ?? state.process,
-      packaging: prevState.packaging ?? state.packaging,
+      item_type:               prevState.item_type ?? state.item_type,
+      process:                 prevState.process   ?? state.process,
+      packaging:               prevState.packaging ?? state.packaging,
+      required_galv_thickness: prevState.required_galv_thickness ?? state.required_galv_thickness,
     })
   }
 
@@ -1404,14 +1522,15 @@ function YardWalkthrough({ pod, startLineId, lineState, updateLine, savingLineId
             <Icon name="check" size={16}/> Same as line {idx} {carryDescription(prevState, step)}
           </button>
         )}
-        {step === 'qty'       && <StepQuantity  line={line} state={state} set={set}/>}
-        {step === 'type'      && <StepItemType  state={state} set={set}/>}
-        {step === 'process'   && <StepProcess   state={state} set={set}/>}
-        {step === 'packaging' && <StepPackaging state={state} set={set}/>}
-        {step === 'defects'   && <StepDefects   state={state} set={set}/>}
-        {step === 'photo'     && <StepPhoto     state={state} set={set}/>}
-        {step === 'storage'   && <StepStorage   state={state} set={set}/>}
-        {step === 'review'    && <StepReview    line={line} state={state} set={set} idx={idx} total={total}/>}
+        {step === 'qty'       && <StepQuantity   line={line} state={state} set={set}/>}
+        {step === 'materials' && <StepMaterials  line={line} state={state} set={set}/>}
+        {step === 'type'      && <StepItemType   state={state} set={set}/>}
+        {step === 'process'   && <StepProcess    state={state} set={set}/>}
+        {step === 'packaging' && <StepPackaging  state={state} set={set}/>}
+        {step === 'defects'   && <StepDefects    state={state} set={set}/>}
+        {step === 'photo'     && <StepPhoto      state={state} set={set}/>}
+        {step === 'storage'   && <StepStorage    state={state} set={set}/>}
+        {step === 'review'    && <StepReview     line={line} state={state} set={set} idx={idx} total={total}/>}
       </div>
 
       {saveError && (
@@ -1462,6 +1581,8 @@ function carryDescription(prev: YardLineState | null, step: Step): string {
 
 function canAdvance(step: Step, state: YardLineState): boolean {
   if (step === 'qty')       return state.received_quantity != null && !!state.discrepancy
+  // Materials step is optional — skip with no changes.
+  if (step === 'materials') return true
   if (step === 'type')      return !!state.item_type
   if (step === 'process')   return !!state.process
   if (step === 'packaging') return !!state.packaging
@@ -1474,6 +1595,33 @@ function canAdvance(step: Step, state: YardLineState): boolean {
 }
 
 // ── Steps ─────────────────────────────────────────────────────────────────────
+
+function StepMaterials({ line, state, set }: { line: ReceiptLine; state: YardLineState; set: (p: Partial<YardLineState>) => void }) {
+  const f = (label: string, placeholder: string, value: string | undefined, lineVal: string, onChange: (v: string) => void) => (
+    <div className="form-field" style={{ marginBottom: '0.75rem' }}>
+      <label className="walk-thickness__label">{label}</label>
+      <input
+        type="text"
+        className="walk-thickness__input"
+        placeholder={placeholder || lineVal || '—'}
+        value={value ?? ''}
+        onChange={e => onChange(e.target.value)}
+        autoComplete="off"
+      />
+      {lineVal && <div style={{ fontSize: '0.75rem', color: 'var(--yard-ink-2)', marginTop: '0.25rem' }}>Current: {lineVal}</div>}
+    </div>
+  )
+  return (
+    <div>
+      <h2 className="walk-step__title">Material Details</h2>
+      <p className="walk-step__sub">Override any fields that differ from the delivery note. Leave blank to keep the existing value.</p>
+      {f('Internal Description', 'Override internal name', state.mat_internal_description, line.internal_description ?? '', v => set({ mat_internal_description: v || undefined }))}
+      {f('Size', 'Override size', state.mat_size, line.material_size ?? '', v => set({ mat_size: v || undefined }))}
+      {f('Thickness', 'e.g. 6mm', state.mat_thickness, line.material_thickness ?? '', v => set({ mat_thickness: v || undefined }))}
+      {f('Job Number', 'Override job number', state.mat_job_number, line.job_number ?? '', v => set({ mat_job_number: v || undefined }))}
+    </div>
+  )
+}
 
 function StepQuantity({ line, state, set }: {
   line: ReceiptLine
@@ -1571,6 +1719,7 @@ function StepProcess({ state, set }: { state: YardLineState; set: (p: Partial<Ya
   const value = state.process
   const itemType = state.item_type
   const opts = availableProcesses(itemType || '').filter(o => o.value && !o.disabled)
+  const thicknessApplies = !!value && (value.includes('galv') || value === 'double_dip')
   return (
     <div>
       <h2 className="walk-step__title">Which process?</h2>
@@ -1586,6 +1735,24 @@ function StepProcess({ state, set }: { state: YardLineState; set: (p: Partial<Ya
           </button>
         ))}
       </div>
+
+      {thicknessApplies && (
+        <div className="walk-thickness">
+          <label className="walk-thickness__label" htmlFor="walk-galv-thickness">
+            Required galv thickness <span className="walk-thickness__hint">(optional)</span>
+          </label>
+          <input
+            id="walk-galv-thickness"
+            type="text"
+            className="walk-thickness__input"
+            placeholder="e.g. 85µm"
+            value={state.required_galv_thickness ?? ''}
+            onChange={e => set({ required_galv_thickness: e.target.value })}
+            inputMode="text"
+            autoComplete="off"
+          />
+        </div>
+      )}
     </div>
   )
 }
@@ -1932,6 +2099,9 @@ function StepReview({ line, state, set, idx, total }: {
         </div>
         <div className="review-row"><span className="k">Material</span><span className="v">{state.item_type}</span></div>
         <div className="review-row"><span className="k">Process</span><span className="v">{processLabel || '—'}</span></div>
+        {state.required_galv_thickness && (
+          <div className="review-row"><span className="k">Galv thickness</span><span className="v">{state.required_galv_thickness}</span></div>
+        )}
         <div className="review-row"><span className="k">Packaging</span><span className="v">{state.packaging}</span></div>
         {(state.bay || state.stored_in) && (
           <div className="review-row">

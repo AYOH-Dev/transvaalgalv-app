@@ -85,6 +85,7 @@ type ReceiptLine struct {
 	Discrepancy           string     `json:"discrepancy"`
 	QuantityDiscrepancy   string     `json:"quantity_discrepancy"`
 	ConditionNotes        string     `json:"condition_notes"`
+	JobNumber             string     `json:"job_number"`
 	DocuWareRecordLine    string     `json:"docuware_record_line_id"`
 	DocuWareUniqueNo      string     `json:"docuware_unique_number"`
 	DocuWarePrimaryKey    string     `json:"docuware_primary_key"`
@@ -150,6 +151,7 @@ type UpdateReceiptLineInput struct {
 	ReceivingStatus       *string  `json:"receiving_status"`
 	Discrepancy           *string  `json:"discrepancy"`
 	ConditionNotes        *string  `json:"condition_notes"`
+	JobNumber             *string  `json:"job_number"`
 
 	// ReceivedByUserID and ReceivedByName are set server-side from the
 	// authenticated session and are never accepted from the request body.
@@ -160,12 +162,16 @@ type UpdateReceiptLineInput struct {
 	ReceivedByName   string `json:"-"`
 }
 
-// BulkDefectEntry is a defect key with a resolved severity and toggle-only
-// mitigations. Used in BulkDefectDiff.Add.
+// BulkDefectEntry is a defect key with a resolved severity, selected
+// mitigations, and optional per-mitigation quantities. Quantities holds the
+// same shape as the walkthrough's MitigationQuantity (mitigation label → qty)
+// and is only populated for defect items that take a qty (i.e. not in the
+// MITIGATION_NO_QTY set on the frontend). Used in BulkDefectDiff.Add.
 type BulkDefectEntry struct {
-	Key         string   `json:"key"`
-	Severity    string   `json:"severity"`
-	Mitigations []string `json:"mitigations"`
+	Key         string         `json:"key"`
+	Severity    string         `json:"severity"`
+	Mitigations []string       `json:"mitigations"`
+	Quantities  map[string]int `json:"quantities,omitempty"`
 }
 
 // BulkDefectDiff describes a merge operation on per-line condition_notes.

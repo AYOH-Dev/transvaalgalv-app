@@ -3,7 +3,11 @@
 **Cabinet:** Receiving Data (ID: 198)  
 **Sync direction:** Receiving App → DocuWare (write-back)  
 **Record structure:** One DocuWare record per delivery line (flat, not table-based)  
-**Last reviewed:** May 2026
+**Last reviewed:** 2026-05-18 (verified against `docs/Receiving Data 4_17_2026 1_26_36 PM.xml`)
+
+> All DBNames below are taken from the live cabinet schema export. Display labels
+> in DocuWare may differ from internal names — column headers like "Vent Holes
+> Quantity" map to the DBName `VENT_HOLES`, not to a field of the same name.
 
 ---
 
@@ -100,39 +104,66 @@ Each flag is only written when the defect is set to a **non-default** value. `DE
 
 ## Mitigation Fields
 
-Written as comma-separated text when one or more mitigations are selected for a defect.
+Mitigations split into two patterns:
 
-| DocuWare Field | Defect | Possible Mitigation Values |
-|---|---|---|
-| `PAINT_MITIGATION` | Paint | `Thinners required`, `Shotblasting required` |
-| `DAMAGE_MITIGATION` | Damaged | `Send to boilershop` |
-| `RUST_MITIGATION` | Rust | `Shotblasting required`, `Send to boilershop` |
-| `DELAMINATION_MITIGATION` | Delamination | `Shotblasting required` |
-| `NON_CONFORMING_PRE_GALV_MITIG` | Non-Conforming Pre-Galv | `Send to stripping` |
-| `THREADED_ARTICLE_MITIGATION` | Threaded Article | `Galv stop required` |
-| `ENCLOSED_CAVITY_HOLES_REQUIRE` | Enclosed Cavity | `Cavity Vent holes required` |
-| `ARTICLE_OVERLAP_VENT_HOLES` | Article Overlap | `Article Overlap Vent Hole required` |
+- **Single-field**: one DocuWare field per defect that holds the comma-joined mitigation labels (or nothing when no mitigation is selected). Used for mitigations that don't take a user-entered qty.
+- **Paired-field**: a *required-flag* field that holds `"yes"` when the mitigation is ticked, plus a separate *quantity* field that holds the number. Both are empty when the mitigation isn't selected.
 
----
+### Single-field mitigations (no qty in app)
 
-## Hole & Hanging Quantity Fields
+| DocuWare Field | DocuWare Display Label | Defect | Source (`condition_notes`) | Example value |
+|---|---|---|---|---|
+| `PAINT_MITIGATION` | Paint Mitigation | Paint | `paintMitigation[]` | `Thinners required, Shotblasting required` |
+| `DAMAGE_MITIGATION` | Damage Mitigation | Damaged | `damagedMitigation[]` | `Send to boilershop` |
+| `RUST_MITIGATION` | Rust Mitigation | Rust | `rustMitigation[]` | `Shotblasting required` |
+| `DELAMINATION_MITIGATION` | Delamination Mitigation | Delamination | `delaminationMitigation[]` | `Shotblasting required` |
+| `NON_CONFORMING_PRE_GALV_MITIG` | Non-Conforming Pre-Galv | Non-Conforming Pre-Galv | `nonConformingPreGalvMitigation[]` | `Send to stripping` |
+| `THREADED_ARTICLE_MITIGATION` | Threaded Article | Threaded Article | `threadedArticleMitigation[]` | `Galv stop required` |
 
-| DocuWare Field | Source | Notes |
-|---|---|---|
-| `VENT_HOLES_REQUIRED` | Holes Inadequate → Vent holes qty | Numeric |
-| `DRAIN_HOLES_REQUIRED` | Holes Inadequate → Drain holes qty | Numeric |
-| `JIG_HOLE_REQUIRED` | Holes Inadequate → Jig holes qty | Numeric |
-| `ENCLOSED_CAVITY_HOLES_QUANTIT` | Enclosed Cavity → Cavity vent holes qty | Numeric |
-| `NO_HANGING_LIFTING_LUG_NUT_RE` | No Hanging → Lifting lug-nut required | Text flag |
-| `NO_HANGING_LIFTING_LUG_NUT_R1` | No Hanging → Lifting lug-nut quantity | Numeric |
-| `NO_HANGING_HANG_NOTCH_REQUIRE` | No Hanging → Hang notch required | Text flag |
-| `NO_HANGING_HANG_NOTCH_REQUIR1` | No Hanging → Hang notch quantity | Numeric |
+### Paired-field mitigations (qty in app)
+
+When the mitigation is ticked, the **required-flag** field gets `"yes"` and the **quantity** field gets the numeric qty. When unticked, both fields are not written (i.e. retain whatever DocuWare already has — clearing isn't pushed).
+
+#### Holes Inadequate
+
+Source: `holesInadequateMitigation[]` (the selected mitigation labels), plus top-level numeric keys `ventHolesQty` / `drainHolesQty` / `jigHolesQty`.
+
+| Mitigation label | Required-flag DBName | Required-flag value | Quantity DBName | Quantity value |
+|---|---|---|---|---|
+| Vent holes required | `VENT_HOLES_REQUIRED` | `"yes"` | `VENT_HOLES` | `ventHolesQty` |
+| Drain holes required | `DRAIN_HOLES_REQUIRED` | `"yes"` | `DRAIN_HOLES` | `drainHolesQty` |
+| Jig holes required | `JIG_HOLE_REQUIRED` | `"yes"` | `JIG_HOLES` | `jigHolesQty` |
+
+#### Enclosed Cavity
+
+Source: `enclosedCavityMitigation[]`, plus top-level numeric key `cavityVentHolesQty`.
+
+| Mitigation label | Required-flag DBName | Required-flag value | Quantity DBName | Quantity value |
+|---|---|---|---|---|
+| Cavity Vent holes required | `ENCLOSED_CAVITY_HOLES_REQUIRE` | `"yes"` | `ENCLOSED_CAVITY_HOLES_QUANTIT` | `cavityVentHolesQty` |
+
+#### No Hanging Method
+
+Source: `noHangingMitigation[]` where qty is embedded inline in the token (e.g. `"Lifting lug-nut required=2"`). The sync splits on `=` to extract the qty.
+
+| Mitigation label | Required-flag DBName | Required-flag value | Quantity DBName | Quantity value |
+|---|---|---|---|---|
+| Lifting lug-nut required | `NO_HANGING_LIFTING_LUG_NUT_RE` | `"yes"` | `NO_HANGING_LIFTING_LUG_NUT_R1` | parsed from `=N` |
+| Hang notch required | `NO_HANGING_HANG_NOTCH_REQUIRE` | `"yes"` | `NO_HANGING_HANG_NOTCH_REQUIR1` | parsed from `=N` |
+
+#### Article Overlap
+
+Source: `articleOverlapMitigation[]` where qty is embedded inline (`"Article Overlap Vent Hole required=N"`).
+
+| Mitigation label | Required-flag DBName | Required-flag value | Quantity DBName | Quantity value |
+|---|---|---|---|---|
+| Article Overlap Vent Hole required | `ARTICLE_OVERLAP_VENT_HOLES` | `"yes"` | `ARTICLE_OVERLAP_QUANTITY` | parsed from `=N` |
 
 ---
 
 ## Fields in DocuWare Cabinet NOT Written by the App
 
-These fields exist in the Receiving Data cabinet but are not written by the receiving app. They are sourced from the upstream POD import or managed externally.
+These fields exist in the Receiving Data cabinet but are not written by the receiving app. They are either sourced from the upstream POD import or are duplicate/legacy columns the cabinet retains for historical reasons.
 
 | DocuWare Field | Notes |
 |---|---|
@@ -145,11 +176,7 @@ These fields exist in the Receiving Data cabinet but are not written by the rece
 | `QUANTITY` | Expected quantity — set at import, not updated by app |
 | `OTHER` | Freeform exception field — not used by app |
 | `TEXTSHOT` | System / OCR field |
-| `DRAIN_HOLES` | Legacy POD field (not the app's DRAIN_HOLES_REQUIRED) |
-| `VENT_HOLES` | Legacy POD field |
-| `JIG_HOLES` | Legacy POD field |
-| `CAVITY_VENT_HOLES` | Legacy POD field |
-| `LIFTING_LUG_NUT` | Legacy POD field |
-| `HANG_NOTCH` | Legacy POD field |
-| `ARTICLE_OVERLAP_VENT_HOLES` | Legacy POD field (app writes mitigation text here) |
+| `CAVITY_VENT_HOLES` | Duplicate of `ENCLOSED_CAVITY_HOLES_QUANTIT` (kept by cabinet for legacy reporting) |
+| `LIFTING_LUG_NUT` | Duplicate of `NO_HANGING_LIFTING_LUG_NUT_R1` |
+| `HANG_NOTCH` | Duplicate of `NO_HANGING_HANG_NOTCH_REQUIR1` |
 | `DWDOCID`, `DWSTOREDATETIME`, `DWMODDATETIME` | DocuWare system fields — read by app, not written |
