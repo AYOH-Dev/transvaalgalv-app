@@ -234,17 +234,30 @@ export default function Yard({ onLogout }: { onLogout?: () => void }) {
     if (st.mat_job_number !== undefined)           edit.job_number = st.mat_job_number
     const notes = (st.notes ?? '').trim()
     const hasDefects = !!(st.defects && st.hasDefects)
-    if (hasDefects || notes) {
+    if (st.defects_done) {
+      // Receiver explicitly went through the defects step — use their result.
+      if (hasDefects || notes) {
+        edit.condition_notes = buildConditionNotes(
+          st.defects ?? {},
+          st.mitigations ?? {},
+          st.quantities ?? {},
+          notes,
+        )
+      } else {
+        edit.condition_notes = ''
+      }
+      edit.discrepancy = hasDefects ? 'defects_noted' : ''
+    } else if (hasDefects || notes) {
+      // Confirm-As-Expected path — defects step was skipped, but state has
+      // defects (shouldn't happen in practice; guard anyway).
       edit.condition_notes = buildConditionNotes(
         st.defects ?? {},
         st.mitigations ?? {},
         st.quantities ?? {},
         notes,
       )
-    } else {
-      edit.condition_notes = ''
+      edit.discrepancy = 'defects_noted'
     }
-    edit.discrepancy = hasDefects ? 'defects_noted' : ''
 
     setSavingLineId(line.id)
     try {
