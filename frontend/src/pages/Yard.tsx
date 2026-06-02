@@ -166,8 +166,9 @@ export default function Yard({ onLogout }: { onLogout?: () => void }) {
   const [receipts, setReceipts] = useState<Receipt[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [view, setView] = useState<'list' | 'detail' | 'walk'>('list')
+  const [view, setView] = useState<'list' | 'group' | 'detail' | 'walk'>('list')
   const [activeId, setActiveId] = useState<string | null>(null)
+  const [activeGroupId, setActiveGroupId] = useState<string | null>(null)
   const [walkStartLineId, setWalkStartLineId] = useState<string | null>(null)
   const [lineState, setLineState] = useState<LineStateMap>({})
   const [savingLineId, setSavingLineId] = useState<string | null>(null)
@@ -205,7 +206,24 @@ export default function Yard({ onLogout }: { onLogout?: () => void }) {
       .catch(() => { /* ignore — empty lines surfaced as empty state */ })
   }, [view, activeId, receipts])
 
+  // Lazy-load lines for all receipts in a group when entering the group view
+  useEffect(() => {
+    if (view !== 'group' || !activeGroupId) return
+    const groupReceipts = receipts.filter(x => (x.load_id || x.id) === activeGroupId)
+    for (const r of groupReceipts) {
+      if (r.lines && r.lines.length > 0) continue
+      apiFetch(`/receipts/${r.id}`)
+        .then(res => res.ok ? res.json() : null)
+        .then((full: Receipt | null) => {
+          if (!full) return
+          setReceipts(prev => prev.map(x => x.id === r.id ? { ...x, lines: full.lines } : x))
+        })
+        .catch(() => {})
+    }
+  }, [view, activeGroupId, receipts])
+
   const active = receipts.find(p => p.id === activeId) || null
+  const activeGroup = activeGroupId ? receipts.filter(r => (r.load_id || r.id) === activeGroupId) : []
 
   const updateLine = useCallback((lineId: string, patch: Partial<YardLineState>) => {
     setLineState(s => ({ ...s, [lineId]: { ...s[lineId], ...patch } }))
@@ -512,9 +530,18 @@ export default function Yard({ onLogout }: { onLogout?: () => void }) {
         <YardLoadsList
           pods={receipts}
           lineState={lineState}
-          onOpen={(id) => { setActiveId(id); setView('detail') }}
+          onOpen={(id) => { setActiveId(id); setActiveGroupId(null); setView('detail') }}
+          onOpenGroup={(groupId) => { setActiveGroupId(groupId); setView('group') }}
           onViewPOD={viewPOD}
           viewingPODFor={viewingPODFor}
+        />
+      )}
+      {!loading && !error && view === 'group' && activeGroup.length > 0 && (
+        <YardGroupedLoadDetail
+          receipts={activeGroup}
+          lineState={lineState}
+          onBack={() => { setActiveGroupId(null); setView('list') }}
+          onOpenReceipt={(id) => { setActiveId(id); setView('detail') }}
         />
       )}
       {!loading && !error && view === 'detail' && active && (
@@ -522,7 +549,7 @@ export default function Yard({ onLogout }: { onLogout?: () => void }) {
           pod={active}
           lineState={lineState}
           savingLineId={savingLineId}
-          onBack={() => setView('list')}
+          onBack={() => { if (activeGroupId) setView('group'); else setView('list') }}
           onWalk={(lineId) => { setWalkStartLineId(lineId ?? null); setView('walk') }}
           onConfirmAsExpected={async (line) => {
             // Client requested that "Confirm as expected" implies the common-case
@@ -628,10 +655,52 @@ function useOutdoorMode(): [boolean, (updater: (v: boolean) => boolean) => void]
 // ════════════════════════════════════════════════════════════════════════════
 // LIST
 // ════════════════════════════════════════════════════════════════════════════
-function YardLoadsList({ pods, lineState, onOpen, onViewPOD, viewingPODFor }: {
+
+type EnrichedReceipt = Receipt & {
+  _total: number
+  _done: number
+  _flagged: number
+  _allDone: boolean
+  _grnIssued: boolean
+}
+
+type LoadGroup = {
+  loadId: string | null
+  receipts: EnrichedReceipt[]
+  _total: number
+  _done: number
+  _flagged: number
+  _allDone: boolean
+  _grnIssued: boolean
+}
+
+function groupReceiptsByLoad(receipts: EnrichedReceipt[]): LoadGroup[] {
+  const map = new Map<string, EnrichedReceipt[]>()
+  const order: string[] = []
+  for (const r of receipts) {
+    const key = r.load_id || r.id
+    if (!map.has(key)) { map.set(key, []); order.push(key) }
+    map.get(key)!.push(r)
+  }
+  return order.map(key => {
+    const group = map.get(key)!
+    return {
+      loadId: group[0].load_id || null,
+      receipts: group,
+      _total:    group.reduce((s, r) => s + r._total, 0),
+      _done:     group.reduce((s, r) => s + r._done, 0),
+      _flagged:  group.reduce((s, r) => s + r._flagged, 0),
+      _allDone:  group.every(r => r._allDone),
+      _grnIssued: group.every(r => r._grnIssued),
+    }
+  })
+}
+
+function YardLoadsList({ pods, lineState, onOpen, onOpenGroup, onViewPOD, viewingPODFor }: {
   pods: Receipt[]
   lineState: LineStateMap
   onOpen: (id: string) => void
+  onOpenGroup: (loadId: string) => void
   onViewPOD: (receiptId: string) => void
   viewingPODFor: string | null
 }) {
@@ -657,20 +726,22 @@ function YardLoadsList({ pods, lineState, onOpen, onViewPOD, viewingPODFor }: {
     return { ...p, _total: total, _done: done, _flagged: flagged, _allDone: allDone, _grnIssued: grnIssued }
   })
 
-  const visible = enriched.filter(p => {
-    if (filter === 'done' && !p._allDone && !p._grnIssued) return false
-    if (filter === 'today' && p._grnIssued) return false
+  const groups = groupReceiptsByLoad(enriched)
+
+  const visibleGroups = groups.filter(g => {
+    if (filter === 'done' && !g._allDone && !g._grnIssued) return false
+    if (filter === 'today' && g._grnIssued) return false
     if (search) {
       const q = search.trim().toLowerCase()
-      const haystack = [
+      return g.receipts.some(p => [
+        p.load_id,
         p.weighbridge_ticket_number,
         p.delivery_note_number,
         p.customer_name,
         p.supplier_name,
         p.vehicle_registration,
         p.receipt_number,
-      ].filter(Boolean).join(' ').toLowerCase()
-      if (!haystack.includes(q)) return false
+      ].filter(Boolean).join(' ').toLowerCase().includes(q))
     }
     return true
   })
@@ -704,28 +775,95 @@ function YardLoadsList({ pods, lineState, onOpen, onViewPOD, viewingPODFor }: {
 
       <div className="yard-tabs" role="tablist">
         <button className={'yard-tab ' + (filter === 'today' ? 'yard-tab--active' : '')} onClick={() => setFilter('today')}>
-          Open <span className="yard-tab__count">{enriched.filter(p => !p._grnIssued).length}</span>
+          Open <span className="yard-tab__count">{groups.filter(g => !g._grnIssued).length}</span>
         </button>
         <button className={'yard-tab ' + (filter === 'done' ? 'yard-tab--active' : '')} onClick={() => setFilter('done')}>
-          Done <span className="yard-tab__count">{enriched.filter(p => p._allDone || p._grnIssued).length}</span>
+          Done <span className="yard-tab__count">{groups.filter(g => g._allDone || g._grnIssued).length}</span>
         </button>
         <button className={'yard-tab ' + (filter === 'all' ? 'yard-tab--active' : '')} onClick={() => setFilter('all')}>All</button>
       </div>
 
       <div className="yard-loads">
-        {visible.map(p => {
-          const podBusy = viewingPODFor === p.id
-          const onCardKey: React.KeyboardEventHandler<HTMLDivElement> = (e) => {
-            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen(p.id) }
+        {visibleGroups.map(g => {
+          if (g.receipts.length === 1) {
+            // Single-DN load — render the original card unchanged
+            const p = g.receipts[0]
+            const podBusy = viewingPODFor === p.id
+            const onCardKey: React.KeyboardEventHandler<HTMLDivElement> = (e) => {
+              if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen(p.id) }
+            }
+            return (
+              <div
+                key={p.id}
+                role="button"
+                tabIndex={0}
+                className="yard-load-card"
+                onClick={() => onOpen(p.id)}
+                onKeyDown={onCardKey}
+              >
+                <div className="yard-load-card__plate">
+                  <Icon name="truck" size={24}/>
+                </div>
+                <div className="yard-load-card__main">
+                  <div className="yard-load-card__row">
+                    <div className="yard-load-card__num">
+                      {p.weighbridge_ticket_number
+                        ? `WB ${p.weighbridge_ticket_number}`
+                        : (p.delivery_note_number || p.receipt_number || '—')}
+                    </div>
+                    {p._grnIssued && <span className="yard-pill yard-pill--success">GRN issued</span>}
+                    {p._allDone && !p._grnIssued && <span className="yard-pill yard-pill--ready">Ready for GRN</span>}
+                    {!p._allDone && p._done > 0 && <span className="yard-pill yard-pill--progress">In progress</span>}
+                  </div>
+                  <div className="yard-load-card__customer">{p.customer_name || p.supplier_name || '—'}</div>
+                  <div className="yard-load-card__meta">
+                    <span><Icon name="truck" size={14}/> {p.vehicle_registration || '—'}</span>
+                    {p.delivery_note_number && p.weighbridge_ticket_number && (
+                      <><span>·</span><span>DN {p.delivery_note_number}</span></>
+                    )}
+                    <span>·</span>
+                    <span>{p._total} line{p._total !== 1 ? 's' : ''}</span>
+                    {p._flagged > 0 && <><span>·</span><span style={{ color: 'var(--yard-amber)' }}><Icon name="flag" size={14}/> {p._flagged} flagged</span></>}
+                  </div>
+                </div>
+                <div className="yard-load-card__right">
+                  {p.source_docuware_document_id && (
+                    <button
+                      type="button"
+                      className="yard-pod-btn yard-pod-btn--compact"
+                      onClick={(e) => { e.stopPropagation(); onViewPOD(p.id) }}
+                      disabled={podBusy}
+                      title="Open POD in DocuWare viewer"
+                      aria-label="View POD"
+                    >
+                      <Icon name="doc" size={16}/> {podBusy ? '…' : 'POD'}
+                    </button>
+                  )}
+                  {p._done > 0 && p._total > 0 && (
+                    <div className="yard-progress-ring" style={{ ['--p' as any]: Math.round((p._done/p._total)*100) }}>
+                      <div className="yard-progress-ring__inner">{p._done}/{p._total}</div>
+                    </div>
+                  )}
+                  <Icon name="chevR" size={28}/>
+                </div>
+              </div>
+            )
+          }
+
+          // Multi-DN load group card
+          const first = g.receipts[0]
+          const groupKey = g.loadId || first.id
+          const onGroupKey: React.KeyboardEventHandler<HTMLDivElement> = (e) => {
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpenGroup(groupKey) }
           }
           return (
             <div
-              key={p.id}
+              key={groupKey}
               role="button"
               tabIndex={0}
-              className="yard-load-card"
-              onClick={() => onOpen(p.id)}
-              onKeyDown={onCardKey}
+              className="yard-load-card yard-load-card--group"
+              onClick={() => onOpenGroup(groupKey)}
+              onKeyDown={onGroupKey}
             >
               <div className="yard-load-card__plate">
                 <Icon name="truck" size={24}/>
@@ -733,41 +871,25 @@ function YardLoadsList({ pods, lineState, onOpen, onViewPOD, viewingPODFor }: {
               <div className="yard-load-card__main">
                 <div className="yard-load-card__row">
                   <div className="yard-load-card__num">
-                    {p.weighbridge_ticket_number
-                      ? `WB ${p.weighbridge_ticket_number}`
-                      : (p.delivery_note_number || p.receipt_number || '—')}
+                    {g.loadId ? `WB ${g.loadId}` : (first.delivery_note_number || first.receipt_number || '—')}
                   </div>
-                  {p._grnIssued && <span className="yard-pill yard-pill--success">GRN issued</span>}
-                  {p._allDone && !p._grnIssued && <span className="yard-pill yard-pill--ready">Ready for GRN</span>}
-                  {!p._allDone && p._done > 0 && <span className="yard-pill yard-pill--progress">In progress</span>}
+                  <span className="yard-pill yard-pill--group">{g.receipts.length} delivery notes</span>
+                  {g._grnIssued && <span className="yard-pill yard-pill--success">GRN issued</span>}
+                  {g._allDone && !g._grnIssued && <span className="yard-pill yard-pill--ready">Ready for GRN</span>}
+                  {!g._allDone && g._done > 0 && <span className="yard-pill yard-pill--progress">In progress</span>}
                 </div>
-                <div className="yard-load-card__customer">{p.customer_name || p.supplier_name || '—'}</div>
+                <div className="yard-load-card__customer">{first.customer_name || first.supplier_name || '—'}</div>
                 <div className="yard-load-card__meta">
-                  <span><Icon name="truck" size={14}/> {p.vehicle_registration || '—'}</span>
-                  {p.delivery_note_number && p.weighbridge_ticket_number && (
-                    <><span>·</span><span>DN {p.delivery_note_number}</span></>
-                  )}
+                  <span><Icon name="truck" size={14}/> {first.vehicle_registration || '—'}</span>
                   <span>·</span>
-                  <span>{p._total} line{p._total !== 1 ? 's' : ''}</span>
-                  {p._flagged > 0 && <><span>·</span><span style={{ color: 'var(--yard-amber)' }}><Icon name="flag" size={14}/> {p._flagged} flagged</span></>}
+                  <span>{g._total} line{g._total !== 1 ? 's' : ''} across {g.receipts.length} DNs</span>
+                  {g._flagged > 0 && <><span>·</span><span style={{ color: 'var(--yard-amber)' }}><Icon name="flag" size={14}/> {g._flagged} flagged</span></>}
                 </div>
               </div>
               <div className="yard-load-card__right">
-                {p.source_docuware_document_id && (
-                  <button
-                    type="button"
-                    className="yard-pod-btn yard-pod-btn--compact"
-                    onClick={(e) => { e.stopPropagation(); onViewPOD(p.id) }}
-                    disabled={podBusy}
-                    title="Open POD in DocuWare viewer"
-                    aria-label="View POD"
-                  >
-                    <Icon name="doc" size={16}/> {podBusy ? '…' : 'POD'}
-                  </button>
-                )}
-                {p._done > 0 && p._total > 0 && (
-                  <div className="yard-progress-ring" style={{ ['--p' as any]: Math.round((p._done/p._total)*100) }}>
-                    <div className="yard-progress-ring__inner">{p._done}/{p._total}</div>
+                {g._done > 0 && g._total > 0 && (
+                  <div className="yard-progress-ring" style={{ ['--p' as any]: Math.round((g._done/g._total)*100) }}>
+                    <div className="yard-progress-ring__inner">{g._done}/{g._total}</div>
                   </div>
                 )}
                 <Icon name="chevR" size={28}/>
@@ -775,13 +897,126 @@ function YardLoadsList({ pods, lineState, onOpen, onViewPOD, viewingPODFor }: {
             </div>
           )
         })}
-        {visible.length === 0 && (
+        {visibleGroups.length === 0 && (
           <div className="yard-empty">
             <div className="yard-empty__title">{search ? 'No matching loads' : 'Nothing in this view'}</div>
             <div className="yard-empty__sub">{search ? 'Try a different search term.' : 'Try a different tab'}</div>
             {search && <button className="btn btn-ghost btn-sm" style={{ marginTop: '0.5rem' }} onClick={() => setSearch('')}>Clear search</button>}
           </div>
         )}
+      </div>
+    </div>
+  )
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// GROUP DETAIL — shows all delivery notes for a multi-DN load side-by-side
+// ════════════════════════════════════════════════════════════════════════════
+function YardGroupedLoadDetail({ receipts, lineState, onBack, onOpenReceipt }: {
+  receipts: Receipt[]
+  lineState: LineStateMap
+  onBack: () => void
+  onOpenReceipt: (id: string) => void
+}) {
+  const first = receipts[0]
+  const loadId = first.load_id || first.weighbridge_ticket_number || first.delivery_note_number || first.receipt_number
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
+
+  const toggleSection = (id: string) => {
+    setCollapsed(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id); else next.add(id)
+      return next
+    })
+  }
+
+  return (
+    <div className="yard-page">
+      <div className="yard-detail__topbar">
+        <button className="yard-back" onClick={onBack}>
+          <Icon name="chevL" size={28}/> Loads
+        </button>
+        <span className="yard-detail__num">WB {loadId}</span>
+      </div>
+
+      <div className="yard-detail__hero">
+        <div>
+          <div className="yard-detail__customer-row">
+            <div className="yard-detail__customer">{first.customer_name || first.supplier_name || '—'}</div>
+          </div>
+          <div className="yard-detail__meta" style={{ marginTop: 4, fontSize: '0.85rem', color: 'var(--yard-muted)' }}>
+            <span><Icon name="truck" size={14}/> {first.vehicle_registration || '—'}</span>
+            <span style={{ margin: '0 6px' }}>·</span>
+            <span>{receipts.length} delivery notes</span>
+          </div>
+        </div>
+      </div>
+
+      <div style={{ padding: '0 1rem 4rem' }}>
+        {receipts.map(r => {
+          const lines = r.lines || []
+          const total = Math.max(r.line_count ?? 0, lines.length)
+          const done = lines.filter(l => l.receiving_status === 'received' || l.receiving_status === 'reviewed' || lineState[l.id]?.received).length
+          const isCollapsed = collapsed.has(r.id)
+
+          return (
+            <div key={r.id} className="yard-group-section">
+              <button
+                type="button"
+                className="yard-group-section__header"
+                onClick={() => toggleSection(r.id)}
+                aria-expanded={!isCollapsed}
+              >
+                <div className="yard-group-section__title">
+                  <span className="yard-group-section__dn">DN {r.delivery_note_number || r.receipt_number}</span>
+                  {total > 0 && (
+                    <span className="yard-group-section__progress">
+                      {done}/{total} lines
+                    </span>
+                  )}
+                </div>
+                <Icon name={isCollapsed ? 'chevR' : 'chevL'} size={20}/>
+              </button>
+
+              {!isCollapsed && (
+                <div className="yard-group-section__body">
+                  {lines.length === 0 ? (
+                    <div className="yard-group-section__empty">Lines not loaded yet</div>
+                  ) : (
+                    lines.map(l => {
+                      const st = lineState[l.id]
+                      const isReceived = st?.received || l.receiving_status === 'received' || l.receiving_status === 'reviewed'
+                      const isFlagged = isLineFlagged(l, st)
+                      return (
+                        <div key={l.id} className={'yard-group-line' + (isReceived ? ' yard-group-line--done' : '') + (isFlagged ? ' yard-group-line--flagged' : '')}>
+                          <div className="yard-group-line__num">{l.line_number}</div>
+                          <div className="yard-group-line__body">
+                            <div className="yard-group-line__desc">{l.material_description || l.description || l.item_code || '—'}</div>
+                            {(l.material_code || l.material_size || l.weight) && (
+                              <div className="yard-group-line__meta">
+                                {[l.material_code, l.material_size, l.weight ? `${l.weight} kg` : null].filter(Boolean).join(' · ')}
+                              </div>
+                            )}
+                          </div>
+                          {isReceived && <span className="yard-pill yard-pill--success" style={{ fontSize: '0.7rem', padding: '2px 6px' }}>Done</span>}
+                          {isFlagged && !isReceived && <span style={{ color: 'var(--yard-amber)' }}><Icon name="flag" size={14}/></span>}
+                        </div>
+                      )
+                    })
+                  )}
+                  <button
+                    type="button"
+                    className="yard-btn yard-btn--secondary"
+                    style={{ width: '100%', marginTop: 8 }}
+                    onClick={() => onOpenReceipt(r.id)}
+                  >
+                    Open DN {r.delivery_note_number || r.receipt_number} <Icon name="chevR" size={16}/>
+                  </button>
+                </div>
+              )}
+            </div>
+          )
+        })}
       </div>
     </div>
   )

@@ -46,6 +46,7 @@ export type Receipt = {
   purchase_order_number: string
   delivery_note_number: string
   weighbridge_ticket_number: string
+  load_id?: string
   vehicle_registration: string
   job_number: string
   status: string

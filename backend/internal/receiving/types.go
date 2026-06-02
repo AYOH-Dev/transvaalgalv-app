@@ -31,6 +31,7 @@ type Receipt struct {
 	PurchaseOrderNumber       string             `json:"purchase_order_number"`
 	DeliveryNoteNumber        string             `json:"delivery_note_number"`
 	WeighbridgeTicketNumber   string             `json:"weighbridge_ticket_number"`
+	LoadID                    string             `json:"load_id"`
 	VehicleRegistration       string             `json:"vehicle_registration"`
 	JobNumber                 string             `json:"job_number"`
 	SourceDocuWareDocument    string             `json:"source_docuware_document_id"`

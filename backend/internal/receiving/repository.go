@@ -45,6 +45,7 @@ func (r *PostgresRepository) ListReceipts(ctx context.Context, includeArchived b
 		       r.purchase_order_number,
 		       r.delivery_note_number,
 		       r.weighbridge_ticket_number,
+		       COALESCE(r.load_id, ''),
 		       r.vehicle_registration,
 		       r.job_number,
 		       r.source_docuware_document_id,
@@ -115,6 +116,7 @@ func (r *PostgresRepository) GetReceipt(ctx context.Context, id string) (Receipt
 		       purchase_order_number,
 		       delivery_note_number,
 		       weighbridge_ticket_number,
+		       COALESCE(load_id, ''),
 		       vehicle_registration,
 		       job_number,
 		       source_docuware_document_id,
@@ -238,6 +240,7 @@ func (r *PostgresRepository) CreateReceipt(ctx context.Context, imported importe
 			purchase_order_number,
 			delivery_note_number,
 			weighbridge_ticket_number,
+			load_id,
 			vehicle_registration,
 			job_number,
 			received_at,
@@ -248,7 +251,7 @@ func (r *PostgresRepository) CreateReceipt(ctx context.Context, imported importe
 			sync_status,
 			docuware_source_payload
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::uuid, $12, $13::receipt_status, $14, $15, $16::jsonb)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12::uuid, $13, $14::receipt_status, $15, $16, $17::jsonb)
 		RETURNING id::text
 	`,
 		imported.ReceiptNumber,
@@ -258,6 +261,7 @@ func (r *PostgresRepository) CreateReceipt(ctx context.Context, imported importe
 		imported.PurchaseOrderNumber,
 		imported.DeliveryNoteNumber,
 		imported.WeighbridgeTicketNumber,
+		imported.LoadID,
 		imported.VehicleRegistration,
 		imported.JobNumber,
 		imported.ReceivedAt,
@@ -345,6 +349,7 @@ func (r *PostgresRepository) upsertImportedReceipt(ctx context.Context, tx pgx.T
 			purchase_order_number,
 			delivery_note_number,
 			weighbridge_ticket_number,
+			load_id,
 			vehicle_registration,
 			job_number,
 			received_at,
@@ -359,7 +364,7 @@ func (r *PostgresRepository) upsertImportedReceipt(ctx context.Context, tx pgx.T
 			sync_status,
 			docuware_source_payload
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::receipt_status, $12, $13, $14, $15, $16, $17, NOW(), $18, $19::jsonb)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12::receipt_status, $13, $14, $15, $16, $17, $18, NOW(), $19, $20::jsonb)
 		ON CONFLICT (receipt_number) DO UPDATE SET updated_at = NOW()
 		RETURNING id::text
 	`,
@@ -370,6 +375,7 @@ func (r *PostgresRepository) upsertImportedReceipt(ctx context.Context, tx pgx.T
 		imported.PurchaseOrderNumber,
 		imported.DeliveryNoteNumber,
 		imported.WeighbridgeTicketNumber,
+		imported.LoadID,
 		imported.VehicleRegistration,
 		imported.JobNumber,
 		imported.ReceivedAt,
@@ -1203,6 +1209,7 @@ func scanReceipt(row rowScanner) (Receipt, error) {
 		&receipt.PurchaseOrderNumber,
 		&receipt.DeliveryNoteNumber,
 		&receipt.WeighbridgeTicketNumber,
+		&receipt.LoadID,
 		&receipt.VehicleRegistration,
 		&receipt.JobNumber,
 		&receipt.SourceDocuWareDocument,
@@ -1269,6 +1276,7 @@ func scanReceiptWithLineCount(row rowScanner) (Receipt, error) {
 		&receipt.PurchaseOrderNumber,
 		&receipt.DeliveryNoteNumber,
 		&receipt.WeighbridgeTicketNumber,
+		&receipt.LoadID,
 		&receipt.VehicleRegistration,
 		&receipt.JobNumber,
 		&receipt.SourceDocuWareDocument,

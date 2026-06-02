@@ -46,6 +46,7 @@ type importedReceipt struct {
 	PurchaseOrderNumber     string
 	DeliveryNoteNumber      string
 	WeighbridgeTicketNumber string
+	LoadID                  string
 	VehicleRegistration     string
 	JobNumber               string
 	SourceDocuWareDocument  string
@@ -326,6 +327,7 @@ func (s *Service) CreateGRN(ctx context.Context, input CreateGRNInput) (Receipt,
 		PurchaseOrderNumber:     orderNumber,
 		DeliveryNoteNumber:      deliveryNote,
 		WeighbridgeTicketNumber: weighbridge,
+		LoadID:                  weighbridge,
 		VehicleRegistration:     vehicleReg,
 		ReceivedAt:              deliveryDate,
 		ReceivedByUserID:        strings.TrimSpace(input.ReceivedByUserID),
@@ -919,6 +921,7 @@ func buildImportedReceipt(input DocuWareImportInput, groupReference string, payl
 		PurchaseOrderNumber:     firstNonEmpty(payloadString(payload, "ORDER_NUMBER"), payloadString(payload, "DOCUMENTNO")),
 		DeliveryNoteNumber:      firstNonEmpty(payloadString(payload, "DELIVERY_NOTE"), payloadString(payload, "DELIVERY_NOTE_NUMBER")),
 		WeighbridgeTicketNumber: payloadString(payload, "WEIGHBRIDGE_TICKET_NUMBER"),
+		LoadID:                  payloadString(payload, "WEIGHBRIDGE_TICKET_NUMBER"),
 		VehicleRegistration:     payloadString(payload, "VEHICLE_REGISTRATION"),
 		JobNumber:               payloadString(payload, "JOB_NUMBER"),
 		SourceDocuWareDocument:  sourceDocumentID,
