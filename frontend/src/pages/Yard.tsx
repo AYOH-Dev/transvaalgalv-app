@@ -921,6 +921,7 @@ function YardGroupedLoadDetail({ receipts, lineState, onBack, onOpenReceipt }: {
   const first = receipts[0]
   const loadId = first.load_id || first.weighbridge_ticket_number || first.delivery_note_number || first.receipt_number
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
+  const [search, setSearch] = useState('')
 
   const toggleSection = (id: string) => {
     setCollapsed(prev => {
@@ -928,6 +929,13 @@ function YardGroupedLoadDetail({ receipts, lineState, onBack, onOpenReceipt }: {
       if (next.has(id)) next.delete(id); else next.add(id)
       return next
     })
+  }
+
+  const q = search.trim().toLowerCase()
+  const lineMatches = (l: ReceiptLine) => {
+    if (!q) return true
+    return [l.item_code, l.description, l.material_description, l.material_size, l.material_markings, String(l.line_number)]
+      .filter(Boolean).join(' ').toLowerCase().includes(q)
   }
 
   return (
@@ -952,30 +960,53 @@ function YardGroupedLoadDetail({ receipts, lineState, onBack, onOpenReceipt }: {
         </div>
       </div>
 
+      <div className="yard-search" style={{ margin: '0 1rem 12px' }}>
+        <svg className="yard-search__icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+        </svg>
+        <input
+          type="search"
+          className="yard-search__input"
+          placeholder="Search lines across all delivery notes…"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          aria-label="Search lines"
+        />
+        {search && (
+          <button type="button" className="yard-search__clear" onClick={() => setSearch('')} aria-label="Clear search">
+            <Icon name="close" size={14}/>
+          </button>
+        )}
+      </div>
+
       <div style={{ padding: '0 1rem 4rem' }}>
         {receipts.map(r => {
           const lines = r.lines || []
           const total = Math.max(r.line_count ?? 0, lines.length)
           const done = lines.filter(l => l.receiving_status === 'received' || l.receiving_status === 'reviewed' || lineState[l.id]?.received).length
-          const isCollapsed = collapsed.has(r.id)
+          const filteredLines = lines.filter(lineMatches)
+          // When searching, skip sections with no matches
+          if (q && filteredLines.length === 0) return null
+          // When searching, force-expand sections with matches
+          const isCollapsed = q ? false : collapsed.has(r.id)
 
           return (
             <div key={r.id} className="yard-group-section">
               <button
                 type="button"
                 className="yard-group-section__header"
-                onClick={() => toggleSection(r.id)}
+                onClick={() => { if (!q) toggleSection(r.id) }}
                 aria-expanded={!isCollapsed}
               >
                 <div className="yard-group-section__title">
                   <span className="yard-group-section__dn">DN {r.delivery_note_number || r.receipt_number}</span>
                   {total > 0 && (
                     <span className="yard-group-section__progress">
-                      {done}/{total} lines
+                      {q ? `${filteredLines.length} match${filteredLines.length !== 1 ? 'es' : ''}` : `${done}/${total} lines`}
                     </span>
                   )}
                 </div>
-                <Icon name={isCollapsed ? 'chevR' : 'chevL'} size={20}/>
+                {!q && <Icon name={isCollapsed ? 'chevR' : 'chevL'} size={20}/>}
               </button>
 
               {!isCollapsed && (
@@ -983,7 +1014,7 @@ function YardGroupedLoadDetail({ receipts, lineState, onBack, onOpenReceipt }: {
                   {lines.length === 0 ? (
                     <div className="yard-group-section__empty">Lines not loaded yet</div>
                   ) : (
-                    lines.map(l => {
+                    filteredLines.map(l => {
                       const st = lineState[l.id]
                       const isReceived = st?.received || l.receiving_status === 'received' || l.receiving_status === 'reviewed'
                       const isFlagged = isLineFlagged(l, st)
